@@ -994,11 +994,11 @@ static inline int countpairs_fallback_DOUBLE(const int64_t N0, DOUBLE *x0, DOUBL
     weight_func_t_DOUBLE weight_func = NULL;
     if(need_weightavg){
         // Same particle list, new copy of num_weights pointers into that list
+        //copy_weight_struct_DOUBLE(&local_w0, weights0);
+        //copy_weight_struct_DOUBLE(&local_w1, weights1);
         local_w0 = *weights0;
         local_w1 = *weights1;
-
-        pair.num_weights = local_w0.num_weights;
-
+        set_pair_struct_DOUBLE(&pair, &local_w0, &local_w1);
         weight_func = get_weight_func_by_method_DOUBLE(weight_method);
     }
 

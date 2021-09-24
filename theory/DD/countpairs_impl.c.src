@@ -605,6 +605,7 @@ int countpairs_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z1,
                 // Keep in mind this is an autocorrelation (i.e. only one particle set to consider)
                 weight_func_t_DOUBLE weight_func = get_weight_func_by_method_DOUBLE(extra->weight_method);
                 pair_struct_DOUBLE pair = {.num_weights = extra->weights0.num_weights,
+                                           .num_integer_weights = extra->weights0.num_integer_weights,
                                            .dx.d=0., .dy.d=0., .dz.d=0.,  // always 0 separation
                                            .parx.d=0., .pary.d=0., .parz.d=0.};
                 for(int64_t j = 0; j < ND1; j++){

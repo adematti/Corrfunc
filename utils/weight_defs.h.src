@@ -6,5 +6,13 @@
 typedef struct
 {
     DOUBLE *weights[MAX_NUM_WEIGHTS];  // This will be of shape weights[num_weights][num_particles]
-    int64_t num_weights;
+    uint8_t num_weights;
+    uint8_t num_integer_weights;
 } weight_struct_DOUBLE;
+
+
+static inline void copy_weight_struct_DOUBLE(weight_struct_DOUBLE *weight_st0, const weight_struct_DOUBLE *weight_st1) {
+    weight_st0->num_weights = weight_st1->num_weights;
+    weight_st0->num_integer_weights = weight_st1->num_integer_weights;
+    //weight_st0->weights = weight_st1->weights;
+}

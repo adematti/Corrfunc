@@ -227,9 +227,12 @@ def DD(autocorr, nthreads, binfile, X1, Y1, Z1, weights1=None, periodic=True,
     weights1, weights2 = process_weights(weights1, weights2, X1, X2, weight_type, autocorr)
 
     # Ensure all input arrays are native endian
-    X1, Y1, Z1, weights1, X2, Y2, Z2, weights2 = [
+    X1, Y1, Z1, X2, Y2, Z2 = [
             convert_to_native_endian(arr, warn=True) for arr in
-            [X1, Y1, Z1, weights1, X2, Y2, Z2, weights2]]
+            [X1, Y1, Z1, X2, Y2, Z2]]
+    if weight_type is not None:
+        weights1 = [convert_to_native_endian(arr, warn=True) for arr in weights1]
+        weights2 = [convert_to_native_endian(arr, warn=True) for arr in weights2]
 
     # Passing None parameters breaks the parsing code, so avoid this
     kwargs = {}

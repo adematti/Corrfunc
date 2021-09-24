@@ -548,11 +548,11 @@ def translate_bin_type_string_to_enum(bin_type):
     except NameError:
         if not isinstance(bin_type, str):
             raise TypeError(msg)
-    valid_bin_types = ['AUTO', 'CUSTOM', 'LIN']
+    valid_bin_type = ['AUTO', 'CUSTOM', 'LIN']
     bin_type_upper = bin_type.upper()
-    if bin_type_upper not in valid_bin_types:
+    if bin_type_upper not in valid_bin_type:
         msg = "Desired bin type = {0} is not in the list of valid "\
-              "bin types = {1}".format(bin_type, valid_bin_types)
+              "bin types = {1}".format(bin_type, valid_bin_type)
         raise ValueError(msg)
 
     enums = {'AUTO': 0,
@@ -1034,26 +1034,25 @@ def process_weights(weights1, weights2, X1, X2, weight_type, autocorr):
 
     # Takes a scalar, 1d, or 2d weights array
     # and returns a 2d array of shape (nweights,npart)
-    def prep(w,x):
-        if w is None:
-            return w
+    def prep(weights, x):
+        if weights is None:
+            return weights
 
-        # not None, so probably float or numpy array
-        if isinstance(w, float):
-            # Use the particle dtype if a Python float was given
-            w = np.array(w, dtype=x.dtype)
+        if not isinstance(weights, (tuple,list)):
+            if isinstance(weights, np.ndarray) and weights.ndim == 2:
+                weights = list(weights)
+            else:
+                weights = [weights]
 
-        w = np.atleast_1d(w)  # could have been numpy scalar
+        toret = []
+        for w in weights:
+            w = np.asarray(w)
+            w.shape = (-1,)
+            if w.shape[-1] == 1:
+                w = np.tile(w, len(x))
+            toret.append(w)
 
-        # If only one particle's weight(s) were given,
-        # assume it applies to all particles
-        if w.shape[-1] == 1:
-            w = np.tile(w, len(x))
-
-        # now of shape (nweights,nparticles)
-        w = np.atleast_2d(w)
-
-        return w
+        return toret
 
     weights1 = prep(weights1, X1)
 
@@ -1067,10 +1066,10 @@ def process_weights(weights1, weights2, X1, X2, weight_type, autocorr):
                                  "both weight arrays.")
 
         if weights1 is None and weights2 is not None:
-            weights1 = np.ones((len(weights2),len(X1)), dtype=X1.dtype)
+            weights1 = [np.ones_like(X1) for w in weights2]
 
         if weights2 is None and weights1 is not None:
-            weights2 = np.ones((len(weights1),len(X2)), dtype=X2.dtype)
+            weights2 = [np.ones_like(X2) for w in weights1]
 
     return weights1, weights2
 

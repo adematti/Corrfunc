@@ -348,29 +348,89 @@ static inline struct config_options get_config_options(void)
 
 #define MAX_NUM_WEIGHTS 10
 
+typedef enum {
+    FLOAT_TYPE,
+    INT_TYPE
+} weight_type_t;
+
 typedef struct
 {
-    void *weights[MAX_NUM_WEIGHTS];  // This will be of shape weights[num_weights][num_particles]
-    int64_t num_weights;
+    char *weights[MAX_NUM_WEIGHTS];  // This will be of shape weights[num_weights][num_particles]
+    uint8_t num_weights;
+    uint8_t num_integer_weights;
 } weight_struct;
 
 typedef enum {
   NONE=-42, /* default */
   PAIR_PRODUCT=0,
+  INVERSE_BITWISE=1,
   NUM_WEIGHT_TYPE
 } weight_method_t; // type of weighting to apply
 
 /* Gives the number of weight arrays required by the given weighting method
- */
-static inline int get_num_weights_by_method(const weight_method_t method){
-    switch(method){
-        case PAIR_PRODUCT:
-            return 1;
-        default:
-        case NONE:
-            return 0;
+*/
+
+
+static inline int set_weight_struct(weight_struct* weight_st, const weight_method_t method, const weight_type_t* type, const int8_t num_weights) {
+    // index is 0 (first weights) or 1 (second weights)
+    weight_st->num_weights = num_weights;
+    if (num_weights < 0) {
+        switch (method) {
+            case PAIR_PRODUCT:
+                weight_st->num_weights = 1;
+                break;
+            case INVERSE_BITWISE:
+                weight_st->num_weights = 1;
+                break;
+            default:
+                weight_st->num_weights = 0;
+        }
     }
+    char itemtype[MAX_NUM_WEIGHTS];
+    for (int w=0; w<weight_st->num_weights; w++) {
+        if (type == NULL) {
+            switch (method) {
+                case INVERSE_BITWISE:
+                    itemtype[w] = INT_TYPE;
+                    break;
+                default:
+                    itemtype[w] = FLOAT_TYPE;
+            }
+        }
+        else {
+            itemtype[w] = type[w];
+        }
+        switch (method) {
+            case PAIR_PRODUCT:
+                if (itemtype[w] == INT_TYPE) {
+                    fprintf(stderr,"Error: pair_product weights only supports floating weights\n");
+                    return EXIT_FAILURE;
+                }
+                break;
+            default:
+              break;
+        }
+    }
+    // check weights are first ints, then (optionally) float
+    weight_st->num_integer_weights = 0;
+    if (method == INVERSE_BITWISE) {
+        int first_float = 0;
+        for (int w=0; w<weight_st->num_weights; w++) {
+            if (itemtype[w] == INT_TYPE) {
+                if (first_float) {
+                    fprintf(stderr,"Error: inverse_bitwise weights should first include integer weights, then float weights\n");
+                    return EXIT_FAILURE;
+                }
+                weight_st->num_integer_weights++;
+            } else {
+                first_float = w;
+            }
+        }
+    }
+    printf("Found %d integer weights among %d weights.\n",weight_st->num_integer_weights,weight_st->num_weights);
+    return EXIT_SUCCESS;
 }
+
 
 /* Maps a name to weighting method
    `method` will be set on return.
@@ -386,9 +446,14 @@ static inline int get_weight_method_by_name(const char *name, weight_method_t *m
         *method = PAIR_PRODUCT;
         return EXIT_SUCCESS;
     }
+    if(strcmp(name, "inverse_bitwise") == 0){
+        *method = INVERSE_BITWISE;
+        return EXIT_SUCCESS;
+    }
 
     return EXIT_FAILURE;
 }
+
 
 struct extra_options
 {
@@ -408,10 +473,8 @@ static inline struct extra_options get_extra_options(const weight_method_t weigh
 
     extra.weight_method = weight_method;
 
-    weight_struct *w0 = &(extra.weights0);
-    weight_struct *w1 = &(extra.weights1);
-    w0->num_weights = get_num_weights_by_method(extra.weight_method);
-    w1->num_weights = w0->num_weights;
+    set_weight_struct(&(extra.weights0), weight_method, NULL, -1);
+    set_weight_struct(&(extra.weights1), weight_method, NULL, -1);
 
     return extra;
 }

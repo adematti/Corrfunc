@@ -30,7 +30,7 @@ extern "C" {
 #endif
 
 #ifdef __AVX__
-    
+
 #define REGISTER_WIDTH 256  //cpu supports avx instructions
 #define NVECF  8  //8 floats per ymm register
 #define NVECD  4  //4 doubles per ymm register
@@ -38,7 +38,7 @@ extern "C" {
 #else
 
 #ifdef __SSE4_2__
-    
+
 #define REGISTER_WIDTH 128  //cpu supports sse instructions
 #define NVECF  4  //8 floats per xmm register
 #define NVECD  2  //4 doubles per xmm register
@@ -54,7 +54,7 @@ extern "C" {
 
 
 #include <float.h>
-    
+
 #ifdef DOUBLE_PREC
 #define DOUBLE double
 #define REAL_FORMAT "lf"
@@ -89,6 +89,24 @@ extern "C" {
 #define POW    powf
 #define ABS    fabsf
 #define MAX_POSITIVE_FLOAT FLT_MAX
+#endif
+
+#include <inttypes.h>
+
+#ifdef DOUBLE_PREC
+#define LONG   uint64_t
+#if defined(__GNUC__) || defined(__GNUG__)
+#define POPCOUNT(X) __builtin_popcount(X)
+#else
+#define POPCOUNT(X) _popcnt32(X)
+#endif
+#else
+#define LONG   uint32_t
+#if defined(__GNUC__) || defined(__GNUG__)
+#define POPCOUNT(X) __builtin_popcountll(X)
+#else
+#define POPCOUNT(X) _popcnt64(X)
+#endif
 #endif
 
 #ifdef __cplusplus

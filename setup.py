@@ -453,7 +453,7 @@ def setup_packages():
 
     # create a list of the python extensions
     python_dirs = ["theory/python_bindings",
-                   "mocks/python_bindings"]
+                   "mocks/python_bindings"][:1]
     extensions = generate_extensions(python_dirs)
 
     # check requirement for extensions and set the compiler if specified

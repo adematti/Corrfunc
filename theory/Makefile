@@ -6,7 +6,7 @@ PYTHON_EXT_DIR:=
 ifneq ($(COMPILE_PYTHON_EXT), 0)
   PYTHON_EXT_DIR:=python_bindings
 else
-  $(warning $(ccmagenta) Not compiling C extensions for mocks. Either python or numpy not available $(ccreset))
+  $(warning $(ccmagenta) Not compiling C extensions for theory. Either python or numpy not available $(ccreset))
 endif
 
 TARGETS:=DD DDrppi DDsmu wp xi vpf examples $(PYTHON_EXT_DIR)
