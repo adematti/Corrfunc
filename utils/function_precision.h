@@ -19,6 +19,7 @@ extern "C" {
 
 #define PI_OVER_180       0.017453292519943295769236907684886127134428718885417254560971
 #define INV_PI_OVER_180   57.29577951308232087679815481410517033240547246656432154916024
+#define CLAMP(x, low, high)  (((x) > (high)) ? (high) : (((x) < (low)) ? (low) : (x))) //min(max(a,low),high)
 
 //Define the Macros
 #ifdef DOUBLE_PREC
