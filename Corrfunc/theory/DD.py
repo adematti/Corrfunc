@@ -18,7 +18,8 @@ def DD(autocorr, nthreads, binfile, X1, Y1, Z1, weights1=None, periodic=True,
        output_ravg=False, xbin_refine_factor=2, ybin_refine_factor=2,
        zbin_refine_factor=1, max_cells_per_dim=100,
        copy_particles=True, enable_min_sep_opt=True,
-       c_api_timer=False, isa='fastest', weight_type=None, bin_type='custom'):
+       c_api_timer=False, isa='fastest', weight_type=None, bin_type='custom',
+       costheta_weight=None, costheta_min=0.0, costheta_max=None):
     """
     Calculate the 3-D pair-counts corresponding to the real-space correlation
     function, :math:`\\xi(r)`.
@@ -138,7 +139,7 @@ def DD(autocorr, nthreads, binfile, X1, Y1, Z1, weights1=None, periodic=True,
         into an ``enum`` for the instruction set defined in ``utils/defs.h``.
 
     weight_type: string, optional. Default: None.
-        The type of weighting to apply.  One of ["pair_product", None].
+        The type of weighting to apply.  One of ["pair_product", "inverse_bitwise", None].
 
     bin_type : string, case-insensitive (default ``custom``)
         Set to ``lin`` for speed-up in case of linearly-spaced bins.
@@ -152,6 +153,16 @@ def DD(autocorr, nthreads, binfile, X1, Y1, Z1, weights1=None, periodic=True,
         within ``rtol = 1e-05`` (relative tolerance) *and* ``atol = 1e-08``
         (absolute tolerance) of the array
         ``np.linspace(binfile[0], binfile[-1], len(binfile))``.
+
+    costheta_weight : array-like, optional. Default: None.
+        Array of angular weights as a function of linearly-spaced cosine
+        of angular separation.
+
+    costheta_min : float, optional. Default: 0.
+        Min cosine of angular separation.
+
+    costheta_max : float, optional. Default: None.
+        Max cosine of angular separation.
 
     Returns
     --------
@@ -245,7 +256,8 @@ def DD(autocorr, nthreads, binfile, X1, Y1, Z1, weights1=None, periodic=True,
     # Passing None parameters breaks the parsing code, so avoid this
     kwargs = {}
     for k in ['weights1', 'weights2', 'weight_type',
-              'X2', 'Y2', 'Z2', 'boxsize']:
+              'X2', 'Y2', 'Z2', 'boxsize',
+              'costheta_weight', 'costheta_min', 'costheta_max']:
         v = locals()[k]
         if v is not None:
             kwargs[k] = v

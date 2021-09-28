@@ -11,8 +11,10 @@ typedef struct
 } weight_struct_DOUBLE;
 
 
-static inline void copy_weight_struct_DOUBLE(weight_struct_DOUBLE *weight_st0, const weight_struct_DOUBLE *weight_st1) {
-    weight_st0->num_weights = weight_st1->num_weights;
-    weight_st0->num_integer_weights = weight_st1->num_integer_weights;
-    //weight_st0->weights = weight_st1->weights;
-}
+typedef struct
+{
+    DOUBLE *array;
+    int num;
+    DOUBLE min;
+    DOUBLE invstep;
+} tab_weight_struct_DOUBLE;
