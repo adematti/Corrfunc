@@ -33,7 +33,6 @@ static inline int countpairs_avx512_intrinsics_DOUBLE(const int64_t N0, DOUBLE *
                                                       DOUBLE *src_weightavg, const weight_method_t weight_method, const tab_weight_struct tab_weight,
                                                       const bin_type_t bin_type)
 {
-    (void) sqr_rpmax, (void) sqr_rpmin;
 
 #ifdef COUNT_VECTORIZED
     struct timespec tcell_start;
@@ -51,7 +50,7 @@ static inline int countpairs_avx512_intrinsics_DOUBLE(const int64_t N0, DOUBLE *
     }
     const int32_t need_rpavg = src_rpavg != NULL;
     const int32_t need_weightavg = src_weightavg != NULL;
-    const DOUBLE sqr_rpmin=rpmin*rpmin, sqr_rpmax=rpmax*rpmax;
+    const DOUBLE sqr_rpmax=rpmax*rpmax;
     AVX512_FLOATS m_inv_rpstep = AVX512_SETZERO_FLOAT();
     AVX512_FLOATS m_rpmin_invstep = AVX512_SETZERO_FLOAT();
     if (bin_type == BIN_LIN) {

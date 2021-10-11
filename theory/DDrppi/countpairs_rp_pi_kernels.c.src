@@ -32,7 +32,7 @@ static inline int countpairs_rp_pi_avx512_intrinsics_DOUBLE(const int64_t N0, DO
                                                             DOUBLE *src_rpavg, uint64_t *src_npairs,
                                                             DOUBLE *src_weightavg, const weight_method_t weight_method, const bin_type_t bin_type)
 {
-    (void) sqr_rpmin;
+
     if(N0 == 0 || N1 == 0) {
         return EXIT_SUCCESS;
     }
@@ -43,7 +43,7 @@ static inline int countpairs_rp_pi_avx512_intrinsics_DOUBLE(const int64_t N0, DO
 
     const int32_t need_rpavg = src_rpavg != NULL;
     const int32_t need_weightavg = src_weightavg != NULL;
-    const DOUBLE sqr_rpmin=rpmin*rpmin, sqr_rpmax=rpmax*rpmax;
+    const DOUBLE sqr_rpmax=rpmax*rpmax;
     AVX512_FLOATS m_inv_rpstep = AVX512_SETZERO_FLOAT();
     AVX512_FLOATS m_rpmin_invstep = AVX512_SETZERO_FLOAT();
     if (bin_type == BIN_LIN) {
