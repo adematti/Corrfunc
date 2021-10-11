@@ -139,7 +139,7 @@ def DD(autocorr, nthreads, binfile, X1, Y1, Z1, weights1=None, periodic=True,
         into an ``enum`` for the instruction set defined in ``utils/defs.h``.
 
     weight_type: string, optional. Default: None.
-        The type of weighting to apply.  One of ["pair_product", "inverse_bitwise", None].
+        The type of weighting to apply. One of ["pair_product", "inverse_bitwise", None].
 
     bin_type : string, case-insensitive (default ``custom``)
         Set to ``lin`` for speed-up in case of linearly-spaced bins.
