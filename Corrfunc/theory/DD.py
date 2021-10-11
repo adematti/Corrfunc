@@ -19,7 +19,7 @@ def DD(autocorr, nthreads, binfile, X1, Y1, Z1, weights1=None, periodic=True,
        zbin_refine_factor=1, max_cells_per_dim=100,
        copy_particles=True, enable_min_sep_opt=True,
        c_api_timer=False, isa='fastest', weight_type=None, bin_type='custom',
-       costheta_weight=None, costheta_min=0.0, costheta_max=None):
+       pair_weights=None, sep_pair_weights=None):
     """
     Calculate the 3-D pair-counts corresponding to the real-space correlation
     function, :math:`\\xi(r)`.
@@ -157,15 +157,11 @@ def DD(autocorr, nthreads, binfile, X1, Y1, Z1, weights1=None, periodic=True,
         ``rtol = 1e-05`` *and* ``atol = 1e-08`` (relative and absolute tolerance)
         of ``np.linspace(binfile[0], binfile[-1], len(binfile))``.
 
-    costheta_weight : array-like, optional. Default: None.
-        Array of angular weights as a function of linearly-spaced cosine
-        of angular separation.
+    pair_weights : array-like, optional. Default: None.
+        Array of pair weights.
 
-    costheta_min : float, optional. Default: 0.
-        Min cosine of angular separation.
-
-    costheta_max : float, optional. Default: None.
-        Max cosine of angular separation.
+    sep_pair_weights : array-like, optional. Default: None.
+        Array of separations corresponding to ``pair_weights``.
 
     Returns
     --------
@@ -256,11 +252,15 @@ def DD(autocorr, nthreads, binfile, X1, Y1, Z1, weights1=None, periodic=True,
         weights1 = [convert_to_native_endian(arr, warn=True) for arr in weights1]
         weights2 = [convert_to_native_endian(arr, warn=True) for arr in weights2]
 
+    if pair_weights is not None:
+        pair_weights = convert_to_native_endian(pair_weights, warn=True)
+        sep_pair_weights = convert_to_native_endian(sep_pair_weights, warn=True)
+
     # Passing None parameters breaks the parsing code, so avoid this
     kwargs = {}
     for k in ['weights1', 'weights2', 'weight_type',
               'X2', 'Y2', 'Z2', 'boxsize',
-              'costheta_weight', 'costheta_min', 'costheta_max']:
+              'pair_weights', 'sep_pair_weights']:
         v = locals()[k]
         if v is not None:
             kwargs[k] = v

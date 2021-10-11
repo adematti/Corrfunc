@@ -1197,47 +1197,58 @@ finally:
     return status;
 }
 
-static int check_tab_weight(PyObject *module, tab_weight_struct *tab_weight_st, PyObject *array_obj, const double sepmin, const double sepmax, size_t element_size)
+static int check_pair_weight(PyObject *module, pair_weight_struct *pair_weight_st, PyObject *sep_obj, PyObject *weight_obj, size_t element_size)
 {
     int status = EXIT_SUCCESS;
     char msg[1024];
     const int requirements = NPY_ARRAY_IN_ARRAY;
-    PyArrayObject *array = (PyArrayObject *) PyArray_FromArray((PyArrayObject *) array_obj, NOTYPE_DESCR, requirements);
-    if (array == NULL) {
-        snprintf(msg, 1024, "TypeError: Could not convert input tab weight to array. Are you passing numpy array?\n");
-        goto except;
-    }
-    const int ndims = PyArray_NDIM(array);
-    if (ndims != 1) {
-        snprintf(msg, 1024, "ERROR: Expected 1-D numpy arrays.\nFound ndims = %d instead.\n", ndims);
-        goto except;
-    }
-    const int array_type = PyArray_TYPE(array);
-    switch (array_type) {
-        case NPY_FLOAT:
-            if (element_size != sizeof(float)) {
-                snprintf(msg, 1024, "ERROR: Input coordinates are float32 but provided tab weight is float64. Please use the same size.\n");
-                goto except;
-            }
-            break;
-        case NPY_DOUBLE:
-            if (element_size != sizeof(double)) {
-                snprintf(msg, 1024, "ERROR: Input coordinates are float64 but provided tab weight is float32. Please use the same size.\n");
-                goto except;
-            }
-            break;
-        default:
-            snprintf(msg, 1024, "TypeError: Expected floating array for tab weight. Instead found type-num %d.\n", array_type);
+    PyArrayObject *sep = (PyArrayObject *) PyArray_FromArray((PyArrayObject *) sep_obj, NOTYPE_DESCR, requirements);
+    PyArrayObject *weight = (PyArrayObject *) PyArray_FromArray((PyArrayObject *) weight_obj, NOTYPE_DESCR, requirements);
+    PyArrayObject *arrays[2] = {sep, weight};
+    for (int ii=0; ii<2; ii++) {
+        PyArrayObject *array = arrays[ii];
+        if (array == NULL) {
+            snprintf(msg, 1024, "TypeError: Could not convert input pair weight to array. Are you passing numpy array?\n");
             goto except;
+        }
+        const int ndims = PyArray_NDIM(array);
+        if (ndims != 1) {
+            snprintf(msg, 1024, "ERROR: Expected 1-D numpy arrays.\nFound ndims = %d instead.\n", ndims);
+            goto except;
+        }
+        const int array_type = PyArray_TYPE(array);
+        switch (array_type) {
+            case NPY_FLOAT:
+                if (element_size != sizeof(float)) {
+                    snprintf(msg, 1024, "ERROR: Input coordinates are float32 but provided pair weight is float64. Please use the same size.\n");
+                    goto except;
+                }
+                break;
+            case NPY_DOUBLE:
+                if (element_size != sizeof(double)) {
+                    snprintf(msg, 1024, "ERROR: Input coordinates are float64 but provided pair weight is float32. Please use the same size.\n");
+                    goto except;
+                }
+                break;
+            default:
+                snprintf(msg, 1024, "TypeError: Expected floating array for pair weight. Instead found type-num %d.\n", array_type);
+                goto except;
+        }
     }
-    const int num = (int64_t) PyArray_SIZE((PyArrayObject *) array);
-    set_tab_weight_struct(tab_weight_st, (void *) PyArray_DATA(array), num, sepmin, sepmax);
+    const int num = (int) PyArray_SIZE((PyArrayObject *) sep);
+    const int num_weight = (int) PyArray_SIZE((PyArrayObject *) weight);
+    if (num_weight != num) {
+        snprintf(msg, 1024, "ERROR: Expected pair weight array and separation array to be of same size.\nFound %d and %d instead.\n", num_weight, num);
+        goto except;
+    }
+    set_pair_weight_struct(pair_weight_st, (void *) PyArray_DATA(sep), (void *) PyArray_DATA(weight), num);
     goto finally;
 except:
     countpairs_error_out(module, msg);
     return EXIT_FAILURE;
 finally:
-    Py_XDECREF(array);
+    Py_XDECREF(sep);
+    Py_XDECREF(weight);
     return status;
 }
 
@@ -1259,8 +1270,7 @@ static PyObject *countpairs_countpairs(PyObject *self, PyObject *args, PyObject 
     int nthreads=4;
     char *binfile, *weighting_method_str = NULL;
 
-    PyObject *costheta_weight_obj=NULL;
-    double costheta_min=0, costheta_max=0;
+    PyObject *pair_weight_obj=NULL, *sep_pair_weight_obj=NULL;
 
     struct config_options options = get_config_options();
     options.verbose = 0;
@@ -1300,15 +1310,14 @@ static PyObject *countpairs_countpairs(PyObject *self, PyObject *args, PyObject 
         "c_api_timer",
         "isa",/* instruction set to use of type enum isa; valid values are AVX512F, AVX, SSE, FALLBACK */
         "weight_type",
-        "costheta_weight",
-        "costheta_min",
-        "costheta_max",
+        "pair_weights",
+        "sep_pair_weights",
         "bin_type",
         NULL
     };
 
     // Note: type 'O!' doesn't allow for None to be passed, which we might want to do.
-    if ( ! PyArg_ParseTupleAndKeywords(args, kwargs, "iisO!O!O!|OO!O!O!ObbdbbbbhbbbisO!ddI", kwlist,
+    if ( ! PyArg_ParseTupleAndKeywords(args, kwargs, "iisO!O!O!|OO!O!O!ObbdbbbbhbbbisO!O!I", kwlist,
                                        &autocorr,&nthreads,&binfile,
                                        &PyArray_Type,&x1_obj,
                                        &PyArray_Type,&y1_obj,
@@ -1329,9 +1338,8 @@ static PyObject *countpairs_countpairs(PyObject *self, PyObject *args, PyObject 
                                        &(options.c_api_timer),
                                        &(options.instruction_set),
                                        &weighting_method_str,
-                                       &PyArray_Type,&costheta_weight_obj,
-                                       &costheta_min,
-                                       &costheta_max,
+                                       &PyArray_Type,&pair_weight_obj,
+                                       &PyArray_Type,&sep_pair_weight_obj,
                                        &(options.bin_type))
 
          ) {
@@ -1505,7 +1513,7 @@ static PyObject *countpairs_countpairs(PyObject *self, PyObject *args, PyObject 
         }*/
         if (weights2_obj != NULL) wstatus = check_weights(module, weights2_obj, &(extra.weights1), extra.weight_method, ND2, element_size);
     }
-    if (costheta_weight_obj != NULL) wstatus = check_tab_weight(module, &(extra.tab_weight), costheta_weight_obj, costheta_min, costheta_max, element_size);
+    if (pair_weight_obj != NULL) wstatus = check_pair_weight(module, &(extra.pair_weight), sep_pair_weight_obj, pair_weight_obj, element_size);
 
     /* Pack the weights into extra_options */
     /*for(int64_t w = 0; w < extra.weights0.num_weights; w++){

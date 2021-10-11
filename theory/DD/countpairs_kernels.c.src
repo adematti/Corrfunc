@@ -30,7 +30,7 @@ static inline int countpairs_avx512_intrinsics_DOUBLE(const int64_t N0, DOUBLE *
                                                       const DOUBLE min_xdiff, const DOUBLE min_ydiff, const DOUBLE min_zdiff,
                                                       const DOUBLE closest_icell_xpos, const DOUBLE closest_icell_ypos, const DOUBLE closest_icell_zpos,
                                                       DOUBLE *src_rpavg, uint64_t *src_npairs,
-                                                      DOUBLE *src_weightavg, const weight_method_t weight_method, const tab_weight_struct tab_weight,
+                                                      DOUBLE *src_weightavg, const weight_method_t weight_method, const pair_weight_struct pair_weight,
                                                       const bin_type_t bin_type)
 {
 
@@ -307,7 +307,7 @@ static inline int countpairs_avx_intrinsics_DOUBLE(const int64_t N0, DOUBLE *x0,
                                                    const DOUBLE min_xdiff, const DOUBLE min_ydiff, const DOUBLE min_zdiff,
                                                    const DOUBLE closest_icell_xpos, const DOUBLE closest_icell_ypos, const DOUBLE closest_icell_zpos,
                                                    DOUBLE *src_rpavg, uint64_t *src_npairs,
-                                                   DOUBLE *src_weightavg, const weight_method_t weight_method, const tab_weight_struct tab_weight,
+                                                   DOUBLE *src_weightavg, const weight_method_t weight_method, const pair_weight_struct pair_weight,
                                                    const bin_type_t bin_type)
 {
     const int32_t need_rpavg = src_rpavg != NULL;
@@ -645,7 +645,7 @@ static inline int countpairs_sse_intrinsics_DOUBLE(const int64_t N0, DOUBLE *x0,
                                                    const DOUBLE min_xdiff, const DOUBLE min_ydiff, const DOUBLE min_zdiff,
                                                    const DOUBLE closest_icell_xpos, const DOUBLE closest_icell_ypos, const DOUBLE closest_icell_zpos,
                                                    DOUBLE *src_rpavg, uint64_t *src_npairs,
-                                                   DOUBLE *src_weightavg, const weight_method_t weight_method, const tab_weight_struct tab_weight,
+                                                   DOUBLE *src_weightavg, const weight_method_t weight_method, const pair_weight_struct pair_weight,
                                                    const bin_type_t bin_type)
 {
   uint64_t npairs[nbin];
@@ -949,7 +949,7 @@ static inline int countpairs_fallback_DOUBLE(const int64_t N0, DOUBLE *x0, DOUBL
                                              const DOUBLE min_xdiff, const DOUBLE min_ydiff, const DOUBLE min_zdiff,
                                              const DOUBLE closest_icell_xpos, const DOUBLE closest_icell_ypos, const DOUBLE closest_icell_zpos,
                                              DOUBLE *src_rpavg, uint64_t *src_npairs,
-                                             DOUBLE *src_weightavg, const weight_method_t weight_method, const tab_weight_struct tab_weight,
+                                             DOUBLE *src_weightavg, const weight_method_t weight_method, const pair_weight_struct pair_weight,
                                              const bin_type_t bin_type)
 {
     /*----------------- FALLBACK CODE --------------------*/
@@ -988,8 +988,8 @@ static inline int countpairs_fallback_DOUBLE(const int64_t N0, DOUBLE *x0, DOUBL
         //copy_weight_struct_DOUBLE(&local_w1, weights1);
         local_w0 = *weights0;
         local_w1 = *weights1;
-        set_pair_struct_DOUBLE(&pair, &local_w0, &local_w1, &tab_weight);
-        need_costheta = tab_weight.num;
+        set_pair_struct_DOUBLE(&pair, &local_w0, &local_w1, &pair_weight);
+        need_costheta = pair_weight.num;
         weight_func = get_weight_func_by_method_DOUBLE(weight_method);
     }
     DOUBLE *norm1 = NULL;

@@ -13,8 +13,7 @@ typedef struct
 
 typedef struct
 {
-    DOUBLE *array;
+    DOUBLE *weight;
+    DOUBLE *sep;
     int num;
-    DOUBLE min;
-    DOUBLE invstep;
-} tab_weight_struct_DOUBLE;
+} pair_weight_struct_DOUBLE;

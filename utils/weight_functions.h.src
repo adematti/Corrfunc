@@ -49,7 +49,7 @@ typedef struct
 
     // Add for angular weights
     weight_union_DOUBLE costheta;
-    tab_weight_struct_DOUBLE tab_weight;
+    pair_weight_struct_DOUBLE pair_weight;
 
     uint8_t num_weights;
     uint8_t num_integer_weights;
@@ -57,13 +57,12 @@ typedef struct
 
 
 // set pair_struct_DOUBLE from two weight_struct_DOUBLE
-static inline int set_pair_struct_DOUBLE(pair_struct_DOUBLE *pair, weight_struct_DOUBLE *local_w0, weight_struct_DOUBLE *local_w1, tab_weight_struct *tab_w) {
+static inline int set_pair_struct_DOUBLE(pair_struct_DOUBLE *pair, const weight_struct_DOUBLE *local_w0, const weight_struct_DOUBLE *local_w1, const pair_weight_struct *pair_w) {
     pair->num_weights = local_w0->num_weights;
     pair->num_integer_weights = local_w0->num_integer_weights;
-    pair->tab_weight.array = tab_w->array;
-    pair->tab_weight.num = tab_w->num;
-    pair->tab_weight.min = tab_w->min;
-    pair->tab_weight.invstep = tab_w->invstep;
+    pair->pair_weight.weight = pair_w->weight;
+    pair->pair_weight.sep = pair_w->sep;
+    pair->pair_weight.num = pair_w->num;
     return EXIT_SUCCESS;
 }
 
@@ -121,13 +120,22 @@ static inline DOUBLE inverse_bitwise_DOUBLE(pair_struct_DOUBLE *pair){
     for (int w=pair->num_integer_weights;w<pair->num_weights;w++) {
         weight *= pair->weights0[w].d*pair->weights1[w].d;
     }
-    if (pair->tab_weight.num) {
-        DOUBLE findex = pair->costheta.d*pair->tab_weight.invstep + pair->tab_weight.min;
-        int index = (int) findex;
-        // TODO: handle points at last index
-        if ((index >= 0) && (index < pair->tab_weight.num - 1)) {
-            DOUBLE frac = findex - index;
-            weight *= (1 - frac) * pair->tab_weight.array[index] + frac * pair->tab_weight.array[index+1];
+    int num = pair->pair_weight.num;
+    if (num) {
+        DOUBLE costheta = pair->costheta.d;
+        DOUBLE *pair_sep = pair->pair_weight.sep;
+        if (costheta >= pair_sep[num-1] || (costheta < pair_sep[0])) {
+            return weight;
+        }
+        else {
+            DOUBLE *pair_weight = pair->pair_weight.weight;
+            for (int kbin=num-2;kbin>=0;kbin--) {
+                if(costheta >= pair_sep[kbin]) {
+                    DOUBLE frac = (costheta - pair_sep[kbin])/(pair_sep[kbin+1] - pair_sep[kbin]);
+                    weight *= (1 - frac) * pair_weight[kbin] + frac * pair_weight[kbin+1];
+                    break;
+                }
+            }
         }
     }
     return weight;

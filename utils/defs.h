@@ -362,11 +362,10 @@ typedef struct
 
 typedef struct
 {
-    void *array;
+    void *weight;
+    void *sep;
     int num;
-    double min;
-    double invstep;
-} tab_weight_struct;
+} pair_weight_struct;
 
 typedef enum {
   NONE=-42, /* default */
@@ -444,11 +443,11 @@ static inline int set_weight_struct(weight_struct* weight_st, const weight_metho
 }
 
 
-static inline int set_tab_weight_struct(tab_weight_struct* tab_weight_st,  void* array, int num, double sepmin, double sepmax) {
-    tab_weight_st->array = array;
-    tab_weight_st->num = num;
-    tab_weight_st->invstep = (num - 1)/(sepmax - sepmin);
-    tab_weight_st->min = - sepmin * tab_weight_st->invstep;
+static inline int set_pair_weight_struct(pair_weight_struct* pair_weight_st, void* sep, void* weight, int num) {
+    pair_weight_st->weight = weight;
+    pair_weight_st->sep = sep;
+    pair_weight_st->num = num;
+    printf("Found %d pair weights.\n",num);
     return EXIT_SUCCESS;
 }
 
@@ -481,9 +480,9 @@ struct extra_options
     // Two possible weight_structs (at most we will have two loaded sets of particles)
     weight_struct weights0;
     weight_struct weights1;
-    tab_weight_struct tab_weight;
+    pair_weight_struct pair_weight;
     weight_method_t weight_method; // the function that will get called to give the weight of a particle pair
-    uint8_t reserved[EXTRA_OPTIONS_HEADER_SIZE - 2*sizeof(weight_struct) - sizeof(weight_method_t) - sizeof(tab_weight_struct)];
+    uint8_t reserved[EXTRA_OPTIONS_HEADER_SIZE - 2*sizeof(weight_struct) - sizeof(weight_method_t) - sizeof(pair_weight_struct)];
 };
 
 // weight_method determines the number of various weighting arrays that we allocate
@@ -497,7 +496,7 @@ static inline struct extra_options get_extra_options(const weight_method_t weigh
 
     set_weight_struct(&(extra.weights0), weight_method, NULL, -1);
     set_weight_struct(&(extra.weights1), weight_method, NULL, -1);
-    set_tab_weight_struct(&(extra.tab_weight), NULL, 0., 0., 1.);
+    set_pair_weight_struct(&(extra.pair_weight), NULL, NULL, 0);
 
     return extra;
 }
