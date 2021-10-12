@@ -385,6 +385,10 @@ static inline void copy_weight_struct(weight_struct *weight_st0, const weight_st
 static inline int set_weight_struct(weight_struct* weight_st, const weight_method_t method, const weight_type_t* type, const int8_t num_weights) {
     // index is 0 (first weights) or 1 (second weights)
     weight_st->num_weights = num_weights;
+    if (num_weights > MAX_NUM_WEIGHTS) {
+        fprintf(stderr,"Error: %d weight arrays are provided, but only %d are suppored\n", num_weights, MAX_NUM_WEIGHTS);
+        return EXIT_FAILURE;
+    }
     if (num_weights < 0) {
         switch (method) {
             case PAIR_PRODUCT:
@@ -438,7 +442,7 @@ static inline int set_weight_struct(weight_struct* weight_st, const weight_metho
             }
         }
     }
-    printf("Found %d integer weights among %d weights.\n",weight_st->num_integer_weights,weight_st->num_weights);
+    //printf("Found %d integer weights among %d weights.\n",weight_st->num_integer_weights,weight_st->num_weights);
     return EXIT_SUCCESS;
 }
 
@@ -447,7 +451,7 @@ static inline int set_pair_weight_struct(pair_weight_struct* pair_weight_st, voi
     pair_weight_st->weight = weight;
     pair_weight_st->sep = sep;
     pair_weight_st->num = num;
-    printf("Found %d pair weights.\n",num);
+    //printf("Found %d pair weights.\n",num);
     return EXIT_SUCCESS;
 }
 

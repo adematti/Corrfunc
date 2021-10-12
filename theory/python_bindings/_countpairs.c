@@ -997,7 +997,7 @@ PyMODINIT_FUNC init_countpairs(void)
 }
 // weights1_obj may be NULL, in which case it is ignored.
 // If it is not NULL, it will be checked alongside the positions
-static int64_t check_dims_and_datatype(PyObject *module, PyArrayObject *x1_obj, PyArrayObject *y1_obj, PyArrayObject *z1_obj, PyArrayObject *weights1_obj, size_t *element_size)
+static int64_t check_dims_and_datatype(PyObject *module, PyArrayObject *x1_obj, PyArrayObject *y1_obj, PyArrayObject *z1_obj, size_t *element_size)
 {
     char msg[1024];
 
@@ -1394,7 +1394,7 @@ static PyObject *countpairs_countpairs(PyObject *self, PyObject *args, PyObject 
     /* We have numpy arrays and all the required inputs*/
     /* How many data points are there? And are they all of floating point type */
     size_t element_size;
-    const int64_t ND1 = check_dims_and_datatype(module, x1_obj, y1_obj, z1_obj, weights1_obj, &element_size);
+    const int64_t ND1 = check_dims_and_datatype(module, x1_obj, y1_obj, z1_obj, &element_size);
     if(ND1 == -1) {
         //Error has already been set -> simply return
         Py_RETURN_NONE;
@@ -1436,7 +1436,7 @@ static PyObject *countpairs_countpairs(PyObject *self, PyObject *args, PyObject 
             Py_RETURN_NONE;
         }
         size_t element_size2;
-        ND2 = check_dims_and_datatype(module, x2_obj, y2_obj, z2_obj, weights2_obj, &element_size2);
+        ND2 = check_dims_and_datatype(module, x2_obj, y2_obj, z2_obj, &element_size2);
         if(ND2 == -1) {
             //Error has already been set -> simply return
             Py_RETURN_NONE;
@@ -1581,13 +1581,16 @@ static PyObject *countpairs_countpairs_rp_pi(PyObject *self, PyObject *args, PyO
     //In python3, self is simply the module object that was returned earlier by init
     PyObject *module = self;
 #endif
-    PyArrayObject *x1_obj=NULL, *y1_obj=NULL, *z1_obj=NULL, *weights1_obj=NULL;
-    PyArrayObject *x2_obj=NULL, *y2_obj=NULL, *z2_obj=NULL, *weights2_obj=NULL;
+    PyArrayObject *x1_obj=NULL, *y1_obj=NULL, *z1_obj=NULL;
+    PyArrayObject *x2_obj=NULL, *y2_obj=NULL, *z2_obj=NULL;
+    PyObject *weights1_obj=NULL, *weights2_obj=NULL;
     int autocorr=0;
     int nthreads=4;
 
     double pimax;
     char *binfile, *weighting_method_str = NULL;
+    PyObject *pair_weight_obj=NULL, *sep_pair_weight_obj=NULL;
+
     struct config_options options = get_config_options();
     options.verbose = 0;
     options.instruction_set = -1;
@@ -1625,20 +1628,22 @@ static PyObject *countpairs_countpairs_rp_pi(PyObject *self, PyObject *args, PyO
         "c_api_timer",
         "isa",/* instruction set to use of type enum isa; valid values are AVX512F, AVX, SSE, FALLBACK */
         "weight_type",
+        "pair_weights",
+        "sep_pair_weights",
         "bin_type",
         NULL
     };
 
-    if ( ! PyArg_ParseTupleAndKeywords(args, kwargs, "iidsO!O!O!|O!O!O!O!O!bbdbbbbhbbbisI", kwlist,
+    if ( ! PyArg_ParseTupleAndKeywords(args, kwargs, "iidsO!O!O!|OO!O!O!ObbdbbbbhbbbisO!O!I", kwlist,
                                        &autocorr,&nthreads,&pimax,&binfile,
                                        &PyArray_Type,&x1_obj,
                                        &PyArray_Type,&y1_obj,
                                        &PyArray_Type,&z1_obj,
-                                       &PyArray_Type,&weights1_obj,
+                                       &weights1_obj,
                                        &PyArray_Type,&x2_obj,
                                        &PyArray_Type,&y2_obj,
                                        &PyArray_Type,&z2_obj,
-                                       &PyArray_Type,&weights2_obj,
+                                       &weights2_obj,
                                        &(options.periodic),
                                        &(options.verbose),
                                        &(options.boxsize),
@@ -1650,6 +1655,8 @@ static PyObject *countpairs_countpairs_rp_pi(PyObject *self, PyObject *args, PyO
                                        &(options.c_api_timer),
                                        &(options.instruction_set),
                                        &weighting_method_str,
+                                       &PyArray_Type,&pair_weight_obj,
+                                       &PyArray_Type,&sep_pair_weight_obj,
                                        &(options.bin_type))
 
          ) {
@@ -1701,29 +1708,12 @@ static PyObject *countpairs_countpairs_rp_pi(PyObject *self, PyObject *args, PyO
 
     size_t element_size;
     /* How many data points are there? And are they all of floating point type */
-    const int64_t ND1 = check_dims_and_datatype(module, x1_obj, y1_obj, z1_obj, weights1_obj, &element_size);
+    const int64_t ND1 = check_dims_and_datatype(module, x1_obj, y1_obj, z1_obj, &element_size);
     if(ND1 == -1) {
         //Error has already been set -> simply return
         Py_RETURN_NONE;
     }
-
-    int found_weights = weights1_obj == NULL ? 0 : PyArray_SHAPE(weights1_obj)[0];
     struct extra_options extra = get_extra_options(weighting_method);
-    if(extra.weights0.num_weights > 0 && extra.weights0.num_weights != found_weights){
-        char msg[1024];
-        snprintf(msg, 1024, "ValueError: In %s: specified weighting method %s which requires %"PRId64" weight(s)-per-particle, but found %d weight(s) instead!\n",
-                 __FUNCTION__, weighting_method_str, extra.weights0.num_weights, found_weights);
-        countpairs_error_out(module, msg);
-        Py_RETURN_NONE;
-    }
-
-    if(extra.weights0.num_weights > 0 && found_weights > MAX_NUM_WEIGHTS){
-        char msg[1024];
-        snprintf(msg, 1024, "ValueError: In %s: Provided %d weights-per-particle, but the code was compiled with MAX_NUM_WEIGHTS=%d.\n",
-                 __FUNCTION__, found_weights, MAX_NUM_WEIGHTS);
-        countpairs_error_out(module, msg);
-        Py_RETURN_NONE;
-    }
 
     int64_t ND2=ND1;
     if(autocorr == 0) {
@@ -1742,7 +1732,7 @@ static PyObject *countpairs_countpairs_rp_pi(PyObject *self, PyObject *args, PyO
         }
 
         size_t element_size2;
-        ND2 = check_dims_and_datatype(module, x2_obj, y2_obj, z2_obj, weights2_obj, &element_size2);
+        ND2 = check_dims_and_datatype(module, x2_obj, y2_obj, z2_obj, &element_size2);
         if(ND2 == -1) {
             //Error has already been set -> simply return
             Py_RETURN_NONE;
@@ -1761,19 +1751,12 @@ static PyObject *countpairs_countpairs_rp_pi(PyObject *self, PyObject *args, PyO
     PyObject *x1_array = PyArray_FromArray(x1_obj, NOTYPE_DESCR, requirements);
     PyObject *y1_array = PyArray_FromArray(y1_obj, NOTYPE_DESCR, requirements);
     PyObject *z1_array = PyArray_FromArray(z1_obj, NOTYPE_DESCR, requirements);
-    PyObject *weights1_array = NULL;
-    if(weights1_obj != NULL){
-        weights1_array = PyArray_FromArray(weights1_obj, NOTYPE_DESCR, requirements);
-    }
 
-    PyObject *x2_array = NULL, *y2_array = NULL, *z2_array = NULL, *weights2_array = NULL;
+    PyObject *x2_array = NULL, *y2_array = NULL, *z2_array = NULL;
     if(autocorr == 0) {
         x2_array = PyArray_FromArray(x2_obj, NOTYPE_DESCR, requirements);
         y2_array = PyArray_FromArray(y2_obj, NOTYPE_DESCR, requirements);
         z2_array = PyArray_FromArray(z2_obj, NOTYPE_DESCR, requirements);
-        if(weights2_obj != NULL){
-            weights2_array = PyArray_FromArray(weights2_obj, NOTYPE_DESCR, requirements);
-        }
     }
 
     if (x1_array == NULL || y1_array == NULL || z1_array == NULL ||
@@ -1781,12 +1764,10 @@ static PyObject *countpairs_countpairs_rp_pi(PyObject *self, PyObject *args, PyO
         Py_XDECREF(x1_array);
         Py_XDECREF(y1_array);
         Py_XDECREF(z1_array);
-        Py_XDECREF(weights1_array);
 
         Py_XDECREF(x2_array);
         Py_XDECREF(y2_array);
         Py_XDECREF(z2_array);
-        Py_XDECREF(weights2_array);
         char msg[1024];
         snprintf(msg, 1024, "TypeError: In %s: Could not convert input to arrays of allowed floating point types (doubles or floats). Are you passing numpy arrays?",
                  __FUNCTION__);
@@ -1799,27 +1780,21 @@ static PyObject *countpairs_countpairs_rp_pi(PyObject *self, PyObject *args, PyO
     void *X1 = PyArray_DATA((PyArrayObject *) x1_array);
     void *Y1 = PyArray_DATA((PyArrayObject *) y1_array);
     void *Z1 = PyArray_DATA((PyArrayObject *) z1_array);
-    void *weights1=NULL;
-    if(weights1_array != NULL){
-        weights1 = PyArray_DATA((PyArrayObject *) weights1_array);
-    }
 
-    void *X2 = NULL, *Y2 = NULL, *Z2 = NULL, *weights2=NULL;
+    if (weights1_obj != NULL) wstatus = check_weights(module, weights1_obj, &(extra.weights0), extra.weight_method, ND1, element_size);
+
+    void *X2 = NULL, *Y2 = NULL, *Z2 = NULL;
     if(autocorr == 0) {
         X2 = PyArray_DATA((PyArrayObject *) x2_array);
         Y2 = PyArray_DATA((PyArrayObject *) y2_array);
         Z2 = PyArray_DATA((PyArrayObject *) z2_array);
-        if(weights2_array != NULL){
-            weights2 = PyArray_DATA((PyArrayObject *) weights2_array);
-        }
-    }
 
-    /* Pack the weights into extra_options */
-    for(int64_t w = 0; w < extra.weights0.num_weights; w++){
-        extra.weights0.weights[w] = (char *) weights1 + w*ND1*element_size;
-        if(autocorr == 0){
-            extra.weights1.weights[w] = (char *) weights2 + w*ND2*element_size;
-        }
+        if (weights2_obj != NULL) wstatus = check_weights(module, weights2_obj, &(extra.weights1), extra.weight_method, ND2, element_size);
+    }
+    if (pair_weight_obj != NULL) wstatus = check_pair_weight(module, &(extra.pair_weight), sep_pair_weight_obj, pair_weight_obj, element_size);
+
+    if(wstatus != EXIT_SUCCESS) {
+        Py_RETURN_NONE;
     }
 
     NPY_BEGIN_THREADS_DEF;
@@ -1843,8 +1818,8 @@ static PyObject *countpairs_countpairs_rp_pi(PyObject *self, PyObject *args, PyO
     NPY_END_THREADS;
 
     /* Clean up. */
-    Py_DECREF(x1_array);Py_DECREF(y1_array);Py_DECREF(z1_array);Py_XDECREF(weights1_array);//x1 should absolutely not be NULL
-    Py_XDECREF(x2_array);Py_XDECREF(y2_array);Py_XDECREF(z2_array);Py_XDECREF(weights2_array);//x2 might be NULL depending on value of autocorr
+    Py_DECREF(x1_array);Py_DECREF(y1_array);Py_DECREF(z1_array);//x1 should absolutely not be NULL
+    Py_XDECREF(x2_array);Py_XDECREF(y2_array);Py_XDECREF(z2_array);//x2 might be NULL depending on value of autocorr
     if(status != EXIT_SUCCESS) {
         Py_RETURN_NONE;
     }
@@ -1882,10 +1857,12 @@ static PyObject *countpairs_countpairs_wp(PyObject *self, PyObject *args, PyObje
     //In python3, self is simply the module object that was returned earlier by init
     PyObject *module = self;
 #endif
-    PyArrayObject *x1_obj=NULL, *y1_obj=NULL, *z1_obj=NULL, *weights1_obj=NULL;
+    PyArrayObject *x1_obj=NULL, *y1_obj=NULL, *z1_obj=NULL;
+    PyObject *weights1_obj=NULL;
     double boxsize,pimax;
     int nthreads=1;
     char *binfile, *weighting_method_str = NULL;
+    PyObject *pair_weight_obj=NULL, *sep_pair_weight_obj=NULL;
     size_t element_size;
 
     struct config_options options = get_config_options();
@@ -1922,16 +1899,18 @@ static PyObject *countpairs_countpairs_wp(PyObject *self, PyObject *args, PyObje
         "c_api_timer",
         "c_cell_timer",
         "isa",/* instruction set to use of type enum isa; valid values are AVX512F, AVX, SSE, FALLBACK */
+        "pair_weights",
+        "sep_pair_weights",
         "bin_type",
         NULL
     };
 
-    if( ! PyArg_ParseTupleAndKeywords(args, kwargs, "ddisO!O!O!|O!sbbbbbhbbbbiI", kwlist,
+    if( ! PyArg_ParseTupleAndKeywords(args, kwargs, "ddisO!O!O!|OsbbbbbhbbbbiO!O!I", kwlist,
                                       &boxsize,&pimax,&nthreads,&binfile,
                                       &PyArray_Type,&x1_obj,
                                       &PyArray_Type,&y1_obj,
                                       &PyArray_Type,&z1_obj,
-                                      &PyArray_Type,&weights1_obj,
+                                      &weights1_obj,
                                       &weighting_method_str,
                                       &(options.verbose),
                                       &(options.need_avg_sep),
@@ -1942,6 +1921,8 @@ static PyObject *countpairs_countpairs_wp(PyObject *self, PyObject *args, PyObje
                                       &(options.c_api_timer),
                                       &(options.c_cell_timer),
                                       &(options.instruction_set),
+                                      &PyArray_Type,&pair_weight_obj,
+                                      &PyArray_Type,&sep_pair_weight_obj,
                                       &(options.bin_type))
 
         ){
@@ -1992,46 +1973,23 @@ static PyObject *countpairs_countpairs_wp(PyObject *self, PyObject *args, PyObje
     }
 
     /* How many data points are there? And are they all of floating point type */
-    const int64_t ND1 = check_dims_and_datatype(module, x1_obj, y1_obj, z1_obj, weights1_obj, &element_size);
+    const int64_t ND1 = check_dims_and_datatype(module, x1_obj, y1_obj, z1_obj, &element_size);
     if(ND1 == -1) {
         //Error has already been set -> simply return
         Py_RETURN_NONE;
     }
-
-    int found_weights = weights1_obj == NULL ? 0 : PyArray_SHAPE(weights1_obj)[0];
     struct extra_options extra = get_extra_options(weighting_method);
-    if(extra.weights0.num_weights > 0 && extra.weights0.num_weights != found_weights){
-        char msg[1024];
-        snprintf(msg, 1024, "ValueError: In %s: specified weighting method %s which requires %"PRId64" weight(s)-per-particle, but found %d weight(s) instead!\n",
-                 __FUNCTION__, weighting_method_str, extra.weights0.num_weights, found_weights);
-        countpairs_error_out(module, msg);
-        Py_RETURN_NONE;
-    }
-
-    if(extra.weights0.num_weights > 0 && found_weights > MAX_NUM_WEIGHTS){
-        char msg[1024];
-        snprintf(msg, 1024, "ValueError: In %s: Provided %d weights-per-particle, but the code was compiled with MAX_NUM_WEIGHTS=%d.\n",
-                 __FUNCTION__, found_weights, MAX_NUM_WEIGHTS);
-        countpairs_error_out(module, msg);
-        Py_RETURN_NONE;
-    }
 
     /* Interpret the input objects as numpy arrays. */
     const int requirements = NPY_ARRAY_IN_ARRAY;
     PyObject *x1_array = PyArray_FromArray(x1_obj, NOTYPE_DESCR, requirements);
     PyObject *y1_array = PyArray_FromArray(y1_obj, NOTYPE_DESCR, requirements);
     PyObject *z1_array = PyArray_FromArray(z1_obj, NOTYPE_DESCR, requirements);
-    PyObject *weights1_array = NULL;
-    if(weights1_obj != NULL){
-        weights1_array = PyArray_FromArray(weights1_obj, NOTYPE_DESCR, requirements);
-    }
-
 
     if (x1_array == NULL || y1_array == NULL || z1_array == NULL) {
         Py_XDECREF(x1_array);
         Py_XDECREF(y1_array);
         Py_XDECREF(z1_array);
-        Py_XDECREF(weights1_array);
         char msg[1024];
         snprintf(msg, 1024, "TypeError: In %s: Could not convert input array to allowed floating point types (doubles or floats). Are you passing numpy arrays?",
                  __FUNCTION__);
@@ -2045,19 +2003,16 @@ static PyObject *countpairs_countpairs_wp(PyObject *self, PyObject *args, PyObje
     void *X1 = PyArray_DATA((PyArrayObject *) x1_array);
     void *Y1 = PyArray_DATA((PyArrayObject *) y1_array);
     void *Z1 = PyArray_DATA((PyArrayObject *) z1_array);
-    void *weights1 = NULL;
-    if(weights1_array != NULL){
-        weights1 = PyArray_DATA((PyArrayObject *) weights1_array);
-    }
 
-    /* Pack the weights into extra_options */
-    for(int64_t w = 0; w < extra.weights0.num_weights; w++){
-        extra.weights0.weights[w] = (char *) weights1 + w*ND1*element_size;
+    if (weights1_obj != NULL) wstatus = check_weights(module, weights1_obj, &(extra.weights0), extra.weight_method, ND1, element_size);
+    if (pair_weight_obj != NULL) wstatus = check_pair_weight(module, &(extra.pair_weight), sep_pair_weight_obj, pair_weight_obj, element_size);
+
+    if(wstatus != EXIT_SUCCESS) {
+        Py_RETURN_NONE;
     }
 
     NPY_BEGIN_THREADS_DEF;
     NPY_BEGIN_THREADS;
-
 
     results_countpairs_wp results;
     options.float_type = element_size;
@@ -2076,7 +2031,7 @@ static PyObject *countpairs_countpairs_wp(PyObject *self, PyObject *args, PyObje
     NPY_END_THREADS;
 
     /* Clean up. */
-    Py_DECREF(x1_array);Py_DECREF(y1_array);Py_DECREF(z1_array);Py_XDECREF(weights1_array);
+    Py_DECREF(x1_array);Py_DECREF(y1_array);Py_DECREF(z1_array);
 
     if(status != EXIT_SUCCESS) {
         Py_RETURN_NONE;
@@ -2130,10 +2085,13 @@ static PyObject *countpairs_countpairs_xi(PyObject *self, PyObject *args, PyObje
     PyObject *module = self;
 #endif
 
-    PyArrayObject *x1_obj, *y1_obj, *z1_obj, *weights1_obj = NULL;
+    PyArrayObject *x1_obj, *y1_obj, *z1_obj;
+    PyObject *weights1_obj=NULL;
     double boxsize;
     int nthreads=4;
     char *binfile, *weighting_method_str = NULL;
+    PyObject *pair_weight_obj=NULL, *sep_pair_weight_obj=NULL;
+
     struct config_options options = get_config_options();
     options.verbose = 0;
     options.periodic=1;
@@ -2164,17 +2122,19 @@ static PyObject *countpairs_countpairs_xi(PyObject *self, PyObject *args, PyObje
         "enable_min_sep_opt",
         "c_api_timer",
         "isa",/* instruction set to use of type enum isa; valid values are AVX512F, AVX, SSE, FALLBACK */
+        "pair_weights",
+        "sep_pair_weights",
         "bin_type",
         NULL
     };
 
 
-    if( ! PyArg_ParseTupleAndKeywords(args, kwargs, "disO!O!O!|O!sbbbbbhbbbiI", kwlist,
+    if( ! PyArg_ParseTupleAndKeywords(args, kwargs, "disO!O!O!|OsbbbbbhbbbiO!O!I", kwlist,
                                       &boxsize,&nthreads,&binfile,
                                       &PyArray_Type,&x1_obj,
                                       &PyArray_Type,&y1_obj,
                                       &PyArray_Type,&z1_obj,
-                                      &PyArray_Type,&weights1_obj,
+                                      &weights1_obj,
                                       &weighting_method_str,
                                       &(options.verbose),
                                       &(options.need_avg_sep),
@@ -2184,6 +2144,8 @@ static PyObject *countpairs_countpairs_xi(PyObject *self, PyObject *args, PyObje
                                       &(options.enable_min_sep_opt),
                                       &(options.c_api_timer),
                                       &(options.instruction_set),
+                                      &PyArray_Type,&pair_weight_obj,
+                                      &PyArray_Type,&sep_pair_weight_obj,
                                       &(options.bin_type))
         ) {
 
@@ -2234,45 +2196,23 @@ static PyObject *countpairs_countpairs_xi(PyObject *self, PyObject *args, PyObje
 
     /* How many data points are there? And are they all of floating point type */
     size_t element_size;
-    const int64_t ND1 = check_dims_and_datatype(module, x1_obj, y1_obj, z1_obj, weights1_obj, &element_size);
+    const int64_t ND1 = check_dims_and_datatype(module, x1_obj, y1_obj, z1_obj, &element_size);
     if(ND1 == -1) {
         //Error has already been set -> simply return
         Py_RETURN_NONE;
     }
-
-    int found_weights = weights1_obj == NULL ? 0 : PyArray_SHAPE(weights1_obj)[0];
     struct extra_options extra = get_extra_options(weighting_method);
-    if(extra.weights0.num_weights > 0 && extra.weights0.num_weights != found_weights){
-        char msg[1024];
-        snprintf(msg, 1024, "ValueError: In %s: specified weighting method %s which requires %"PRId64" weight(s)-per-particle, but found %d weight(s) instead!\n",
-                 __FUNCTION__, weighting_method_str, extra.weights0.num_weights, found_weights);
-        countpairs_error_out(module, msg);
-        Py_RETURN_NONE;
-    }
-
-    if(extra.weights0.num_weights > 0 && found_weights > MAX_NUM_WEIGHTS){
-        char msg[1024];
-        snprintf(msg, 1024, "ValueError: In %s: Provided %d weights-per-particle, but the code was compiled with MAX_NUM_WEIGHTS=%d.\n",
-                 __FUNCTION__, found_weights, MAX_NUM_WEIGHTS);
-        countpairs_error_out(module, msg);
-        Py_RETURN_NONE;
-    }
 
     /* Interpret the input objects as numpy arrays. */
     const int requirements = NPY_ARRAY_IN_ARRAY;
     PyObject *x1_array = PyArray_FromArray(x1_obj, NOTYPE_DESCR, requirements);
     PyObject *y1_array = PyArray_FromArray(y1_obj, NOTYPE_DESCR, requirements);
     PyObject *z1_array = PyArray_FromArray(z1_obj, NOTYPE_DESCR, requirements);
-    PyObject *weights1_array = NULL;
-    if(weights1_obj != NULL){
-        weights1_array = PyArray_FromArray(weights1_obj, NOTYPE_DESCR, requirements);
-    }
 
     if (x1_array == NULL || y1_array == NULL || z1_array == NULL) {
         Py_XDECREF(x1_array);
         Py_XDECREF(y1_array);
         Py_XDECREF(z1_array);
-        Py_XDECREF(weights1_array);
         char msg[1024];
         snprintf(msg, 1024, "TypeError: In %s: Could not convert to array of allowed floating point type (doubles or floats). Are you passing numpy arrays?",
                  __FUNCTION__);
@@ -2284,14 +2224,12 @@ static PyObject *countpairs_countpairs_xi(PyObject *self, PyObject *args, PyObje
     void *X1 = PyArray_DATA((PyArrayObject *) x1_array);
     void *Y1 = PyArray_DATA((PyArrayObject *) y1_array);
     void *Z1 = PyArray_DATA((PyArrayObject *) z1_array);
-    void *weights1 = NULL;
-    if(weights1_array != NULL){
-        weights1 = PyArray_DATA((PyArrayObject *) weights1_array);
-    }
 
-    /* Pack the weights into extra_options */
-    for(int64_t w = 0; w < extra.weights0.num_weights; w++){
-        extra.weights0.weights[w] = (char *) weights1 + w*ND1*element_size;
+    if (weights1_obj != NULL) wstatus = check_weights(module, weights1_obj, &(extra.weights0), extra.weight_method, ND1, element_size);
+    if (pair_weight_obj != NULL) wstatus = check_pair_weight(module, &(extra.pair_weight), sep_pair_weight_obj, pair_weight_obj, element_size);
+
+    if(wstatus != EXIT_SUCCESS) {
+        Py_RETURN_NONE;
     }
 
     NPY_BEGIN_THREADS_DEF;
@@ -2314,7 +2252,7 @@ static PyObject *countpairs_countpairs_xi(PyObject *self, PyObject *args, PyObje
     NPY_END_THREADS;
 
     /* Clean up. */
-    Py_DECREF(x1_array);Py_DECREF(y1_array);Py_DECREF(z1_array);Py_XDECREF(weights1_array);
+    Py_DECREF(x1_array);Py_DECREF(y1_array);Py_DECREF(z1_array);
     if(status != EXIT_SUCCESS) {
         Py_RETURN_NONE;
     }
@@ -2355,14 +2293,17 @@ static PyObject *countpairs_countpairs_s_mu(PyObject *self, PyObject *args, PyOb
     //In python3, self is simply the module object that was returned earlier by init
     PyObject *module = self;
 #endif
-    PyArrayObject *x1_obj=NULL, *y1_obj=NULL, *z1_obj=NULL, *weights1_obj=NULL;
-    PyArrayObject *x2_obj=NULL, *y2_obj=NULL, *z2_obj=NULL, *weights2_obj=NULL;
+    PyArrayObject *x1_obj=NULL, *y1_obj=NULL, *z1_obj=NULL;
+    PyArrayObject *x2_obj=NULL, *y2_obj=NULL, *z2_obj=NULL;
+    PyObject *weights1_obj=NULL, *weights2_obj=NULL;
     int autocorr=0;
     int nthreads=4;
 
     double mu_max;
     int nmu_bins;
     char *binfile, *weighting_method_str = NULL;
+    PyObject *pair_weight_obj=NULL, *sep_pair_weight_obj=NULL;
+
     struct config_options options = get_config_options();
     options.verbose = 0;
     options.instruction_set = -1;
@@ -2403,20 +2344,22 @@ static PyObject *countpairs_countpairs_s_mu(PyObject *self, PyObject *args, PyOb
         "c_api_timer",
         "isa",/* instruction set to use of type enum isa; valid values are AVX512F, AVX, SSE, FALLBACK */
         "weight_type",
+        "pair_weights",
+        "sep_pair_weights",
         "bin_type",
         NULL
     };
 
-    if ( ! PyArg_ParseTupleAndKeywords(args, kwargs, "iisdiO!O!O!|O!O!O!O!O!bbdbbbbbhbbbisI", kwlist,
+    if ( ! PyArg_ParseTupleAndKeywords(args, kwargs, "iisdiO!O!O!|OO!O!O!ObbdbbbbbhbbbisO!O!I", kwlist,
                                        &autocorr,&nthreads,&binfile, &mu_max, &nmu_bins,
                                        &PyArray_Type,&x1_obj,
                                        &PyArray_Type,&y1_obj,
                                        &PyArray_Type,&z1_obj,
-                                       &PyArray_Type,&weights1_obj,
+                                       &weights1_obj,
                                        &PyArray_Type,&x2_obj,
                                        &PyArray_Type,&y2_obj,
                                        &PyArray_Type,&z2_obj,
-                                       &PyArray_Type,&weights2_obj,
+                                       &weights2_obj,
                                        &(options.periodic),
                                        &(options.verbose),
                                        &(options.boxsize),
@@ -2480,29 +2423,12 @@ static PyObject *countpairs_countpairs_s_mu(PyObject *self, PyObject *args, PyOb
 
     size_t element_size;
     /* How many data points are there? And are they all of floating point type */
-    const int64_t ND1 = check_dims_and_datatype(module, x1_obj, y1_obj, z1_obj, weights1_obj, &element_size);
+    const int64_t ND1 = check_dims_and_datatype(module, x1_obj, y1_obj, z1_obj, &element_size);
     if(ND1 == -1) {
         //Error has already been set -> simply return
         Py_RETURN_NONE;
     }
-
-    int found_weights = weights1_obj == NULL ? 0 : PyArray_SHAPE(weights1_obj)[0];
     struct extra_options extra = get_extra_options(weighting_method);
-    if(extra.weights0.num_weights > 0 && extra.weights0.num_weights != found_weights){
-        char msg[1024];
-        snprintf(msg, 1024, "ValueError: In %s: specified weighting method %s which requires %"PRId64" weight(s)-per-particle, but found %d weight(s) instead!\n",
-                 __FUNCTION__, weighting_method_str, extra.weights0.num_weights, found_weights);
-        countpairs_error_out(module, msg);
-        Py_RETURN_NONE;
-    }
-
-    if(extra.weights0.num_weights > 0 && found_weights > MAX_NUM_WEIGHTS){
-        char msg[1024];
-        snprintf(msg, 1024, "ValueError: In %s: Provided %d weights-per-particle, but the code was compiled with MAX_NUM_WEIGHTS=%d.\n",
-                 __FUNCTION__, found_weights, MAX_NUM_WEIGHTS);
-        countpairs_error_out(module, msg);
-        Py_RETURN_NONE;
-    }
 
     int64_t ND2=ND1;
     if(autocorr == 0) {
@@ -2521,7 +2447,7 @@ static PyObject *countpairs_countpairs_s_mu(PyObject *self, PyObject *args, PyOb
         }
 
         size_t element_size2;
-        ND2 = check_dims_and_datatype(module, x2_obj, y2_obj, z2_obj, weights2_obj, &element_size2);
+        ND2 = check_dims_and_datatype(module, x2_obj, y2_obj, z2_obj, &element_size2);
         if(ND2 == -1) {
             //Error has already been set -> simply return
             Py_RETURN_NONE;
@@ -2540,19 +2466,12 @@ static PyObject *countpairs_countpairs_s_mu(PyObject *self, PyObject *args, PyOb
     PyObject *x1_array = PyArray_FromArray(x1_obj, NOTYPE_DESCR, requirements);
     PyObject *y1_array = PyArray_FromArray(y1_obj, NOTYPE_DESCR, requirements);
     PyObject *z1_array = PyArray_FromArray(z1_obj, NOTYPE_DESCR, requirements);
-    PyObject *weights1_array = NULL;
-    if(weights1_obj != NULL){
-        weights1_array = PyArray_FromArray(weights1_obj, NOTYPE_DESCR, requirements);
-    }
 
-    PyObject *x2_array = NULL, *y2_array = NULL, *z2_array = NULL, *weights2_array = NULL;
+    PyObject *x2_array = NULL, *y2_array = NULL, *z2_array = NULL;
     if(autocorr == 0) {
         x2_array = PyArray_FromArray(x2_obj, NOTYPE_DESCR, requirements);
         y2_array = PyArray_FromArray(y2_obj, NOTYPE_DESCR, requirements);
         z2_array = PyArray_FromArray(z2_obj, NOTYPE_DESCR, requirements);
-        if(weights2_obj != NULL){
-            weights2_array = PyArray_FromArray(weights2_obj, NOTYPE_DESCR, requirements);
-        }
     }
 
     if (x1_array == NULL || y1_array == NULL || z1_array == NULL ||
@@ -2560,12 +2479,10 @@ static PyObject *countpairs_countpairs_s_mu(PyObject *self, PyObject *args, PyOb
         Py_XDECREF(x1_array);
         Py_XDECREF(y1_array);
         Py_XDECREF(z1_array);
-        Py_XDECREF(weights1_array);
 
         Py_XDECREF(x2_array);
         Py_XDECREF(y2_array);
         Py_XDECREF(z2_array);
-        Py_XDECREF(weights2_array);
         char msg[1024];
         snprintf(msg, 1024, "TypeError: In %s: Could not convert input to arrays of allowed floating point types (doubles or floats). Are you passing numpy arrays?",
                  __FUNCTION__);
@@ -2578,27 +2495,21 @@ static PyObject *countpairs_countpairs_s_mu(PyObject *self, PyObject *args, PyOb
     void *X1 = PyArray_DATA((PyArrayObject *) x1_array);
     void *Y1 = PyArray_DATA((PyArrayObject *) y1_array);
     void *Z1 = PyArray_DATA((PyArrayObject *) z1_array);
-    void *weights1=NULL;
-    if(weights1_array != NULL){
-        weights1 = PyArray_DATA((PyArrayObject *) weights1_array);
-    }
 
-    void *X2 = NULL, *Y2 = NULL, *Z2 = NULL, *weights2=NULL;
+    if (weights1_obj != NULL) wstatus = check_weights(module, weights1_obj, &(extra.weights0), extra.weight_method, ND1, element_size);
+
+    void *X2 = NULL, *Y2 = NULL, *Z2 = NULL;
     if(autocorr == 0) {
         X2 = PyArray_DATA((PyArrayObject *) x2_array);
         Y2 = PyArray_DATA((PyArrayObject *) y2_array);
         Z2 = PyArray_DATA((PyArrayObject *) z2_array);
-        if(weights2_array != NULL){
-            weights2 = PyArray_DATA((PyArrayObject *) weights2_array);
-        }
-    }
 
-    /* Pack the weights into extra_options */
-    for(int64_t w = 0; w < extra.weights0.num_weights; w++){
-        extra.weights0.weights[w] = (char *) weights1 + w*ND1*element_size;
-        if(autocorr == 0){
-            extra.weights1.weights[w] = (char *) weights2 + w*ND2*element_size;
-        }
+        if (weights2_obj != NULL) wstatus = check_weights(module, weights2_obj, &(extra.weights1), extra.weight_method, ND2, element_size);
+    }
+    if (pair_weight_obj != NULL) wstatus = check_pair_weight(module, &(extra.pair_weight), sep_pair_weight_obj, pair_weight_obj, element_size);
+
+    if(wstatus != EXIT_SUCCESS) {
+        Py_RETURN_NONE;
     }
 
     NPY_BEGIN_THREADS_DEF;
@@ -2623,8 +2534,8 @@ static PyObject *countpairs_countpairs_s_mu(PyObject *self, PyObject *args, PyOb
     NPY_END_THREADS;
 
     /* Clean up. */
-    Py_DECREF(x1_array);Py_DECREF(y1_array);Py_DECREF(z1_array);Py_XDECREF(weights1_array);//x1 should absolutely not be NULL
-    Py_XDECREF(x2_array);Py_XDECREF(y2_array);Py_XDECREF(z2_array);Py_XDECREF(weights2_array);//x2 might be NULL depending on value of autocorr
+    Py_DECREF(x1_array);Py_DECREF(y1_array);Py_DECREF(z1_array);//x1 should absolutely not be NULL
+    Py_XDECREF(x2_array);Py_XDECREF(y2_array);Py_XDECREF(z2_array);//x2 might be NULL depending on value of autocorr
     if(status != EXIT_SUCCESS) {
         Py_RETURN_NONE;
     }
@@ -2754,7 +2665,7 @@ static PyObject *countpairs_countspheres_vpf(PyObject *self, PyObject *args, PyO
 
     /* How many data points are there? And are they all of floating point type */
     size_t element_size;
-    const int64_t ND1 = check_dims_and_datatype(module, x1_obj, y1_obj, z1_obj, NULL, &element_size);
+    const int64_t ND1 = check_dims_and_datatype(module, x1_obj, y1_obj, z1_obj, &element_size);
     if(ND1 == -1) {
         //Error has already been set -> simply return
         Py_RETURN_NONE;

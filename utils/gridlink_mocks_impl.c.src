@@ -124,6 +124,7 @@ cellarray_mocks_DOUBLE * gridlink_mocks_DOUBLE(const int64_t NPART,
         lattice[icell].nelements=0;
         lattice[icell].owns_memory = 0;
         lattice[icell].weights.num_weights = (WEIGHTS == NULL) ? 0 : WEIGHTS->num_weights;
+        lattice[icell].weights.num_integer_weights = (WEIGHTS == NULL) ? 0 : WEIGHTS->num_integer_weights;
         lattice[icell].xbounds[0] = MAX_POSITIVE_FLOAT;
         lattice[icell].xbounds[1] = -MAX_POSITIVE_FLOAT;
         lattice[icell].ybounds[0] = MAX_POSITIVE_FLOAT;
@@ -626,6 +627,7 @@ cellarray_mocks_DOUBLE * gridlink_mocks_theta_dec_DOUBLE(const int64_t NPART,
         lattice[icell].nelements = 0;
         lattice[icell].owns_memory = 0;
         lattice[icell].weights.num_weights = (WEIGHTS == NULL) ? 0 : WEIGHTS->num_weights;
+        lattice[icell].weights.num_integer_weights = (WEIGHTS == NULL) ? 0 : WEIGHTS->num_integer_weights;
         lattice[icell].xbounds[0] = MAX_POSITIVE_FLOAT;
         lattice[icell].xbounds[1] = -MAX_POSITIVE_FLOAT;
         lattice[icell].ybounds[0] = MAX_POSITIVE_FLOAT;
@@ -1192,6 +1194,7 @@ cellarray_mocks_DOUBLE * gridlink_mocks_theta_ra_dec_DOUBLE(const int64_t NPART,
 
         // Now do the same for the weights
         lattice[icell].weights.num_weights = (WEIGHTS == NULL) ? 0 : WEIGHTS->num_weights;
+        lattice[icell].weights.num_integer_weights = (WEIGHTS == NULL) ? 0 : WEIGHTS->num_integer_weights;
 
         lattice[icell].dec_bounds[0]=MAX_POSITIVE_FLOAT;
         lattice[icell].dec_bounds[1]=-MAX_POSITIVE_FLOAT;

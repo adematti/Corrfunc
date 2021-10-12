@@ -285,7 +285,8 @@ def wp(boxsize, pimax, nthreads, binfile, X, Y, Z,
        xbin_refine_factor=2, ybin_refine_factor=2,
        zbin_refine_factor=1, max_cells_per_dim=100,
        copy_particles=True, enable_min_sep_opt=True,
-       c_api_timer=False, c_cell_timer=False, isa='fastest', bin_type='custom'):
+       c_api_timer=False, c_cell_timer=False, isa='fastest', bin_type='custom',
+       pair_weights=None, sep_pair_weights=None):
     """
     Function to compute the projected correlation function in a
     periodic cosmological box. Pairs which are separated by less
@@ -423,6 +424,12 @@ def wp(boxsize, pimax, nthreads, binfile, X, Y, Z,
         ``rtol = 1e-05`` *and* ``atol = 1e-08`` (relative and absolute tolerance)
         of ``np.linspace(binfile[0], binfile[-1], len(binfile))``.
 
+    pair_weights : array-like, optional. Default: None.
+        Array of pair weights.
+
+    sep_pair_weights : array-like, optional. Default: None.
+        Array of separations corresponding to ``pair_weights``.
+
     Returns
     --------
 
@@ -504,12 +511,19 @@ def wp(boxsize, pimax, nthreads, binfile, X, Y, Z,
     weights, _ = process_weights(weights, None, X, None, weight_type, autocorr=True)
 
     # Ensure all input arrays are native endian
-    X, Y, Z, weights = [convert_to_native_endian(arr, warn=True)
-                        for arr in [X, Y, Z, weights]]
+    X, Y, Z = [convert_to_native_endian(arr, warn=True)
+                        for arr in [X, Y, Z]]
+
+    if weight_type is not None:
+        weights = [convert_to_native_endian(arr, warn=True) for arr in weights]
+
+    if pair_weights is not None:
+        pair_weights = convert_to_native_endian(pair_weights, warn=True)
+        sep_pair_weights = convert_to_native_endian(sep_pair_weights, warn=True)
 
     # Passing None parameters breaks the parsing code, so avoid this
     kwargs = {}
-    for k in ['weights', 'weight_type']:
+    for k in ['weights', 'weight_type', 'pair_weights', 'sep_pair_weights']:
         v = locals()[k]
         if v is not None:
             kwargs[k] = v

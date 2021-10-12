@@ -32,7 +32,8 @@ static inline int countpairs_theta_mocks_fallback_DOUBLE(const int64_t N0, DOUBL
                                                          const DOUBLE min_zdiff, const DOUBLE closest_icell_xpos,
                                                          const DOUBLE closest_icell_ypos, const DOUBLE closest_icell_zpos,
                                                          DOUBLE *src_rpavg, uint64_t *src_npairs,
-                                                         DOUBLE *src_weightavg, const weight_method_t weight_method, const bin_type_t bin_type)
+                                                         DOUBLE *src_weightavg, const weight_method_t weight_method, const pair_weight_struct pair_weight,
+                                                         const bin_type_t bin_type)
 {
     if(N0 == 0 || N1 == 0) {
         return EXIT_SUCCESS;
@@ -83,8 +84,7 @@ static inline int countpairs_theta_mocks_fallback_DOUBLE(const int64_t N0, DOUBL
         local_w0 = *weights0;
         local_w1 = *weights1;
 
-        pair.num_weights = local_w0.num_weights;
-
+        set_pair_struct_DOUBLE(&pair, &local_w0, &local_w1, &pair_weight);
         weight_func = get_weight_func_by_method_DOUBLE(weight_method);
     }
 
@@ -218,6 +218,8 @@ static inline int countpairs_theta_mocks_fallback_DOUBLE(const int64_t N0, DOUBL
                 pair.pary.d = y2 + ypos;
                 pair.parz.d = z2 + zpos;
 
+                pair.costheta.d = costheta;
+
                 pairweight = weight_func(&pair);
             }
 
@@ -271,7 +273,8 @@ static inline int countpairs_theta_mocks_sse_intrinsics_DOUBLE(const int64_t N0,
                                                                 const DOUBLE min_zdiff, const DOUBLE closest_icell_xpos,
                                                                 const DOUBLE closest_icell_ypos, const DOUBLE closest_icell_zpos,
                                                                 DOUBLE *src_rpavg, uint64_t *src_npairs,
-                                                                DOUBLE *src_weightavg, const weight_method_t weight_method, const bin_type_t bin_type)
+                                                                DOUBLE *src_weightavg, const weight_method_t weight_method, const pair_weight_struct pair_weight,
+                                                                const bin_type_t bin_type)
 {
     if(N0 == 0 || N1 == 0) {
         return EXIT_SUCCESS;
@@ -291,7 +294,7 @@ static inline int countpairs_theta_mocks_sse_intrinsics_DOUBLE(const int64_t N0,
                                                       min_xdiff, min_ydiff,
                                                       min_zdiff, closest_icell_xpos,
                                                       closest_icell_ypos, closest_icell_zpos,
-                                                      src_rpavg, src_npairs, src_weightavg, weight_method, bin_type);
+                                                      src_rpavg, src_npairs, src_weightavg, weight_method, pair_weight, bin_type);
     }
 
     const int32_t need_rpavg = src_rpavg != NULL;
@@ -634,7 +637,8 @@ static inline int countpairs_theta_mocks_avx_intrinsics_DOUBLE(const int64_t N0,
                                                                 const DOUBLE min_zdiff, const DOUBLE closest_icell_xpos,
                                                                 const DOUBLE closest_icell_ypos, const DOUBLE closest_icell_zpos,
                                                                 DOUBLE *src_rpavg, uint64_t *src_npairs,
-                                                                DOUBLE *src_weightavg, const weight_method_t weight_method, const bin_type_t bin_type)
+                                                                DOUBLE *src_weightavg, const weight_method_t weight_method, const pair_weight_struct pair_weight,
+                                                                const bin_type_t bin_type)
 {
     if(N0 == 0 || N1 == 0) {
         return EXIT_SUCCESS;
@@ -653,7 +657,7 @@ static inline int countpairs_theta_mocks_avx_intrinsics_DOUBLE(const int64_t N0,
                                                     min_xdiff, min_ydiff,
                                                     min_zdiff, closest_icell_xpos,
                                                     closest_icell_ypos, closest_icell_zpos,
-                                                    src_rpavg, src_npairs, src_weightavg, weight_method, bin_type);
+                                                    src_rpavg, src_npairs, src_weightavg, weight_method, pair_weight, bin_type);
     }
 
 
@@ -990,7 +994,8 @@ static inline int countpairs_theta_mocks_avx512_intrinsics_DOUBLE(const int64_t 
                                                                    const DOUBLE min_zdiff, const DOUBLE closest_icell_xpos,
                                                                    const DOUBLE closest_icell_ypos, const DOUBLE closest_icell_zpos,
                                                                    DOUBLE *src_rpavg, uint64_t *src_npairs,
-                                                                   DOUBLE *src_weightavg, const weight_method_t weight_method, const bin_type_t bin_type)
+                                                                   DOUBLE *src_weightavg, const weight_method_t weight_method, const pair_weight_struct pair_weight,
+                                                                   const bin_type_t bin_type)
 {
     if(N0 == 0 || N1 == 0) {
         return EXIT_SUCCESS;

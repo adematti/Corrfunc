@@ -24,7 +24,8 @@ def DDrppi_mocks(autocorr, cosmology, nthreads, pimax, binfile,
                  zbin_refine_factor=1, max_cells_per_dim=100,
                  copy_particles=True, enable_min_sep_opt=True,
                  c_api_timer=False, isa='fastest',
-                 weight_type=None, bin_type='custom'):
+                 weight_type=None, bin_type='custom',
+                 pair_weights=None, sep_pair_weights=None):
     """
     Calculate the 2-D pair-counts corresponding to the projected correlation
     function, :math:`\\xi(r_p, \pi)`. Pairs which are separated by less
@@ -236,6 +237,12 @@ def DDrppi_mocks(autocorr, cosmology, nthreads, pimax, binfile,
         ``rtol = 1e-05`` *and* ``atol = 1e-08`` (relative and absolute tolerance)
         of ``np.linspace(binfile[0], binfile[-1], len(binfile))``.
 
+    pair_weights : array-like, optional. Default: None.
+        Array of pair weights.
+
+    sep_pair_weights : array-like, optional. Default: None.
+        Array of separations corresponding to ``pair_weights``.
+
     Returns
     --------
 
@@ -361,17 +368,27 @@ def DDrppi_mocks(autocorr, cosmology, nthreads, pimax, binfile,
     weights1, weights2 = process_weights(weights1, weights2, RA1, RA2, weight_type, autocorr)
 
     # Ensure all input arrays are native endian
-    RA1, DEC1, CZ1, weights1, RA2, DEC2, CZ2, weights2 = [
+    RA1, DEC1, CZ1, RA2, DEC2, CZ2 = [
             convert_to_native_endian(arr, warn=True) for arr in
-            [RA1, DEC1, CZ1, weights1, RA2, DEC2, CZ2, weights2]]
+            [RA1, DEC1, CZ1, RA2, DEC2, CZ2]]
 
     fix_ra_dec(RA1, DEC1)
     if autocorr == 0:
         fix_ra_dec(RA2, DEC2)
 
+    if weight_type is not None:
+        weights1 = [convert_to_native_endian(arr, warn=True) for arr in weights1]
+        if not autocorr:
+            weights2 = [convert_to_native_endian(arr, warn=True) for arr in weights2]
+
+    if pair_weights is not None:
+        pair_weights = convert_to_native_endian(pair_weights, warn=True)
+        sep_pair_weights = convert_to_native_endian(sep_pair_weights, warn=True)
+
     # Passing None parameters breaks the parsing code, so avoid this
     kwargs = {}
-    for k in ['weights1', 'weights2', 'weight_type', 'RA2', 'DEC2', 'CZ2']:
+    for k in ['weights1', 'weights2', 'weight_type', 'RA2', 'DEC2', 'CZ2',
+              'pair_weights', 'sep_pair_weights']:
         v = locals()[k]
         if v is not None:
             kwargs[k] = v
