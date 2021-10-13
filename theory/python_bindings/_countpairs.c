@@ -2372,6 +2372,8 @@ static PyObject *countpairs_countpairs_s_mu(PyObject *self, PyObject *args, PyOb
                                        &(options.c_api_timer),
                                        &(options.instruction_set),
                                        &weighting_method_str,
+                                       &PyArray_Type,&pair_weight_obj,
+                                       &PyArray_Type,&sep_pair_weight_obj,
                                        &(options.bin_type))
 
          ) {

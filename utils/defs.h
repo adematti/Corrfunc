@@ -386,7 +386,7 @@ static inline int set_weight_struct(weight_struct* weight_st, const weight_metho
     // index is 0 (first weights) or 1 (second weights)
     weight_st->num_weights = num_weights;
     if (num_weights > MAX_NUM_WEIGHTS) {
-        fprintf(stderr,"Error: %d weight arrays are provided, but only %d are suppored\n", num_weights, MAX_NUM_WEIGHTS);
+        fprintf(stderr,"Error: %d weight arrays are provided, but only %d are supported\n", num_weights, MAX_NUM_WEIGHTS);
         return EXIT_FAILURE;
     }
     if (num_weights < 0) {
