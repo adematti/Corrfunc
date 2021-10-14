@@ -316,10 +316,10 @@ def DDsmu(autocorr, nthreads, binfile, mu_max, nmu_bins,
             convert_to_native_endian(arr, warn=True) for arr in
             [X1, Y1, Z1, X2, Y2, Z2]]
 
-    if weight_type is not None:
+    if weights1 is not None:
         weights1 = [convert_to_native_endian(arr, warn=True) for arr in weights1]
-        if not autocorr:
-            weights2 = [convert_to_native_endian(arr, warn=True) for arr in weights2]
+    if weights2 is not None:
+        weights2 = [convert_to_native_endian(arr, warn=True) for arr in weights2]
 
     if pair_weights is not None:
         pair_weights = convert_to_native_endian(pair_weights, warn=True)

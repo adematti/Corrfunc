@@ -395,7 +395,7 @@ static inline int set_weight_struct(weight_struct* weight_st, const weight_metho
                 weight_st->num_weights = 1;
                 break;
             case INVERSE_BITWISE:
-                weight_st->num_weights = 1;
+                weight_st->num_weights = 0; // we can e.g. have only angular upweighting
                 break;
             default:
                 weight_st->num_weights = 0;

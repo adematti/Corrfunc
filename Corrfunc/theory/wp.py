@@ -514,7 +514,7 @@ def wp(boxsize, pimax, nthreads, binfile, X, Y, Z,
     X, Y, Z = [convert_to_native_endian(arr, warn=True)
                         for arr in [X, Y, Z]]
 
-    if weight_type is not None:
+    if weights is not None:
         weights = [convert_to_native_endian(arr, warn=True) for arr in weights]
 
     if pair_weights is not None:
