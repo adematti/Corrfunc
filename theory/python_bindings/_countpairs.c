@@ -1197,10 +1197,25 @@ finally:
     return status;
 }
 
-static int check_pair_weight(PyObject *module, pair_weight_struct *pair_weight_st, PyObject *sep_obj, PyObject *weight_obj, size_t element_size)
+static int check_pair_weight(PyObject *module, pair_weight_struct *pair_weight_st, PyObject *sep_obj, PyObject *weight_obj, size_t element_size, PyObject *weight_attrs)
 {
     int status = EXIT_SUCCESS;
     char msg[1024];
+    pair_weight_st->noffset = 1;
+    pair_weight_st->default_value = 0.;
+    if (weight_attrs != NULL) {
+        if (!PySequence_Check(weight_attrs)) {
+            snprintf(msg, 1024, "Please input tuple/list of weight attributes");
+            return EXIT_FAILURE;
+        }
+        pair_weight_st->noffset = PyLong_AsLong(PySequence_Fast_GET_ITEM(weight_attrs,0));
+        pair_weight_st->default_value = PyFloat_AsDouble(PySequence_Fast_GET_ITEM(weight_attrs,1));
+        if (PyErr_Occurred() != NULL) {
+          snprintf(msg, 1024, "Please provide tuple of integers (noffset, default_value) as weight attributes");
+          return EXIT_FAILURE;
+        }
+    }
+    if (weight_obj == NULL) return status;
     const int requirements = NPY_ARRAY_IN_ARRAY;
     PyArrayObject *sep = (PyArrayObject *) PyArray_FromArray((PyArrayObject *) sep_obj, NOTYPE_DESCR, requirements);
     PyArrayObject *weight = (PyArrayObject *) PyArray_FromArray((PyArrayObject *) weight_obj, NOTYPE_DESCR, requirements);
@@ -1241,7 +1256,7 @@ static int check_pair_weight(PyObject *module, pair_weight_struct *pair_weight_s
         snprintf(msg, 1024, "ERROR: Expected pair weight array and separation array to be of same size.\nFound %d and %d instead.\n", num_weight, num);
         goto except;
     }
-    set_pair_weight_struct(pair_weight_st, (void *) PyArray_DATA(sep), (void *) PyArray_DATA(weight), num);
+    set_pair_weight_struct(pair_weight_st, (void *) PyArray_DATA(sep), (void *) PyArray_DATA(weight), num, pair_weight_st->noffset, pair_weight_st->default_value);
     goto finally;
 except:
     countpairs_error_out(module, msg);
@@ -1270,7 +1285,7 @@ static PyObject *countpairs_countpairs(PyObject *self, PyObject *args, PyObject 
     int nthreads=4;
     char *binfile, *weighting_method_str = NULL;
 
-    PyObject *pair_weight_obj=NULL, *sep_pair_weight_obj=NULL;
+    PyObject *pair_weight_obj=NULL, *sep_pair_weight_obj=NULL, *attrs_pair_weight=NULL;
 
     struct config_options options = get_config_options();
     options.verbose = 0;
@@ -1312,12 +1327,13 @@ static PyObject *countpairs_countpairs(PyObject *self, PyObject *args, PyObject 
         "weight_type",
         "pair_weights",
         "sep_pair_weights",
+        "attrs_pair_weights",
         "bin_type",
         NULL
     };
 
     // Note: type 'O!' doesn't allow for None to be passed, which we might want to do.
-    if ( ! PyArg_ParseTupleAndKeywords(args, kwargs, "iisO!O!O!|OO!O!O!ObbdbbbbhbbbisO!O!I", kwlist,
+    if ( ! PyArg_ParseTupleAndKeywords(args, kwargs, "iisO!O!O!|OO!O!O!ObbdbbbbhbbbisO!O!OI", kwlist,
                                        &autocorr,&nthreads,&binfile,
                                        &PyArray_Type,&x1_obj,
                                        &PyArray_Type,&y1_obj,
@@ -1340,6 +1356,7 @@ static PyObject *countpairs_countpairs(PyObject *self, PyObject *args, PyObject 
                                        &weighting_method_str,
                                        &PyArray_Type,&pair_weight_obj,
                                        &PyArray_Type,&sep_pair_weight_obj,
+                                       &attrs_pair_weight,
                                        &(options.bin_type))
 
          ) {
@@ -1513,7 +1530,7 @@ static PyObject *countpairs_countpairs(PyObject *self, PyObject *args, PyObject 
         }*/
         if (weights2_obj != NULL) wstatus = check_weights(module, weights2_obj, &(extra.weights1), extra.weight_method, ND2, element_size);
     }
-    if (pair_weight_obj != NULL) wstatus = check_pair_weight(module, &(extra.pair_weight), sep_pair_weight_obj, pair_weight_obj, element_size);
+    wstatus = check_pair_weight(module, &(extra.pair_weight), sep_pair_weight_obj, pair_weight_obj, element_size, attrs_pair_weight);
 
     /* Pack the weights into extra_options */
     /*for(int64_t w = 0; w < extra.weights0.num_weights; w++){
@@ -1589,7 +1606,7 @@ static PyObject *countpairs_countpairs_rp_pi(PyObject *self, PyObject *args, PyO
 
     double pimax;
     char *binfile, *weighting_method_str = NULL;
-    PyObject *pair_weight_obj=NULL, *sep_pair_weight_obj=NULL;
+    PyObject *pair_weight_obj=NULL, *sep_pair_weight_obj=NULL, *attrs_pair_weight=NULL;
 
     struct config_options options = get_config_options();
     options.verbose = 0;
@@ -1630,11 +1647,12 @@ static PyObject *countpairs_countpairs_rp_pi(PyObject *self, PyObject *args, PyO
         "weight_type",
         "pair_weights",
         "sep_pair_weights",
+        "attrs_pair_weights",
         "bin_type",
         NULL
     };
 
-    if ( ! PyArg_ParseTupleAndKeywords(args, kwargs, "iidsO!O!O!|OO!O!O!ObbdbbbbhbbbisO!O!I", kwlist,
+    if ( ! PyArg_ParseTupleAndKeywords(args, kwargs, "iidsO!O!O!|OO!O!O!ObbdbbbbhbbbisO!O!OI", kwlist,
                                        &autocorr,&nthreads,&pimax,&binfile,
                                        &PyArray_Type,&x1_obj,
                                        &PyArray_Type,&y1_obj,
@@ -1657,6 +1675,7 @@ static PyObject *countpairs_countpairs_rp_pi(PyObject *self, PyObject *args, PyO
                                        &weighting_method_str,
                                        &PyArray_Type,&pair_weight_obj,
                                        &PyArray_Type,&sep_pair_weight_obj,
+                                       &attrs_pair_weight,
                                        &(options.bin_type))
 
          ) {
@@ -1791,7 +1810,7 @@ static PyObject *countpairs_countpairs_rp_pi(PyObject *self, PyObject *args, PyO
 
         if (weights2_obj != NULL) wstatus = check_weights(module, weights2_obj, &(extra.weights1), extra.weight_method, ND2, element_size);
     }
-    if (pair_weight_obj != NULL) wstatus = check_pair_weight(module, &(extra.pair_weight), sep_pair_weight_obj, pair_weight_obj, element_size);
+    wstatus = check_pair_weight(module, &(extra.pair_weight), sep_pair_weight_obj, pair_weight_obj, element_size, attrs_pair_weight);
 
     if(wstatus != EXIT_SUCCESS) {
         Py_RETURN_NONE;
@@ -1862,7 +1881,7 @@ static PyObject *countpairs_countpairs_wp(PyObject *self, PyObject *args, PyObje
     double boxsize,pimax;
     int nthreads=1;
     char *binfile, *weighting_method_str = NULL;
-    PyObject *pair_weight_obj=NULL, *sep_pair_weight_obj=NULL;
+    PyObject *pair_weight_obj=NULL, *sep_pair_weight_obj=NULL, *attrs_pair_weight=NULL;
     size_t element_size;
 
     struct config_options options = get_config_options();
@@ -1901,11 +1920,12 @@ static PyObject *countpairs_countpairs_wp(PyObject *self, PyObject *args, PyObje
         "isa",/* instruction set to use of type enum isa; valid values are AVX512F, AVX, SSE, FALLBACK */
         "pair_weights",
         "sep_pair_weights",
+        "attrs_pair_weights",
         "bin_type",
         NULL
     };
 
-    if( ! PyArg_ParseTupleAndKeywords(args, kwargs, "ddisO!O!O!|OsbbbbbhbbbbiO!O!I", kwlist,
+    if( ! PyArg_ParseTupleAndKeywords(args, kwargs, "ddisO!O!O!|OsbbbbbhbbbbiO!O!OI", kwlist,
                                       &boxsize,&pimax,&nthreads,&binfile,
                                       &PyArray_Type,&x1_obj,
                                       &PyArray_Type,&y1_obj,
@@ -1923,6 +1943,7 @@ static PyObject *countpairs_countpairs_wp(PyObject *self, PyObject *args, PyObje
                                       &(options.instruction_set),
                                       &PyArray_Type,&pair_weight_obj,
                                       &PyArray_Type,&sep_pair_weight_obj,
+                                      &attrs_pair_weight,
                                       &(options.bin_type))
 
         ){
@@ -2005,7 +2026,7 @@ static PyObject *countpairs_countpairs_wp(PyObject *self, PyObject *args, PyObje
     void *Z1 = PyArray_DATA((PyArrayObject *) z1_array);
 
     if (weights1_obj != NULL) wstatus = check_weights(module, weights1_obj, &(extra.weights0), extra.weight_method, ND1, element_size);
-    if (pair_weight_obj != NULL) wstatus = check_pair_weight(module, &(extra.pair_weight), sep_pair_weight_obj, pair_weight_obj, element_size);
+    wstatus = check_pair_weight(module, &(extra.pair_weight), sep_pair_weight_obj, pair_weight_obj, element_size, attrs_pair_weight);
 
     if(wstatus != EXIT_SUCCESS) {
         Py_RETURN_NONE;
@@ -2090,7 +2111,7 @@ static PyObject *countpairs_countpairs_xi(PyObject *self, PyObject *args, PyObje
     double boxsize;
     int nthreads=4;
     char *binfile, *weighting_method_str = NULL;
-    PyObject *pair_weight_obj=NULL, *sep_pair_weight_obj=NULL;
+    PyObject *pair_weight_obj=NULL, *sep_pair_weight_obj=NULL, *attrs_pair_weight=NULL;
 
     struct config_options options = get_config_options();
     options.verbose = 0;
@@ -2124,12 +2145,13 @@ static PyObject *countpairs_countpairs_xi(PyObject *self, PyObject *args, PyObje
         "isa",/* instruction set to use of type enum isa; valid values are AVX512F, AVX, SSE, FALLBACK */
         "pair_weights",
         "sep_pair_weights",
+        "attrs_pair_weights",
         "bin_type",
         NULL
     };
 
 
-    if( ! PyArg_ParseTupleAndKeywords(args, kwargs, "disO!O!O!|OsbbbbbhbbbiO!O!I", kwlist,
+    if( ! PyArg_ParseTupleAndKeywords(args, kwargs, "disO!O!O!|OsbbbbbhbbbiO!O!OI", kwlist,
                                       &boxsize,&nthreads,&binfile,
                                       &PyArray_Type,&x1_obj,
                                       &PyArray_Type,&y1_obj,
@@ -2146,6 +2168,7 @@ static PyObject *countpairs_countpairs_xi(PyObject *self, PyObject *args, PyObje
                                       &(options.instruction_set),
                                       &PyArray_Type,&pair_weight_obj,
                                       &PyArray_Type,&sep_pair_weight_obj,
+                                      &attrs_pair_weight,
                                       &(options.bin_type))
         ) {
 
@@ -2226,7 +2249,7 @@ static PyObject *countpairs_countpairs_xi(PyObject *self, PyObject *args, PyObje
     void *Z1 = PyArray_DATA((PyArrayObject *) z1_array);
 
     if (weights1_obj != NULL) wstatus = check_weights(module, weights1_obj, &(extra.weights0), extra.weight_method, ND1, element_size);
-    if (pair_weight_obj != NULL) wstatus = check_pair_weight(module, &(extra.pair_weight), sep_pair_weight_obj, pair_weight_obj, element_size);
+    wstatus = check_pair_weight(module, &(extra.pair_weight), sep_pair_weight_obj, pair_weight_obj, element_size, attrs_pair_weight);
 
     if(wstatus != EXIT_SUCCESS) {
         Py_RETURN_NONE;
@@ -2302,7 +2325,7 @@ static PyObject *countpairs_countpairs_s_mu(PyObject *self, PyObject *args, PyOb
     double mu_max;
     int nmu_bins;
     char *binfile, *weighting_method_str = NULL;
-    PyObject *pair_weight_obj=NULL, *sep_pair_weight_obj=NULL;
+    PyObject *pair_weight_obj=NULL, *sep_pair_weight_obj=NULL, *attrs_pair_weight=NULL;
 
     struct config_options options = get_config_options();
     options.verbose = 0;
@@ -2346,11 +2369,12 @@ static PyObject *countpairs_countpairs_s_mu(PyObject *self, PyObject *args, PyOb
         "weight_type",
         "pair_weights",
         "sep_pair_weights",
+        "attrs_pair_weights",
         "bin_type",
         NULL
     };
 
-    if ( ! PyArg_ParseTupleAndKeywords(args, kwargs, "iisdiO!O!O!|OO!O!O!ObbdbbbbbhbbbisO!O!I", kwlist,
+    if ( ! PyArg_ParseTupleAndKeywords(args, kwargs, "iisdiO!O!O!|OO!O!O!ObbdbbbbbhbbbisO!O!OI", kwlist,
                                        &autocorr,&nthreads,&binfile, &mu_max, &nmu_bins,
                                        &PyArray_Type,&x1_obj,
                                        &PyArray_Type,&y1_obj,
@@ -2374,6 +2398,7 @@ static PyObject *countpairs_countpairs_s_mu(PyObject *self, PyObject *args, PyOb
                                        &weighting_method_str,
                                        &PyArray_Type,&pair_weight_obj,
                                        &PyArray_Type,&sep_pair_weight_obj,
+                                       &attrs_pair_weight,
                                        &(options.bin_type))
 
          ) {
@@ -2508,7 +2533,7 @@ static PyObject *countpairs_countpairs_s_mu(PyObject *self, PyObject *args, PyOb
 
         if (weights2_obj != NULL) wstatus = check_weights(module, weights2_obj, &(extra.weights1), extra.weight_method, ND2, element_size);
     }
-    if (pair_weight_obj != NULL) wstatus = check_pair_weight(module, &(extra.pair_weight), sep_pair_weight_obj, pair_weight_obj, element_size);
+    wstatus = check_pair_weight(module, &(extra.pair_weight), sep_pair_weight_obj, pair_weight_obj, element_size, attrs_pair_weight);
 
     if(wstatus != EXIT_SUCCESS) {
         Py_RETURN_NONE;

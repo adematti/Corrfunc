@@ -364,7 +364,9 @@ typedef struct
 {
     void *weight;
     void *sep;
-    int num;
+    uint8_t num;
+    int8_t noffset;
+    double default_value;
 } pair_weight_struct;
 
 typedef enum {
@@ -382,6 +384,20 @@ static inline void copy_weight_struct(weight_struct *weight_st0, const weight_st
     weight_st0->num_integer_weights = weight_st1->num_integer_weights;
 }
 
+
+static inline int get_num_weights_by_method(const weight_method_t method) {
+    switch (method) {
+        case PAIR_PRODUCT:
+            return 1;
+        case INVERSE_BITWISE:
+            return 0; // we can e.g. have only angular upweighting
+        default:
+            return 0;
+    }
+    return 0;
+}
+
+
 static inline int set_weight_struct(weight_struct* weight_st, const weight_method_t method, const weight_type_t* type, const int8_t num_weights) {
     // index is 0 (first weights) or 1 (second weights)
     weight_st->num_weights = num_weights;
@@ -390,16 +406,7 @@ static inline int set_weight_struct(weight_struct* weight_st, const weight_metho
         return EXIT_FAILURE;
     }
     if (num_weights < 0) {
-        switch (method) {
-            case PAIR_PRODUCT:
-                weight_st->num_weights = 1;
-                break;
-            case INVERSE_BITWISE:
-                weight_st->num_weights = 0; // we can e.g. have only angular upweighting
-                break;
-            default:
-                weight_st->num_weights = 0;
-        }
+        weight_st->num_weights = get_num_weights_by_method(method);
     }
     char itemtype[MAX_NUM_WEIGHTS];
     for (int w=0; w<weight_st->num_weights; w++) {
@@ -447,10 +454,13 @@ static inline int set_weight_struct(weight_struct* weight_st, const weight_metho
 }
 
 
-static inline int set_pair_weight_struct(pair_weight_struct* pair_weight_st, void* sep, void* weight, int num) {
+static inline int set_pair_weight_struct(pair_weight_struct* pair_weight_st, void* sep, void* weight, const uint8_t num,
+                                         const int8_t noffset, const double default_value) {
     pair_weight_st->weight = weight;
     pair_weight_st->sep = sep;
     pair_weight_st->num = num;
+    pair_weight_st->noffset = noffset;
+    pair_weight_st->default_value = default_value;
     //printf("Found %d pair weights.\n",num);
     return EXIT_SUCCESS;
 }
@@ -500,7 +510,7 @@ static inline struct extra_options get_extra_options(const weight_method_t weigh
 
     set_weight_struct(&(extra.weights0), weight_method, NULL, -1);
     set_weight_struct(&(extra.weights1), weight_method, NULL, -1);
-    set_pair_weight_struct(&(extra.pair_weight), NULL, NULL, 0);
+    set_pair_weight_struct(&(extra.pair_weight), NULL, NULL, 0, 1, 0.);
 
     return extra;
 }

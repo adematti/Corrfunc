@@ -19,7 +19,7 @@ def DD(autocorr, nthreads, binfile, X1, Y1, Z1, weights1=None, periodic=True,
        zbin_refine_factor=1, max_cells_per_dim=100,
        copy_particles=True, enable_min_sep_opt=True,
        c_api_timer=False, isa='fastest', weight_type=None, bin_type='custom',
-       pair_weights=None, sep_pair_weights=None):
+       pair_weights=None, sep_pair_weights=None, attrs_pair_weights=None):
     """
     Calculate the 3-D pair-counts corresponding to the real-space correlation
     function, :math:`\\xi(r)`.
@@ -163,6 +163,11 @@ def DD(autocorr, nthreads, binfile, X1, Y1, Z1, weights1=None, periodic=True,
     sep_pair_weights : array-like, optional. Default: None.
         Array of separations corresponding to ``pair_weights``.
 
+    attrs_pair_weights : tuple. Default: None.
+        Attributes for pair weights; in case ``weight_type`` is "inverse_bitwise",
+        the tuple of (offset to be added to the bitwise counts,
+        default weight value if denominator is zero).
+
     Returns
     --------
 
@@ -262,7 +267,7 @@ def DD(autocorr, nthreads, binfile, X1, Y1, Z1, weights1=None, periodic=True,
     kwargs = {}
     for k in ['weights1', 'weights2', 'weight_type',
               'X2', 'Y2', 'Z2', 'boxsize',
-              'pair_weights', 'sep_pair_weights']:
+              'pair_weights', 'sep_pair_weights', 'attrs_pair_weights']:
         v = locals()[k]
         if v is not None:
             kwargs[k] = v

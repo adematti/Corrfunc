@@ -286,7 +286,7 @@ def wp(boxsize, pimax, nthreads, binfile, X, Y, Z,
        zbin_refine_factor=1, max_cells_per_dim=100,
        copy_particles=True, enable_min_sep_opt=True,
        c_api_timer=False, c_cell_timer=False, isa='fastest', bin_type='custom',
-       pair_weights=None, sep_pair_weights=None):
+       pair_weights=None, sep_pair_weights=None, attrs_pair_weights=None):
     """
     Function to compute the projected correlation function in a
     periodic cosmological box. Pairs which are separated by less
@@ -430,6 +430,11 @@ def wp(boxsize, pimax, nthreads, binfile, X, Y, Z,
     sep_pair_weights : array-like, optional. Default: None.
         Array of separations corresponding to ``pair_weights``.
 
+    attrs_pair_weights : tuple. Default: None.
+        Attributes for pair weights; in case ``weight_type`` is "inverse_bitwise",
+        the tuple of (offset to be added to the bitwise counts,
+        default weight value if denominator is zero).
+
     Returns
     --------
 
@@ -523,7 +528,7 @@ def wp(boxsize, pimax, nthreads, binfile, X, Y, Z,
 
     # Passing None parameters breaks the parsing code, so avoid this
     kwargs = {}
-    for k in ['weights', 'weight_type', 'pair_weights', 'sep_pair_weights']:
+    for k in ['weights', 'weight_type', 'pair_weights', 'sep_pair_weights', 'attrs_pair_weights']:
         v = locals()[k]
         if v is not None:
             kwargs[k] = v

@@ -15,5 +15,5 @@ typedef struct
 {
     DOUBLE *weight;
     DOUBLE *sep;
-    int num;
+    uint8_t num;
 } pair_weight_struct_DOUBLE;

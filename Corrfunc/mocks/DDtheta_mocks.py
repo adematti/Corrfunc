@@ -25,7 +25,7 @@ def DDtheta_mocks(autocorr, nthreads, binfile,
                   copy_particles=True, enable_min_sep_opt=True,
                   c_api_timer=False, isa='fastest',
                   weight_type=None, bin_type='custom',
-                  pair_weights=None, sep_pair_weights=None):
+                  pair_weights=None, sep_pair_weights=None, attrs_pair_weights=None):
     """
     Function to compute the angular correlation function for points on
     the sky (i.e., mock catalogs or observed galaxies).
@@ -222,6 +222,11 @@ def DDtheta_mocks(autocorr, nthreads, binfile,
     sep_pair_weights : array-like, optional. Default: None.
         Array of separations corresponding to ``pair_weights``.
 
+    attrs_pair_weights : tuple. Default: None.
+        Attributes for pair weights; in case ``weight_type`` is "inverse_bitwise",
+        the tuple of (offset to be added to the bitwise counts,
+        default weight value if denominator is zero).
+
     Returns
     --------
 
@@ -342,7 +347,7 @@ def DDtheta_mocks(autocorr, nthreads, binfile,
     # Passing None parameters breaks the parsing code, so avoid this
     kwargs = {}
     for k in ['weights1', 'weights2', 'weight_type', 'RA2', 'DEC2',
-              'pair_weights', 'sep_pair_weights']:
+              'pair_weights', 'sep_pair_weights', 'attrs_pair_weights']:
         v = locals()[k]
         if v is not None:
             kwargs[k] = v

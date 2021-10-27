@@ -53,6 +53,8 @@ typedef struct
 
     uint8_t num_weights;
     uint8_t num_integer_weights;
+    int8_t noffset;
+    DOUBLE default_value;
 } pair_struct_DOUBLE;
 
 
@@ -63,6 +65,8 @@ static inline int set_pair_struct_DOUBLE(pair_struct_DOUBLE *pair, const weight_
     pair->pair_weight.weight = pair_w->weight;
     pair->pair_weight.sep = pair_w->sep;
     pair->pair_weight.num = pair_w->num;
+    pair->noffset = pair_w->noffset;
+    pair->default_value = (DOUBLE) pair_w->default_value;
     return EXIT_SUCCESS;
 }
 
@@ -111,12 +115,13 @@ static inline SSE_FLOATS sse_pair_product_DOUBLE(pair_struct_DOUBLE *pair){
  * The bitwise weight is a bit product of the particle weights
  */
 static inline DOUBLE inverse_bitwise_DOUBLE(pair_struct_DOUBLE *pair){
-    int nbits = 1;
+    int nbits = pair->noffset;
+    //printf("%d ", nbits);
     for (int w=0;w<pair->num_integer_weights;w++) {
         //printf("w%d %ld %ld\n", w, *((LONG *) &(pair->weights0[w].d)), *((LONG *) &(pair->weights1[w].d)));
         nbits += POPCOUNT(*((LONG *) &(pair->weights0[w].d)) & *((LONG *) &(pair->weights1[w].d)));
     }
-    DOUBLE weight = 1./nbits;
+    DOUBLE weight = (nbits == 0) ? pair->default_value : 1./nbits;
     for (int w=pair->num_integer_weights;w<pair->num_weights;w++) {
         weight *= pair->weights0[w].d*pair->weights1[w].d;
     }
