@@ -210,11 +210,12 @@ static inline int countpairs_avx512_intrinsics_DOUBLE(const int64_t N0, DOUBLE *
                 continue;
             }
 
-            if(need_rpavg) {
-                union_mDperp.m_Dperp = AVX512_MASKZ_SQRT_FLOAT(m_mask_left, r2);
-            }
             if(need_weightavg){
                 union_mweight.m_weights = avx512_weight_func(&pair);
+            }
+            if(need_rpavg) {
+                union_mDperp.m_Dperp = AVX512_MASKZ_SQRT_FLOAT(m_mask_left, r2);
+                if(need_weightavg) union_mDperp.m_Dperp = AVX512_MASKZ_MULTIPLY_FLOATS(m_mask_left, union_mDperp.m_Dperp, union_mweight.m_weights);
             }
 
             AVX512_INTS m_rpbin = AVX512_SETZERO_INT();
@@ -488,11 +489,12 @@ static inline int countpairs_avx_intrinsics_DOUBLE(const int64_t N0, DOUBLE *x0,
             }
 
             AVX_FLOATS m_rpbin = AVX_SETZERO_FLOAT();
-            if(need_rpavg) {
-                union_mDperp.m_Dperp = AVX_SQRT_FLOAT(r2);
-            }
             if(need_weightavg){
                 union_mweight.m_weights = avx_weight_func(&pair);
+            }
+            if(need_rpavg) {
+                union_mDperp.m_Dperp = AVX_SQRT_FLOAT(r2);
+                if(need_weightavg) union_mDperp.m_Dperp = AVX_MULTIPLY_FLOATS(union_mDperp.m_Dperp, union_mweight.m_weights);
             }
 
             //Loop backwards through nbins. m_mask_left contains all the points that are less than rpmax
@@ -554,11 +556,12 @@ static inline int countpairs_avx_intrinsics_DOUBLE(const int64_t N0, DOUBLE *x0,
             }
 
             DOUBLE r = ZERO, pairweight = ZERO;
-            if(need_rpavg) {
-                r = SQRT(r2);
-            }
             if(need_weightavg){
                 pairweight = fallback_weight_func(&pair);
+            }
+            if(need_rpavg) {
+                r = SQRT(r2);
+                if(need_weightavg) r *= pairweight;
             }
 
             for(int kbin=nbin-1;kbin>=1;kbin--) {
@@ -775,11 +778,12 @@ static inline int countpairs_sse_intrinsics_DOUBLE(const int64_t N0, DOUBLE *x0,
           }
 
           SSE_FLOATS m_rpbin = SSE_SETZERO_FLOAT();
-          if(need_rpavg) {
-              union_mDperp.m_Dperp = SSE_SQRT_FLOAT(r2);
-          }
           if(need_weightavg){
               union_mweight.m_weights = sse_weight_func(&pair);
+          }
+          if(need_rpavg) {
+              union_mDperp.m_Dperp = SSE_SQRT_FLOAT(r2);
+              if(need_weightavg) union_mDperp.m_Dperp = SSE_MULTIPLY_FLOATS(union_mDperp.m_Dperp, union_mweight.m_weights);
           }
 
           for(int kbin=nbin-1;kbin>=1;kbin--) {
@@ -789,7 +793,7 @@ static inline int countpairs_sse_intrinsics_DOUBLE(const int64_t N0, DOUBLE *x0,
               int test2  = SSE_TEST_COMPARISON(m_bin_mask);
               npairs[kbin] += SSE_BIT_COUNT_INT(test2);
               if(need_rpavg || need_weightavg){
-                  m_rpbin = SSE_BLEND_FLOATS_WITH_MASK(m_rpbin,m_kbin[kbin], m_bin_mask);
+                  m_rpbin = SSE_BLEND_FLOATS_WITH_MASK(m_rpbin, m_kbin[kbin], m_bin_mask);
               }
               int test3 = SSE_TEST_COMPARISON(m_mask_left);
               if(test3 == 0) {
@@ -837,11 +841,12 @@ static inline int countpairs_sse_intrinsics_DOUBLE(const int64_t N0, DOUBLE *x0,
           }
 
           DOUBLE r = ZERO, pairweight = ZERO;
-          if(need_rpavg) {
-              r = SQRT(r2);
-          }
           if(need_weightavg){
               pairweight = fallback_weight_func(&pair);
+          }
+          if(need_rpavg) {
+              r = SQRT(r2);
+              if(need_weightavg) r *= pairweight;
           }
 
           for(int kbin=nbin-1;kbin>=1;kbin--){
@@ -1004,11 +1009,12 @@ static inline int countpairs_fallback_DOUBLE(const int64_t N0, DOUBLE *x0, DOUBL
             }
 
             DOUBLE r = ZERO, pairweight = ZERO;
-            if(need_rpavg) {
-                r = SQRT(r2);
-            }
             if(need_weightavg){
                 pairweight = weight_func(&pair);
+            }
+            if(need_rpavg) {
+                r = SQRT(r2);
+                if(need_weightavg) r *= pairweight;
             }
 
             for(int kbin=nbin-1;kbin>=1;kbin--){

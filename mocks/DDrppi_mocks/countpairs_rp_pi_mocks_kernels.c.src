@@ -297,6 +297,10 @@ static inline int countpairs_rp_pi_mocks_avx512_intrinsics_DOUBLE(const int64_t 
 
                 union_mweight.m_weights = avx512_weight_func(&pair);
             }
+            if(need_rpavg) {
+                union_mDperp.m_Dperp = AVX512_MASKZ_SQRT_FLOAT(m_mask_left, m_sqr_Dperp);
+                if(need_weightavg) union_mDperp.m_Dperp = AVX512_MASKZ_MULTIPLY_FLOATS(m_mask_left, union_mDperp.m_Dperp, union_mweight.m_weights);
+            }
 
             const AVX512_MASK m_mask = m_mask_left;
             AVX512_FLOATS m_rpbin = AVX512_SETZERO_FLOAT();
@@ -328,8 +332,7 @@ static inline int countpairs_rp_pi_mocks_avx512_intrinsics_DOUBLE(const int64_t 
                     rpavg[ibin] += union_mDperp.Dperp[jj];
                 }
                 if(need_weightavg){
-                    const DOUBLE weight = union_mweight.weights[jj];
-                    weightavg[ibin] += weight;
+                    weightavg[ibin] += union_mweight.weights[jj];
                 }
             }
         }//AVX512 j loop
@@ -618,9 +621,6 @@ static inline int countpairs_rp_pi_mocks_avx_intrinsics_DOUBLE(const int64_t N0,
             }
             const AVX_FLOATS m_Dpar = AVX_SQRT_FLOAT(m_sqr_Dpar);
 
-            if(need_rpavg) {
-                union_mDperp.m_Dperp = AVX_SQRT_FLOAT(m_sqr_Dperp);
-            }
             if(need_weightavg){
                 pair.dx.a = m_perpx;
                 pair.dy.a = m_perpy;
@@ -631,6 +631,10 @@ static inline int countpairs_rp_pi_mocks_avx_intrinsics_DOUBLE(const int64_t N0,
                 pair.parz.a = m_parz;
 
                 union_mweight.m_weights = avx_weight_func(&pair);
+            }
+            if(need_rpavg) {
+                union_mDperp.m_Dperp = AVX_SQRT_FLOAT(m_sqr_Dperp);
+                if(need_weightavg) union_mDperp.m_Dperp = AVX_MULTIPLY_FLOATS(union_mDperp.m_Dperp, union_mweight.m_weights);
             }
 
             const AVX_FLOATS m_mask = m_mask_left;
@@ -664,8 +668,7 @@ static inline int countpairs_rp_pi_mocks_avx_intrinsics_DOUBLE(const int64_t N0,
                     rpavg[ibin] += union_mDperp.Dperp[jj];
                 }
                 if(need_weightavg){
-                    const DOUBLE weight = union_mweight.weights[jj];
-                    weightavg[ibin] += weight;
+                    weightavg[ibin] += union_mweight.weights[jj];
                 }
             }
         }//AVX j loop
@@ -698,9 +701,7 @@ static inline int countpairs_rp_pi_mocks_avx_intrinsics_DOUBLE(const int64_t N0,
             const DOUBLE sqr_Dperp  = sqr_s - sqr_Dpar;
             if(sqr_Dperp >= sqr_rpmax || sqr_Dperp < sqr_rpmin) continue;
             DOUBLE rp = ZERO, pairweight = ZERO;
-            if(need_rpavg) {
-                rp = SQRT(sqr_Dperp);
-            }
+
             if(need_weightavg){
                 pair.dx.d = perpx;
                 pair.dy.d = perpy;
@@ -712,13 +713,17 @@ static inline int countpairs_rp_pi_mocks_avx_intrinsics_DOUBLE(const int64_t N0,
 
                 pairweight = fallback_weight_func(&pair);
            }
+           if(need_rpavg) {
+               rp = SQRT(sqr_Dperp);
+               if(need_weightavg) rp *= pairweight;
+           }
 
             for(int kbin=nbin-1;kbin>=1;kbin--) {
                 if(sqr_Dperp >= rupp_sqr[kbin-1]) {
                     const int ibin = kbin*(npibin+1) + pibin;
                     npairs[ibin]++;
                     if(need_rpavg) {
-                        rpavg[ibin]+=rp;
+                        rpavg[ibin] += rp;
                     }
                     if(need_weightavg){
                         weightavg[ibin] += pairweight;
@@ -993,9 +998,6 @@ static inline int countpairs_rp_pi_mocks_sse_intrinsics_DOUBLE(const int64_t N0,
                 m_sqr_Dpar  = SSE_BLEND_FLOATS_WITH_MASK(m_sqr_pimax,m_sqr_Dpar,m_mask_left);
             }
             union float4 union_mDperp;
-            if(need_rpavg) {
-                union_mDperp.m_Dperp = SSE_SQRT_FLOAT(m_sqr_Dperp);
-            }
             if(need_weightavg){
                 pair.dx.s = m_perpx;
                 pair.dy.s = m_perpy;
@@ -1006,6 +1008,10 @@ static inline int countpairs_rp_pi_mocks_sse_intrinsics_DOUBLE(const int64_t N0,
                 pair.parz.s = m_parz;
 
                 union_mweight.m_weights = sse_weight_func(&pair);
+            }
+            if(need_rpavg) {
+                union_mDperp.m_Dperp = SSE_SQRT_FLOAT(m_sqr_Dperp);
+                if(need_weightavg) union_mDperp.m_Dperp = SSE_MULTIPLY_FLOATS(union_mDperp.m_Dperp, union_mweight.m_weights);
             }
 
             const SSE_FLOATS m_mask = m_mask_left;
@@ -1040,8 +1046,7 @@ static inline int countpairs_rp_pi_mocks_sse_intrinsics_DOUBLE(const int64_t N0,
                     rpavg[ibin] += union_mDperp.Dperp[jj];
                 }
                 if(need_weightavg){
-                    const DOUBLE weight = union_mweight.weights[jj];
-                    weightavg[ibin] += weight;
+                    weightavg[ibin] += union_mweight.weights[jj];
                 }
             }
         }//SSE j loop
@@ -1075,9 +1080,6 @@ static inline int countpairs_rp_pi_mocks_sse_intrinsics_DOUBLE(const int64_t N0,
             const DOUBLE sqr_Dperp  = sqr_s - sqr_Dpar;
             if(sqr_Dperp >= sqr_rpmax || sqr_Dperp < sqr_rpmin) continue;
             DOUBLE rp = ZERO, pairweight = ZERO;
-            if(need_rpavg) {
-                rp = SQRT(sqr_Dperp);
-            }
             if(need_weightavg){
                 pair.dx.d = perpx;
                 pair.dy.d = perpy;
@@ -1089,13 +1091,17 @@ static inline int countpairs_rp_pi_mocks_sse_intrinsics_DOUBLE(const int64_t N0,
 
                 pairweight = fallback_weight_func(&pair);
             }
+            if(need_rpavg) {
+                rp = SQRT(sqr_Dperp);
+                if(need_weightavg) rp *= pairweight;
+            }
 
             for(int kbin=nbin-1;kbin>=1;kbin--) {
                 if(sqr_Dperp >= rupp_sqr[kbin-1]) {
                     const int ibin = kbin*(npibin+1) + pibin;
                     npairs[ibin]++;
                     if(need_rpavg){
-                        rpavg[ibin]+=rp;
+                        rpavg[ibin] += rp;
                     }
                     if(need_weightavg){
                         weightavg[ibin] += pairweight;
@@ -1288,9 +1294,6 @@ static inline int countpairs_rp_pi_mocks_fallback_DOUBLE(const int64_t N0, DOUBL
             if(sqr_Dperp >= sqr_rpmax || sqr_Dperp < sqr_rpmin) continue;
 
             DOUBLE rp = ZERO, pairweight = ZERO;
-            if(need_rpavg) {
-                rp = SQRT(sqr_Dperp);
-            }
             if(need_weightavg){
                 pair.dx.d = perpx;
                 pair.dy.d = perpy;
@@ -1302,13 +1305,17 @@ static inline int countpairs_rp_pi_mocks_fallback_DOUBLE(const int64_t N0, DOUBL
 
                 pairweight = weight_func(&pair);
             }
+            if(need_rpavg) {
+                rp = SQRT(sqr_Dperp);
+                if(need_weightavg) rp *= pairweight;
+            }
 
             for(int kbin=nbin-1;kbin>=1;kbin--) {
                 if(sqr_Dperp >= rupp_sqr[kbin-1]) {
                     const int ibin = kbin*(npibin+1) + pibin;
                     npairs[ibin]++;
                     if(need_rpavg) {
-                        rpavg[ibin]+=rp;
+                        rpavg[ibin] += rp;
                     }
                     if(need_weightavg){
                         weightavg[ibin] += pairweight;

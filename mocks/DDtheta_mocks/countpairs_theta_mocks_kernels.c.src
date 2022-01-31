@@ -62,7 +62,7 @@ static inline int countpairs_theta_mocks_fallback_DOUBLE(const int64_t N0, DOUBL
             thetaavg[i] = ZERO;
         }
         if(need_weightavg){
-            weightavg[i]=ZERO;
+            weightavg[i] = ZERO;
         }
     }
 
@@ -189,13 +189,6 @@ static inline int countpairs_theta_mocks_fallback_DOUBLE(const int64_t N0, DOUBL
 
             if(costheta > costhetamin || costheta <= costhetamax) continue;
 
-            if(need_rpavg) {
-                if(order) {
-                    theta =  INV_PI_OVER_180*FAST_ACOS(costheta);
-                } else {
-                    theta =  INV_PI_OVER_180*ACOS(costheta);
-                }
-            }
             if(need_weightavg){
                 // These are only used for passing to weights
                 // Too expensive?
@@ -211,6 +204,14 @@ static inline int countpairs_theta_mocks_fallback_DOUBLE(const int64_t N0, DOUBL
                 pair.parz.d = z2 + zpos;
 
                 pairweight = weight_func(&pair);
+            }
+            if(need_rpavg) {
+                if(order) {
+                    theta = INV_PI_OVER_180*FAST_ACOS(costheta);
+                } else {
+                    theta = INV_PI_OVER_180*ACOS(costheta);
+                }
+                if(need_weightavg) theta *= pairweight;
             }
 
             for(int ibin=nthetabin-1;ibin>=1;ibin--) {
@@ -458,12 +459,7 @@ static inline int countpairs_theta_mocks_sse_intrinsics_DOUBLE(const int64_t N0,
             if(need_rpavg || need_weightavg){
                 m_thetabin = SSE_SETZERO_FLOAT();
             }
-            if(need_rpavg) {
-                //first do the acos to get the actual angles
-                const SSE_FLOATS m_inv_pi_over_180 = SSE_SET_FLOAT(INV_PI_OVER_180);
-                const SSE_FLOATS m_theta = SSE_ARC_COSINE(m_costheta, order);
-                union_mDperp.m_Dperp = SSE_MULTIPLY_FLOATS(m_theta,m_inv_pi_over_180);
-            }
+
             if(need_weightavg){
                 // These are only used for passing to weights
                 // Too expensive?
@@ -480,13 +476,20 @@ static inline int countpairs_theta_mocks_sse_intrinsics_DOUBLE(const int64_t N0,
 
                 union_mweight.m_weights = sse_weight_func(&pair);
             }
+            if(need_rpavg) {
+                //first do the acos to get the actual angles
+                const SSE_FLOATS m_inv_pi_over_180 = SSE_SET_FLOAT(INV_PI_OVER_180);
+                const SSE_FLOATS m_theta = SSE_ARC_COSINE(m_costheta, order);
+                union_mDperp.m_Dperp = SSE_MULTIPLY_FLOATS(m_theta, m_inv_pi_over_180);
+                if (need_weightavg) union_mDperp.m_Dperp = SSE_MULTIPLY_FLOATS(union_mDperp.m_Dperp, union_mweight.m_weights);
+            }
 
             for(int kbin=nthetabin-1;kbin>=1;kbin--) {
                 const SSE_FLOATS m1 = SSE_COMPARE_FLOATS_LE(m_costheta,m_costheta_upp[kbin-1]);
                 const SSE_FLOATS m_bin_mask = SSE_BITWISE_AND(m1,m_mask_left);
                 const int test = SSE_TEST_COMPARISON(m_bin_mask);
                 if(need_rpavg || need_weightavg) {
-                    m_thetabin = SSE_BLEND_FLOATS_WITH_MASK(m_thetabin,m_kbin[kbin], m_bin_mask);
+                    m_thetabin = SSE_BLEND_FLOATS_WITH_MASK(m_thetabin, m_kbin[kbin], m_bin_mask);
                 }
 
                 npairs[kbin] += SSE_BIT_COUNT_INT(test);
@@ -533,13 +536,7 @@ static inline int countpairs_theta_mocks_sse_intrinsics_DOUBLE(const int64_t N0,
                 continue;
             }
             DOUBLE theta = ZERO, pairweight = ZERO;
-            if(need_rpavg) {
-                if(order) {
-                    theta =  INV_PI_OVER_180*FAST_ACOS(costheta);
-                } else {
-                    theta =  INV_PI_OVER_180*ACOS(costheta) ;
-                }
-            }
+
             if(need_weightavg){
                 pair.dx.d = dx;
                 pair.dy.d = dy;
@@ -551,7 +548,14 @@ static inline int countpairs_theta_mocks_sse_intrinsics_DOUBLE(const int64_t N0,
 
                 pairweight = fallback_weight_func(&pair);
             }
-
+            if(need_rpavg) {
+                if(order) {
+                    theta = INV_PI_OVER_180*FAST_ACOS(costheta);
+                } else {
+                    theta = INV_PI_OVER_180*ACOS(costheta);
+                }
+                if(need_weightavg) theta *= pairweight;
+            }
 
             for(int ibin=nthetabin-1;ibin>=1;ibin--) {
                 if(costheta <= costheta_upp[ibin-1]) {
@@ -788,12 +792,6 @@ static inline int countpairs_theta_mocks_avx_intrinsics_DOUBLE(const int64_t N0,
             if(need_rpavg || need_weightavg) {
                 m_thetabin = AVX_SETZERO_FLOAT();
             }
-            if(need_rpavg){
-                //first do the acos to get the actual angles
-                const AVX_FLOATS m_inv_pi_over_180 = AVX_SET_FLOAT(INV_PI_OVER_180);
-                const AVX_FLOATS m_theta = AVX_ARC_COSINE(m_costheta, order);
-                union_mDperp.m_Dperp = AVX_MULTIPLY_FLOATS(m_theta,m_inv_pi_over_180);
-            }
 
             if(need_weightavg){
                 // These are only used for passing to weights
@@ -812,6 +810,13 @@ static inline int countpairs_theta_mocks_avx_intrinsics_DOUBLE(const int64_t N0,
               union_mweight.m_weights = avx_weight_func(&pair);
           }
 
+          if(need_rpavg){
+              //first do the acos to get the actual angles
+              const AVX_FLOATS m_inv_pi_over_180 = AVX_SET_FLOAT(INV_PI_OVER_180);
+              const AVX_FLOATS m_theta = AVX_ARC_COSINE(m_costheta, order);
+              union_mDperp.m_Dperp = AVX_MULTIPLY_FLOATS(m_theta, m_inv_pi_over_180);
+              if (need_weightavg) union_mDperp.m_Dperp = AVX_MULTIPLY_FLOATS(union_mDperp.m_Dperp, union_mweight.m_weights);
+          }
 
           for(int kbin=nthetabin-1;kbin>=1;kbin--) {
               const AVX_FLOATS m1 = AVX_COMPARE_FLOATS(m_costheta,m_costheta_upp[kbin-1],_CMP_LE_OS);
@@ -865,13 +870,7 @@ static inline int countpairs_theta_mocks_avx_intrinsics_DOUBLE(const int64_t N0,
               continue;
           }
           DOUBLE theta = ZERO, pairweight = ZERO;
-          if(need_rpavg) {
-              if(order) {
-                  theta =  INV_PI_OVER_180*FAST_ACOS(costheta) ;
-              } else {
-                  theta =  INV_PI_OVER_180*ACOS(costheta) ;
-              }
-          }
+
           if(need_weightavg){
               pair.dx.d = dx;
               pair.dy.d = dy;
@@ -882,6 +881,14 @@ static inline int countpairs_theta_mocks_avx_intrinsics_DOUBLE(const int64_t N0,
               pair.parz.d = (zpos + dz) + zpos;
 
               pairweight = fallback_weight_func(&pair);
+          }
+          if(need_rpavg) {
+              if(order) {
+                  theta = INV_PI_OVER_180*FAST_ACOS(costheta);
+              } else {
+                  theta = INV_PI_OVER_180*ACOS(costheta);
+              }
+              if(need_weightavg) theta *= pairweight;
           }
 
           for(int ibin=nthetabin-1;ibin>=1;ibin--) {
@@ -1118,13 +1125,6 @@ static inline int countpairs_theta_mocks_avx512_intrinsics_DOUBLE(const int64_t 
                 continue;
             }
 
-            if(need_rpavg){
-                //first do the acos to get the actual angles
-                const AVX512_FLOATS m_inv_pi_over_180 = AVX512_SET_FLOAT(INV_PI_OVER_180);
-                const AVX512_FLOATS m_theta = AVX512_ARC_COSINE(m_costheta, order);
-                union_mDperp.m_Dperp = AVX512_MASKZ_MULTIPLY_FLOATS(m_mask_left, m_theta,m_inv_pi_over_180);
-            }
-
             if(need_weightavg){
                 // These are only used for passing to weights
                 // Too expensive?
@@ -1140,6 +1140,14 @@ static inline int countpairs_theta_mocks_avx512_intrinsics_DOUBLE(const int64_t 
                 pair.parz.a512 = AVX512_ADD_FLOATS(m_z1,m_zpos);
 
                 union_mweight.m_weights = avx512_weight_func(&pair);
+            }
+
+            if(need_rpavg){
+                //first do the acos to get the actual angles
+                const AVX512_FLOATS m_inv_pi_over_180 = AVX512_SET_FLOAT(INV_PI_OVER_180);
+                const AVX512_FLOATS m_theta = AVX512_ARC_COSINE(m_costheta, order);
+                union_mDperp.m_Dperp = AVX512_MASKZ_MULTIPLY_FLOATS(m_mask_left, m_theta, m_inv_pi_over_180);
+                if (need_weightavg) union_mDperp.m_Dperp = AVX512_MASKZ_MULTIPLY_FLOATS(m_mask_left, union_mDperp.m_Dperp, union_mweight.m_weights);
             }
 
             AVX512_INTS m_thetabin = AVX512_SETZERO_INT();

@@ -410,7 +410,7 @@ static inline int countpairs_theta_mocks_brute_force_DOUBLE(const int64_t N0, DO
     for(int i=1;i<nthetabin;i++) {
         if(npairs[i] > 0) {
             if(options->need_avg_sep) {
-                thetaavg[i] /= (DOUBLE) npairs[i] ;
+                thetaavg[i] /= need_weightavg ? weightavg[i] : (DOUBLE) npairs[i];
             }
             if(need_weightavg) {
                 weightavg[i] /= (DOUBLE) npairs[i];
@@ -1169,7 +1169,7 @@ int countpairs_theta_mocks_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1,
     for(int i=1;i<nthetabin;i++) {
         if(npairs[i] > 0) {
             if(options->need_avg_sep) {
-                thetaavg[i] /= (DOUBLE) npairs[i] ;
+                thetaavg[i] /= need_weightavg ? weightavg[i] : (DOUBLE) npairs[i];
             }
             if(need_weightavg) {
                 weightavg[i] /= (DOUBLE) npairs[i];

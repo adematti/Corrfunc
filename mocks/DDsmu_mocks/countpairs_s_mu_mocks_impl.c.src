@@ -791,7 +791,7 @@ int countpairs_mocks_s_mu_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1, D
     for(int i=0;i<totnbins;i++) {
         if(npairs[i] > 0) {
             if(options->need_avg_sep) {
-                savg[i] /= (DOUBLE) npairs[i] ;
+                savg[i] /= need_weightavg ? weightavg[i] : (DOUBLE) npairs[i];
             }
             if(need_weightavg) {
                 weightavg[i] /= (DOUBLE) npairs[i];

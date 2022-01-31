@@ -508,7 +508,7 @@ int countpairs_rp_pi_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z
     if(autocorr == 0) {
         free_cellarray_DOUBLE(lattice2, totncells);
     }
-    
+
     if(abort_status != EXIT_SUCCESS || interrupt_status_DDrppi_DOUBLE != EXIT_SUCCESS) {
         /* Cleanup memory here if aborting */
         free(rupp);
@@ -613,7 +613,7 @@ int countpairs_rp_pi_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z
     for(int i=0;i<totnbins;i++) {
         if(npairs[i] > 0) {
             if(options->need_avg_sep) {
-                rpavg[i] /= (DOUBLE) npairs[i] ;
+                rpavg[i] /= need_weightavg ? weightavg[i] : (DOUBLE) npairs[i];
             }
             if(need_weightavg) {
                 weightavg[i] /= (DOUBLE) npairs[i];

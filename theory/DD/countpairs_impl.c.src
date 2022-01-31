@@ -176,7 +176,7 @@ int countpairs_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z1,
         fprintf(stderr,"Warning: Max. cells per dimension is set to 0 - resetting to `NLATMAX' = %d\n", NLATMAX);
         options->max_cells_per_dim = NLATMAX;
     }
-    
+
     for(int i=0;i<3;i++) {
         if(options->bin_refine_factors[i] < 1) {
             fprintf(stderr,"Warning: bin refine factor along axis = %d *must* be >=1. Instead found bin refine factor =%d\n",
@@ -620,7 +620,7 @@ int countpairs_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z1,
     for(int i=0;i<nrpbin;i++) {
         if(npairs[i] > 0) {
             if(options->need_avg_sep) {
-                rpavg[i] /= (DOUBLE) npairs[i] ;
+                rpavg[i] /= need_weightavg ? weightavg[i] : (DOUBLE) npairs[i];
             }
             if(need_weightavg) {
                 weightavg[i] /= (DOUBLE) npairs[i];
