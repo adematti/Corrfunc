@@ -332,6 +332,7 @@ static inline int countpairs_rp_pi_mocks_avx512_intrinsics_DOUBLE(const int64_t 
             const AVX512_FLOATS m_rpbin_linear_index = AVX512_MULTIPLY_FLOATS(m_rpbin, m_npibin_p1);
             const AVX512_FLOATS m_finalbin = AVX512_MASK_ADD_FLOATS(m_npibin, m_mask, m_rpbin_linear_index, m_pibin);
             union_finalbin.m_ibin = AVX512_TRUNCATE_FLOAT_TO_INT(m_finalbin);
+            if(need_rpavg && need_weightavg) union_mDperp.m_Dperp = AVX512_MASKZ_MULTIPLY_FLOATS(m_mask_left, union_mDperp.m_Dperp, union_mweight.m_weights);
 
 #if  __INTEL_COMPILER
 #pragma unroll(AVX512_NVEC)
@@ -343,8 +344,7 @@ static inline int countpairs_rp_pi_mocks_avx512_intrinsics_DOUBLE(const int64_t 
                     rpavg[ibin] += union_mDperp.Dperp[jj];
                 }
                 if(need_weightavg){
-                    const DOUBLE weight = union_mweight.weights[jj];
-                    weightavg[ibin] += weight;
+                    weightavg[ibin] += union_mweight.weights[jj];
                 }
             }
         }//AVX512 j loop
@@ -685,6 +685,7 @@ static inline int countpairs_rp_pi_mocks_avx_intrinsics_DOUBLE(const int64_t N0,
             const AVX_FLOATS m_binproduct = AVX_ADD_FLOATS(AVX_MULTIPLY_FLOATS(m_rpbin,m_npibin_p1),m_pibin);
 
             union_finalbin.m_ibin = AVX_TRUNCATE_FLOAT_TO_INT(m_binproduct);
+            if(need_rpavg && need_weightavg) union_mDperp.m_Dperp = AVX_MULTIPLY_FLOATS(union_mDperp.m_Dperp, union_mweight.m_weights);
 
 #if  __INTEL_COMPILER
 #pragma unroll(AVX_NVEC)
@@ -696,8 +697,7 @@ static inline int countpairs_rp_pi_mocks_avx_intrinsics_DOUBLE(const int64_t N0,
                     rpavg[ibin] += union_mDperp.Dperp[jj];
                 }
                 if(need_weightavg){
-                    const DOUBLE weight = union_mweight.weights[jj];
-                    weightavg[ibin] += weight;
+                    weightavg[ibin] += union_mweight.weights[jj];
                 }
             }
         }//AVX j loop
@@ -759,7 +759,8 @@ static inline int countpairs_rp_pi_mocks_avx_intrinsics_DOUBLE(const int64_t N0,
             const int ibin = kbin*(npibin+1) + pibin;
             npairs[ibin]++;
             if(need_rpavg) {
-                rpavg[ibin]+=rp;
+                if(need_weightavg) rp *= pairweight;
+                rpavg[ibin] += rp;
             }
             if(need_weightavg){
                 weightavg[ibin] += pairweight;
@@ -1084,6 +1085,7 @@ static inline int countpairs_rp_pi_mocks_sse_intrinsics_DOUBLE(const int64_t N0,
             const SSE_FLOATS m_binproduct = SSE_ADD_FLOATS(SSE_MULTIPLY_FLOATS(m_rpbin,m_npibin_p1),m_pibin);
             union int4 union_finalbin;
             union_finalbin.m_ibin = SSE_TRUNCATE_FLOAT_TO_INT(m_binproduct);
+            if(need_rpavg && need_weightavg) union_mDperp.m_Dperp = SSE_MULTIPLY_FLOATS(union_mDperp.m_Dperp, union_mweight.m_weights);
 
 #if  __INTEL_COMPILER
 #pragma unroll(SSE_NVEC)
@@ -1096,8 +1098,7 @@ static inline int countpairs_rp_pi_mocks_sse_intrinsics_DOUBLE(const int64_t N0,
                     rpavg[ibin] += union_mDperp.Dperp[jj];
                 }
                 if(need_weightavg){
-                    const DOUBLE weight = union_mweight.weights[jj];
-                    weightavg[ibin] += weight;
+                    weightavg[ibin] += union_mweight.weights[jj];
                 }
             }
         }//SSE j loop
@@ -1159,7 +1160,8 @@ static inline int countpairs_rp_pi_mocks_sse_intrinsics_DOUBLE(const int64_t N0,
             const int ibin = kbin*(npibin+1) + pibin;
             npairs[ibin]++;
             if(need_rpavg) {
-                rpavg[ibin]+=rp;
+                if(need_weightavg) rp *= pairweight;
+                rpavg[ibin] += rp;
             }
             if(need_weightavg){
                 weightavg[ibin] += pairweight;
@@ -1402,7 +1404,8 @@ static inline int countpairs_rp_pi_mocks_fallback_DOUBLE(const int64_t N0, DOUBL
             const int ibin = kbin*(npibin+1) + pibin;
             npairs[ibin]++;
             if(need_rpavg) {
-                rpavg[ibin]+=rp;
+                if(need_weightavg) rp *= pairweight;
+                rpavg[ibin] += rp;
             }
             if(need_weightavg){
                 weightavg[ibin] += pairweight;

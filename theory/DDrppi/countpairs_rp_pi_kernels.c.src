@@ -269,6 +269,7 @@ static inline int countpairs_rp_pi_avx512_intrinsics_DOUBLE(const int64_t N0, DO
             const AVX512_FLOATS m_rpbin_linear_index = AVX512_MULTIPLY_FLOATS(m_rpbin, m_npibin_p1);
             const AVX512_FLOATS m_finalbin = AVX512_MASK_ADD_FLOATS(m_npibin, m_mask, m_rpbin_linear_index, m_pibin);
             union_finalbin.m_ibin = AVX512_TRUNCATE_FLOAT_TO_INT(m_finalbin);
+            if(need_rpavg && need_weightavg) union_mDperp.m_Dperp = AVX512_MASKZ_MULTIPLY_FLOATS(m_mask_left, union_mDperp.m_Dperp, union_mweight.m_weights);
 
 #if  __INTEL_COMPILER
 #pragma unroll(AVX512_NVEC)
@@ -280,8 +281,7 @@ static inline int countpairs_rp_pi_avx512_intrinsics_DOUBLE(const int64_t N0, DO
                     rpavg[ibin] += union_mDperp.Dperp[jj];
                 }
                 if(need_weightavg){
-                    const DOUBLE weight = union_mweight.weights[jj];
-                    weightavg[ibin] += weight;
+                    weightavg[ibin] += union_mweight.weights[jj];
                 }
             }
         }//AVX512 j loop
@@ -500,7 +500,7 @@ static inline int countpairs_rp_pi_avx_intrinsics_DOUBLE(const int64_t N0, DOUBL
 
             const AVX_FLOATS m_sqr_xdiff = AVX_SQUARE_FLOAT(m_xdiff);  //(x0 - x[j])^2
             const AVX_FLOATS m_sqr_ydiff = AVX_SQUARE_FLOAT(m_ydiff);  //(y0 - y[j])^2
-            AVX_FLOATS r2  = AVX_ADD_FLOATS(m_sqr_xdiff, m_sqr_ydiff);
+            AVX_FLOATS r2 = AVX_ADD_FLOATS(m_sqr_xdiff, m_sqr_ydiff);
 
             AVX_FLOATS m_mask_left;
 
@@ -573,6 +573,7 @@ static inline int countpairs_rp_pi_avx_intrinsics_DOUBLE(const int64_t N0, DOUBL
             const AVX_FLOATS m_npibin_p1 = AVX_ADD_FLOATS(m_npibin,m_one);
             const AVX_FLOATS m_binproduct = AVX_ADD_FLOATS(AVX_MULTIPLY_FLOATS(m_rpbin,m_npibin_p1),m_pibin);
             union_finalbin.m_ibin = AVX_TRUNCATE_FLOAT_TO_INT(m_binproduct);
+            if(need_rpavg && need_weightavg) union_mDperp.m_Dperp = AVX_MULTIPLY_FLOATS(union_mDperp.m_Dperp, union_mweight.m_weights);
 
             //update the histograms
 #if defined(__ICC) || defined(__INTEL_COMPILER)
@@ -585,8 +586,7 @@ static inline int countpairs_rp_pi_avx_intrinsics_DOUBLE(const int64_t N0, DOUBL
                     rpavg[ibin] += union_mDperp.Dperp[jj];
                 }
                 if(need_weightavg){
-                    const DOUBLE weight = union_mweight.weights[jj];
-                    weightavg[ibin] += weight;
+                    weightavg[ibin] += union_mweight.weights[jj];
                 }
             }
         }
@@ -620,7 +620,6 @@ static inline int countpairs_rp_pi_avx_intrinsics_DOUBLE(const int64_t N0, DOUBL
 
                 pairweight = fallback_weight_func(&pair);
             }
-
             int pibin = (int) (dz*inv_dpi);
             pibin = pibin > npibin ? npibin:pibin;
 
@@ -638,6 +637,7 @@ static inline int countpairs_rp_pi_avx_intrinsics_DOUBLE(const int64_t N0, DOUBL
             const int ibin = kbin*(npibin+1) + pibin;
             npairs[ibin]++;
             if(need_rpavg) {
+                if(need_weightavg) r *= pairweight;
                 rpavg[ibin] += r;
             }
             if(need_weightavg){
@@ -940,6 +940,7 @@ static inline int countpairs_rp_pi_sse_intrinsics_DOUBLE(const int64_t N0, DOUBL
             const SSE_FLOATS m_npibin_p1 = SSE_ADD_FLOATS(m_npibin,m_one);
             const SSE_FLOATS m_binproduct = SSE_ADD_FLOATS(SSE_MULTIPLY_FLOATS(m_rpbin,m_npibin_p1),m_pibin);
             union_finalbin.m_ibin = SSE_TRUNCATE_FLOAT_TO_INT(m_binproduct);
+            if(need_rpavg && need_weightavg) union_mDperp.m_Dperp = SSE_MULTIPLY_FLOATS(union_mDperp.m_Dperp, union_mweight.m_weights);
 
             //update the histograms
 #if defined(__ICC) || defined(__INTEL_COMPILER)
@@ -952,8 +953,7 @@ static inline int countpairs_rp_pi_sse_intrinsics_DOUBLE(const int64_t N0, DOUBL
                     rpavg[ibin] += union_mDperp.Dperp[jj];
                 }
                 if(need_weightavg){
-                    const DOUBLE weight = union_mweight.weights[jj];
-                    weightavg[ibin] += weight;
+                    weightavg[ibin] += union_mweight.weights[jj];
                 }
             }
         }
@@ -1003,6 +1003,7 @@ static inline int countpairs_rp_pi_sse_intrinsics_DOUBLE(const int64_t N0, DOUBL
             const int ibin = kbin*(npibin+1) + pibin;
             npairs[ibin]++;
             if(need_rpavg) {
+                if(need_weightavg) r *= pairweight;
                 rpavg[ibin] += r;
             }
             if(need_weightavg){
@@ -1231,6 +1232,7 @@ static inline int countpairs_rp_pi_fallback_DOUBLE(const int64_t N0, DOUBLE *x0,
             const int ibin = kbin*(npibin+1) + pibin;
             npairs[ibin]++;
             if(need_rpavg) {
+                if(need_weightavg) r *= pairweight;
                 rpavg[ibin] += r;
             }
             if(need_weightavg){

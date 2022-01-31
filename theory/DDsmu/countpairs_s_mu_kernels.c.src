@@ -281,7 +281,7 @@ static inline int countpairs_s_mu_avx512_intrinsics_DOUBLE(const int64_t N0, DOU
                     }
                 }
             }
-            const AVX512_FLOATS m_inv_dmu    = AVX512_SET_FLOAT(inv_dmu);
+            const AVX512_FLOATS m_inv_dmu = AVX512_SET_FLOAT(inv_dmu);
             const AVX512_FLOATS m_nmu_bins = AVX512_SET_FLOAT((DOUBLE) nmu_bins);
             const AVX512_FLOATS m_nmu_bins_p1 = AVX512_SET_FLOAT((DOUBLE) (nmu_bins + 1));
             const AVX512_FLOATS m_mubin = AVX512_MULTIPLY_FLOATS(m_mu,m_inv_dmu);
@@ -290,6 +290,7 @@ static inline int countpairs_s_mu_avx512_intrinsics_DOUBLE(const int64_t N0, DOU
             const AVX512_FLOATS m_sbin_linear_index = AVX512_MULTIPLY_FLOATS(m_sbin, m_nmu_bins_p1);
             const AVX512_FLOATS m_finalbin = AVX512_MASK_ADD_FLOATS(m_nmu_bins, m_mask, m_sbin_linear_index, m_mubin);
             union_finalbin.m_ibin = AVX512_TRUNCATE_FLOAT_TO_INT(m_finalbin);
+            if(need_savg && need_weightavg) union_mDperp.m_Dperp = AVX512_MASKZ_MULTIPLY_FLOATS(m_mask_left, union_mDperp.m_Dperp, union_mweight.m_weights);
 
             //update the histograms
 #if defined(__ICC) || defined(__INTEL_COMPILER)
@@ -302,8 +303,7 @@ static inline int countpairs_s_mu_avx512_intrinsics_DOUBLE(const int64_t N0, DOU
                     savg[ibin] += union_mDperp.Dperp[jj];
                 }
                 if(need_weightavg){
-                    const DOUBLE weight = union_mweight.weights[jj];
-                    weightavg[ibin] += weight;
+                    weightavg[ibin] += union_mweight.weights[jj];
                 }
             }
         }//loop over second set of particles
@@ -594,7 +594,7 @@ static inline int countpairs_s_mu_avx_intrinsics_DOUBLE(const int64_t N0, DOUBLE
             }
 
             const AVX_FLOATS m_mubin = AVX_MULTIPLY_FLOATS(m_mu,m_inv_dmu);
-            AVX_FLOATS m_sbin     = AVX_SETZERO_FLOAT();
+            AVX_FLOATS m_sbin = AVX_SETZERO_FLOAT();
             //AVX_FLOATS m_all_ones = AVX_CAST_INT_TO_FLOAT(AVX_SET_INT(-1));
             if (bin_type == BIN_LIN) {
                 m_sbin = AVX_FMA_ADD_TRUNCATE_FLOATS(union_mDperp.m_Dperp, m_inv_sstep, m_smin_invstep); // s2, then union_mDperp.m_Dperp aready clipped
@@ -615,6 +615,7 @@ static inline int countpairs_s_mu_avx_intrinsics_DOUBLE(const int64_t N0, DOUBLE
             const AVX_FLOATS m_nmu_bins_p1 = AVX_ADD_FLOATS(m_nmu_bins,m_one);
             const AVX_FLOATS m_binproduct = AVX_ADD_FLOATS(AVX_MULTIPLY_FLOATS(m_sbin,m_nmu_bins_p1),m_mubin);
             union_finalbin.m_ibin = AVX_TRUNCATE_FLOAT_TO_INT(m_binproduct);
+            if(need_savg && need_weightavg) union_mDperp.m_Dperp = AVX_MULTIPLY_FLOATS(union_mDperp.m_Dperp, union_mweight.m_weights);
 
             //update the histograms
 #if defined(__ICC) || defined(__INTEL_COMPILER)
@@ -627,8 +628,7 @@ static inline int countpairs_s_mu_avx_intrinsics_DOUBLE(const int64_t N0, DOUBLE
                     savg[ibin] += union_mDperp.Dperp[jj];
                 }
                 if(need_weightavg){
-                    const DOUBLE weight = union_mweight.weights[jj];
-                    weightavg[ibin] += weight;
+                    weightavg[ibin] += union_mweight.weights[jj];
                 }
             }
         }
@@ -681,6 +681,7 @@ static inline int countpairs_s_mu_avx_intrinsics_DOUBLE(const int64_t N0, DOUBLE
             const int ibin = kbin*(nmu_bins+1) + mu_bin;
             npairs[ibin]++;
             if(need_savg) {
+                if(need_weightavg) s *= pairweight;
                 savg[ibin] += s;
             }
             if(need_weightavg){
@@ -990,6 +991,7 @@ static inline int countpairs_s_mu_sse_intrinsics_DOUBLE(const int64_t N0, DOUBLE
             const SSE_FLOATS m_nmu_bins_p1 = SSE_ADD_FLOATS(m_nmu_bins,m_one);
             const SSE_FLOATS m_binproduct = SSE_ADD_FLOATS(SSE_MULTIPLY_FLOATS(m_sbin,m_nmu_bins_p1),m_mubin);
             union_finalbin.m_ibin = SSE_TRUNCATE_FLOAT_TO_INT(m_binproduct);
+            if(need_savg && need_weightavg) union_mDperp.m_Dperp = SSE_MULTIPLY_FLOATS(union_mDperp.m_Dperp, union_mweight.m_weights);
 
             //update the histograms
 #if defined(__ICC) || defined(__INTEL_COMPILER)
@@ -1002,8 +1004,7 @@ static inline int countpairs_s_mu_sse_intrinsics_DOUBLE(const int64_t N0, DOUBLE
                     savg[ibin] += union_mDperp.Dperp[jj];
                 }
                 if(need_weightavg){
-                    const DOUBLE weight = union_mweight.weights[jj];
-                    weightavg[ibin] += weight;
+                    weightavg[ibin] += union_mweight.weights[jj];
                 }
             }
         }
@@ -1054,6 +1055,7 @@ static inline int countpairs_s_mu_sse_intrinsics_DOUBLE(const int64_t N0, DOUBLE
             const int ibin = kbin*(nmu_bins+1) + mu_bin;
             npairs[ibin]++;
             if(need_savg) {
+                if(need_weightavg) s *= pairweight;
                 savg[ibin] += s;
             }
             if(need_weightavg){
@@ -1297,6 +1299,7 @@ static inline int countpairs_s_mu_fallback_DOUBLE(const int64_t N0, DOUBLE *x0, 
             const int ibin = kbin*(nmu_bins+1) + mu_bin;
             npairs[ibin]++;
             if(need_savg) {
+                if(need_weightavg) s *= pairweight;
                 savg[ibin] += s;
             }
             if(need_weightavg){

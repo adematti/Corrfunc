@@ -243,6 +243,7 @@ static inline int xi_avx512_intrinsics_DOUBLE(DOUBLE *x1, DOUBLE *y1, DOUBLE *z1
                     }
                 }//backwards loop over the bins
             }
+            if(need_rpavg && need_weightavg) union_mDperp.m_Dperp = AVX512_MASKZ_MULTIPLY_FLOATS(m_mask_left, union_mDperp.m_Dperp, union_mweight.m_weights);
             if(need_rpavg || need_weightavg || bin_type == BIN_LIN) {
                 //Do I need this step of going via the union? accessing int[] -> AVX* vector might
                 //cause alignment problems but accessing the ints from an AVX*
@@ -275,7 +276,7 @@ static inline int xi_avx512_intrinsics_DOUBLE(DOUBLE *x1, DOUBLE *y1, DOUBLE *z1
         npairs_found += npairs[i];
         src_npairs[i] += npairs[i];
         if(need_rpavg) {
-            src_rpavg[i]  += rpavg[i];
+            src_rpavg[i] += rpavg[i];
         }
         if(need_weightavg) {
             src_weightavg[i] += weightavg[i];
@@ -525,6 +526,7 @@ static inline int xi_avx_intrinsics_DOUBLE(DOUBLE *x1, DOUBLE *y1, DOUBLE *z1, c
                     }
                 }
             }
+            if(need_ravg && need_weightavg) union_mDperp.m_Dperp = AVX_MULTIPLY_FLOATS(union_mDperp.m_Dperp, union_mweight.m_weights);
             if(need_ravg || need_weightavg || bin_type == BIN_LIN) {
                 union_rbin.m_ibin = AVX_TRUNCATE_FLOAT_TO_INT(m_rbin);
                 //protect the unroll pragma in case compiler is not icc.
@@ -590,6 +592,7 @@ static inline int xi_avx_intrinsics_DOUBLE(DOUBLE *x1, DOUBLE *y1, DOUBLE *z1, c
             }
             npair[kbin]++;
             if(need_ravg) {
+                if(need_weightavg) r *= pairweight;
                 ravg[kbin] += r;
             }
             if(need_weightavg){
@@ -831,6 +834,7 @@ static inline int xi_sse_intrinsics_DOUBLE(DOUBLE *x0, DOUBLE *y0, DOUBLE *z0, c
             				}
           			}
             }
+            if(need_ravg && need_weightavg) union_mDperp.m_Dperp = SSE_MULTIPLY_FLOATS(union_mDperp.m_Dperp, union_mweight.m_weights);
             if(need_ravg || need_weightavg || bin_type == BIN_LIN) {
                 union_rbin.m_ibin = SSE_TRUNCATE_FLOAT_TO_INT(m_rbin);
                 //protect the unroll pragma in case compiler is not icc.
@@ -893,6 +897,7 @@ static inline int xi_sse_intrinsics_DOUBLE(DOUBLE *x0, DOUBLE *y0, DOUBLE *z0, c
             }
             npairs[kbin]++;
             if(need_ravg) {
+                if(need_weightavg) r *= pairweight;
                 ravg[kbin] += r;
             }
             if(need_weightavg){
@@ -1089,6 +1094,7 @@ static inline int xi_fallback_DOUBLE(DOUBLE *x0, DOUBLE *y0, DOUBLE *z0, const w
             }
             npairs[kbin]++;
             if(need_ravg) {
+                if(need_weightavg) r *= pairweight;
                 ravg[kbin] += r;
             }
             if(need_weightavg){

@@ -246,6 +246,7 @@ static inline int countpairs_avx512_intrinsics_DOUBLE(const int64_t N0, DOUBLE *
                     }
                 }//backwards loop over the bins
             }
+            if(need_rpavg && need_weightavg) union_mDperp.m_Dperp = AVX512_MASKZ_MULTIPLY_FLOATS(m_mask_left, union_mDperp.m_Dperp, union_mweight.m_weights);
             if(need_rpavg || need_weightavg || bin_type == BIN_LIN) {
                 //Do I need this step of going via the union? accessing int[] -> AVX* vector might
                 //cause alignment problems but accessing the ints from an AVX*
@@ -543,6 +544,7 @@ static inline int countpairs_avx_intrinsics_DOUBLE(const int64_t N0, DOUBLE *x0,
                     }
                 }
             }
+            if(need_rpavg && need_weightavg) union_mDperp.m_Dperp = AVX_MULTIPLY_FLOATS(union_mDperp.m_Dperp, union_mweight.m_weights);
             if(need_rpavg || need_weightavg || bin_type == BIN_LIN) {
                 union_rpbin.m_ibin = AVX_TRUNCATE_FLOAT_TO_INT(m_rpbin);
                 //protect the unroll pragma in case compiler is not icc.
@@ -609,6 +611,7 @@ static inline int countpairs_avx_intrinsics_DOUBLE(const int64_t N0, DOUBLE *x0,
             }
             npairs[kbin]++;
             if(need_rpavg) {
+                if(need_weightavg) r *= pairweight;
                 rpavg[kbin] += r;
             }
             if(need_weightavg){
@@ -856,6 +859,7 @@ static inline int countpairs_sse_intrinsics_DOUBLE(const int64_t N0, DOUBLE *x0,
                   }
               }
           }
+          if(need_rpavg && need_weightavg) union_mDperp.m_Dperp = SSE_MULTIPLY_FLOATS(union_mDperp.m_Dperp, union_mweight.m_weights);
           if(need_rpavg || need_weightavg || bin_type == BIN_LIN) {
               //protect the unroll pragma in case compiler is not icc.
 #if  __INTEL_COMPILER
@@ -918,6 +922,7 @@ static inline int countpairs_sse_intrinsics_DOUBLE(const int64_t N0, DOUBLE *x0,
           }
           npairs[kbin]++;
           if(need_rpavg) {
+              if(need_weightavg) r *= pairweight;
               rpavg[kbin] += r;
           }
           if(need_weightavg){
@@ -1116,6 +1121,7 @@ static inline int countpairs_fallback_DOUBLE(const int64_t N0, DOUBLE *x0, DOUBL
             }
             npairs[kbin]++;
             if(need_rpavg) {
+                if(need_weightavg) r *= pairweight;
                 rpavg[kbin] += r;
             }
             if(need_weightavg){

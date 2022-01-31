@@ -310,6 +310,7 @@ static inline int countpairs_s_mu_mocks_avx512_intrinsics_DOUBLE(const int64_t N
             const AVX512_FLOATS m_sbin_linear_index = AVX512_MULTIPLY_FLOATS(m_sbin, m_nmu_bins_p1);
             const AVX512_FLOATS m_finalbin = AVX512_MASK_ADD_FLOATS(m_nmu_bins, m_mask, m_sbin_linear_index, m_mubin);
             union_finalbin.m_ibin = AVX512_TRUNCATE_FLOAT_TO_INT(m_finalbin);
+            if(need_savg && need_weightavg) union_mDperp.m_Dperp = AVX512_MASKZ_MULTIPLY_FLOATS(m_mask_left, union_mDperp.m_Dperp, union_mweight.m_weights);
 
 #if  __INTEL_COMPILER
 #pragma unroll(AVX512_NVEC)
@@ -637,6 +638,7 @@ static inline int countpairs_s_mu_mocks_avx_intrinsics_DOUBLE(const int64_t N0, 
             const AVX_FLOATS m_nmu_bins_p1 = AVX_ADD_FLOATS(m_nmu_bins,m_one);
             const AVX_FLOATS m_binproduct = AVX_ADD_FLOATS(AVX_MULTIPLY_FLOATS(m_sbin,m_nmu_bins_p1),m_mubin);
             union_finalbin.m_ibin = AVX_TRUNCATE_FLOAT_TO_INT(m_binproduct);
+            if(need_savg && need_weightavg) union_msep.m_Dperp = AVX_MULTIPLY_FLOATS(union_msep.m_Dperp, union_mweight.m_weights);
 
 #if  __INTEL_COMPILER
 #pragma unroll(AVX_NVEC)
@@ -719,6 +721,7 @@ static inline int countpairs_s_mu_mocks_avx_intrinsics_DOUBLE(const int64_t N0, 
             const int ibin = kbin*(nmu_bins+1) + mubin;
             npairs[ibin]++;
             if(need_savg) {
+                if(need_weightavg) s *= pairweight;
                 savg[ibin] += s;
             }
             if(need_weightavg){
@@ -994,6 +997,7 @@ static inline int countpairs_s_mu_mocks_sse_intrinsics_DOUBLE(const int64_t N0, 
             if(need_savg || bin_type == BIN_LIN) {
                 union_msep.m_Dperp = SSE_SQRT_FLOAT(m_sqr_s);
             }
+
             if(need_weightavg){
                 pair.dx.s = m_perpx;
                 pair.dy.s = m_perpy;
@@ -1031,6 +1035,7 @@ static inline int countpairs_s_mu_mocks_sse_intrinsics_DOUBLE(const int64_t N0, 
             const SSE_FLOATS m_nmu_bins_p1 = SSE_ADD_FLOATS(m_nmu_bins,m_one);
             const SSE_FLOATS m_binproduct = SSE_ADD_FLOATS(SSE_MULTIPLY_FLOATS(m_sbin,m_nmu_bins_p1),m_mubin);
             union_finalbin.m_ibin = SSE_TRUNCATE_FLOAT_TO_INT(m_binproduct);
+            if(need_savg && need_weightavg) union_msep.m_Dperp = SSE_MULTIPLY_FLOATS(union_msep.m_Dperp, union_mweight.m_weights);
 
 #if  __INTEL_COMPILER
 #pragma unroll(SSE_NVEC)
@@ -1103,6 +1108,7 @@ static inline int countpairs_s_mu_mocks_sse_intrinsics_DOUBLE(const int64_t N0, 
             const int ibin = kbin*(nmu_bins+1) + mubin;
             npairs[ibin]++;
             if(need_savg) {
+                if(need_weightavg) s *= pairweight;
                 savg[ibin] += s;
             }
             if(need_weightavg){
@@ -1337,6 +1343,7 @@ static inline int countpairs_s_mu_mocks_fallback_DOUBLE(const int64_t N0, DOUBLE
             const int ibin = kbin*(nmu_bins+1) + mubin;
             npairs[ibin]++;
             if(need_savg) {
+                if(need_weightavg) s *= pairweight;
                 savg[ibin] += s;
             }
             if(need_weightavg){

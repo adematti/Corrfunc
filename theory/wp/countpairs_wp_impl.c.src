@@ -586,7 +586,7 @@ int countpairs_wp_DOUBLE(const int64_t ND, DOUBLE * restrict X, DOUBLE * restric
     for(int i=0;i<nrpbins;i++) {
       if(npairs[i] > 0) {
         if(options->need_avg_sep) {
-          rpavg[i] /= (DOUBLE) npairs[i] ;
+          rpavg[i] /= need_weightavg ? weightavg[i] : (DOUBLE) npairs[i];
         }
         if(need_weightavg) {
           weightavg[i] /= (DOUBLE) npairs[i];
