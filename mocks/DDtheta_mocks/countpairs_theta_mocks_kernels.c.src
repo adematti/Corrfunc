@@ -352,8 +352,7 @@ static inline int countpairs_theta_mocks_sse_intrinsics_DOUBLE(const int64_t N0,
       local_w0 = *weights0;
       local_w1 = *weights1;
 
-      pair.num_weights = local_w0.num_weights;
-
+      set_pair_struct_DOUBLE(&pair, &local_w0, &local_w1, &pair_weight);
       sse_weight_func = get_sse_weight_func_by_method_DOUBLE(weight_method);
       fallback_weight_func = get_weight_func_by_method_DOUBLE(weight_method);
     }
@@ -504,6 +503,8 @@ static inline int countpairs_theta_mocks_sse_intrinsics_DOUBLE(const int64_t N0,
                 pair.pary.s = SSE_ADD_FLOATS(m_y2,m_y1);
                 pair.parz.s = SSE_ADD_FLOATS(m_z2,m_z1);
 
+                pair.costheta.s = m_costheta;
+
                 union_mweight.m_weights = sse_weight_func(&pair);
             }
 
@@ -571,9 +572,9 @@ static inline int countpairs_theta_mocks_sse_intrinsics_DOUBLE(const int64_t N0,
             DOUBLE theta = ZERO, pairweight = ZERO;
             if (need_rpavg || bin_type == BIN_LIN) {
                 if(order) {
-                    theta =  INV_PI_OVER_180*FAST_ACOS(costheta);
+                    theta = INV_PI_OVER_180*FAST_ACOS(costheta);
                 } else {
-                    theta =  INV_PI_OVER_180*ACOS(costheta);
+                    theta = INV_PI_OVER_180*ACOS(costheta);
                 }
             }
             if(need_weightavg){
@@ -584,6 +585,8 @@ static inline int countpairs_theta_mocks_sse_intrinsics_DOUBLE(const int64_t N0,
                 pair.parx.d = xpos + (xpos + dx);
                 pair.pary.d = ypos + (ypos + dy);
                 pair.parz.d = zpos + (zpos + dz);
+
+                pair.costheta.d = costheta;
 
                 pairweight = fallback_weight_func(&pair);
             }
@@ -599,7 +602,6 @@ static inline int countpairs_theta_mocks_sse_intrinsics_DOUBLE(const int64_t N0,
                     }
                 }
             }
-            if (ibin>=nthetabin) printf("LOOOOLI %d\n", ibin);
             npairs[ibin]++;
             if(need_rpavg) {
                 if(need_weightavg) theta *= pairweight;
@@ -712,8 +714,7 @@ static inline int countpairs_theta_mocks_avx_intrinsics_DOUBLE(const int64_t N0,
         local_w0 = *weights0;
         local_w1 = *weights1;
 
-        pair.num_weights = local_w0.num_weights;
-
+        set_pair_struct_DOUBLE(&pair, &local_w0, &local_w1, &pair_weight);
         avx_weight_func = get_avx_weight_func_by_method_DOUBLE(weight_method);
         fallback_weight_func = get_weight_func_by_method_DOUBLE(weight_method);
     }
@@ -861,7 +862,9 @@ static inline int countpairs_theta_mocks_avx_intrinsics_DOUBLE(const int64_t N0,
                 pair.pary.a = AVX_ADD_FLOATS(m_y2,m_y1);
                 pair.parz.a = AVX_ADD_FLOATS(m_z2,m_z1);
 
-              union_mweight.m_weights = avx_weight_func(&pair);
+                pair.costheta.a = m_costheta;
+
+                union_mweight.m_weights = avx_weight_func(&pair);
           }
 
           if (bin_type == BIN_LIN) {
@@ -942,6 +945,8 @@ static inline int countpairs_theta_mocks_avx_intrinsics_DOUBLE(const int64_t N0,
               pair.parx.d = (xpos + dx) + xpos;
               pair.pary.d = (ypos + dy) + ypos;
               pair.parz.d = (zpos + dz) + zpos;
+
+              pair.costheta.d = costheta;
 
               pairweight = fallback_weight_func(&pair);
           }
@@ -1066,7 +1071,7 @@ static inline int countpairs_theta_mocks_avx512_intrinsics_DOUBLE(const int64_t 
         local_w0 = *weights0;
         local_w1 = *weights1;
 
-        pair.num_weights = local_w0.num_weights;
+        set_pair_struct_DOUBLE(&pair, &local_w0, &local_w1, &pair_weight);
         avx512_weight_func = get_avx512_weight_func_by_method_DOUBLE(weight_method);
     }
 
@@ -1163,7 +1168,7 @@ static inline int countpairs_theta_mocks_avx512_intrinsics_DOUBLE(const int64_t 
             union float16 union_mDperp;
             union float16_weights union_mweight;
 
-            const AVX512_FLOATS m_costhetamax=AVX512_SET_FLOAT(costhetamax);
+            const AVX512_FLOATS m_costhetamax = AVX512_SET_FLOAT(costhetamax);
             const AVX512_FLOATS m_costhetamin = AVX512_SET_FLOAT(costhetamin);
 
             localx1 += AVX512_NVEC;
@@ -1217,6 +1222,8 @@ static inline int countpairs_theta_mocks_avx512_intrinsics_DOUBLE(const int64_t 
                 pair.parx.a512 = AVX512_ADD_FLOATS(m_x1,m_xpos);
                 pair.pary.a512 = AVX512_ADD_FLOATS(m_y1,m_ypos);
                 pair.parz.a512 = AVX512_ADD_FLOATS(m_z1,m_zpos);
+
+                pair.costheta.a512 = m_costheta;
 
                 union_mweight.m_weights = avx512_weight_func(&pair);
             }

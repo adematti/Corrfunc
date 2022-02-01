@@ -20,18 +20,23 @@
 
 typedef union {
 #ifdef __AVX512F__
-  AVX512_FLOATS a512;/* add the bit width for vector register*/
+  union {
+    AVX512_FLOATS a512;/* add the bit width for vector register*/
+    DOUBLE da512[AVX512_NVEC];
+  };
 #endif
 #ifdef __AVX__
   union {
     AVX_FLOATS a;
     AVX_FLOATS a256;
+    DOUBLE da[AVX_NVEC];
   };
 #endif
 #ifdef __SSE4_2__
     union {
       SSE_FLOATS s;
       SSE_FLOATS s128;
+      DOUBLE ds[SSE_NVEC];
     };
 #endif
     DOUBLE d;
@@ -61,7 +66,7 @@ typedef struct
 // set pair_struct_DOUBLE from two weight_struct_DOUBLE
 static inline int set_pair_struct_DOUBLE(pair_struct_DOUBLE *pair, const weight_struct_DOUBLE *local_w0, const weight_struct_DOUBLE *local_w1, const pair_weight_struct *pair_w) {
     pair->num_weights = local_w0->num_weights;
-    pair->num_integer_weights = local_w0->num_integer_weights;
+    pair->num_integer_weights = local_w1->num_integer_weights;
     pair->pair_weight.weight = pair_w->weight;
     pair->pair_weight.sep = pair_w->sep;
     pair->pair_weight.num = pair_w->num;
@@ -146,21 +151,133 @@ static inline DOUBLE inverse_bitwise_DOUBLE(pair_struct_DOUBLE *pair){
     return weight;
 }
 
+
 #ifdef __AVX512F__
 static inline AVX512_FLOATS avx512_inverse_bitwise_DOUBLE(pair_struct_DOUBLE *pair){
-    return AVX512_MULTIPLY_FLOATS(pair->weights0[0].a512, pair->weights1[0].a512);
+
+    weight_union_DOUBLE m_weight;
+
+    #if  __INTEL_COMPILER
+    #pragma unroll(AVX512_NVEC)
+    #endif
+    for(int jj=0;jj<AVX512_NVEC;jj++) {
+        int nbits = pair->noffset;
+        //printf("%d ", nbits);
+        for (int w=0;w<pair->num_integer_weights;w++) {
+            //printf("w%d %ld %ld\n", w, *((LONG *) &(pair->weights0[w].d)), *((LONG *) &(pair->weights1[w].d)));
+            nbits += POPCOUNT(*((LONG *) &(pair->weights0[w].da512[jj])) & *((LONG *) &(pair->weights1[w].da512[jj])));
+        }
+        DOUBLE weight = (nbits == 0) ? pair->default_value : 1./nbits;
+        for (int w=pair->num_integer_weights;w<pair->num_weights;w++) {
+            weight *= pair->weights0[w].da512[jj]*pair->weights1[w].da512[jj];
+        }
+        int num = pair->pair_weight.num;
+        if (num) {
+            DOUBLE costheta = pair->costheta.da512[jj];
+            DOUBLE *pair_sep = pair->pair_weight.sep;
+            if (costheta >= pair_sep[num-1] || (costheta < pair_sep[0])) {
+                ;
+            }
+            else {
+                DOUBLE *pair_weight = pair->pair_weight.weight;
+                for (int kbin=num-2;kbin>=0;kbin--) {
+                    if(costheta >= pair_sep[kbin]) {
+                        DOUBLE frac = (costheta - pair_sep[kbin])/(pair_sep[kbin+1] - pair_sep[kbin]);
+                        weight *= (1 - frac) * pair_weight[kbin] + frac * pair_weight[kbin+1];
+                        break;
+                    }
+                }
+            }
+        }
+        m_weight.da512[jj] = weight;
+    }
+    return m_weight.a512;
 }
 #endif
+
 
 #ifdef __AVX__
 static inline AVX_FLOATS avx_inverse_bitwise_DOUBLE(pair_struct_DOUBLE *pair){
-    return AVX_MULTIPLY_FLOATS(pair->weights0[0].a256, pair->weights1[0].a256);
+
+    weight_union_DOUBLE m_weight;
+
+    #if  __INTEL_COMPILER
+    #pragma unroll(AVX_NVEC)
+    #endif
+    for(int jj=0;jj<AVX_NVEC;jj++) {
+        int nbits = pair->noffset;
+        for (int w=0;w<pair->num_integer_weights;w++) {
+            nbits += POPCOUNT(*((LONG *) &(pair->weights0[w].da[jj])) & *((LONG *) &(pair->weights1[w].da[jj])));
+        }
+        DOUBLE weight = (nbits == 0) ? pair->default_value : 1./nbits;
+        for (int w=pair->num_integer_weights;w<pair->num_weights;w++) {
+            weight *= pair->weights0[w].da[jj]*pair->weights1[w].da[jj];
+        }
+        int num = pair->pair_weight.num;
+        if (num) {
+            DOUBLE costheta = pair->costheta.da[jj];
+            DOUBLE *pair_sep = pair->pair_weight.sep;
+            if (costheta >= pair_sep[num-1] || (costheta < pair_sep[0])) {
+                ;
+            }
+            else {
+                DOUBLE *pair_weight = pair->pair_weight.weight;
+                for (int kbin=num-2;kbin>=0;kbin--) {
+                    if(costheta >= pair_sep[kbin]) {
+                        DOUBLE frac = (costheta - pair_sep[kbin])/(pair_sep[kbin+1] - pair_sep[kbin]);
+                        weight *= (1 - frac) * pair_weight[kbin] + frac * pair_weight[kbin+1];
+                        break;
+                    }
+                }
+            }
+        }
+        m_weight.da[jj] = weight;
+    }
+    return m_weight.a;
 }
 #endif
 
+
 #ifdef __SSE4_2__
 static inline SSE_FLOATS sse_inverse_bitwise_DOUBLE(pair_struct_DOUBLE *pair){
-    return SSE_MULTIPLY_FLOATS(pair->weights0[0].s128, pair->weights1[0].s128);
+
+    weight_union_DOUBLE m_weight;
+
+    #if  __INTEL_COMPILER
+    #pragma unroll(SSE_NVEC)
+    #endif
+    for(int jj=0;jj<SSE_NVEC;jj++) {
+        int nbits = pair->noffset;
+        //printf("%d ", nbits);
+        for (int w=0;w<pair->num_integer_weights;w++) {
+            //printf("w%d %ld %ld\n", w, *((LONG *) &(pair->weights0[w].d)), *((LONG *) &(pair->weights1[w].d)));
+            nbits += POPCOUNT(*((LONG *) &(pair->weights0[w].ds[jj])) & *((LONG *) &(pair->weights1[w].ds[jj])));
+        }
+        DOUBLE weight = (nbits == 0) ? pair->default_value : 1./nbits;
+        for (int w=pair->num_integer_weights;w<pair->num_weights;w++) {
+            weight *= pair->weights0[w].ds[jj]*pair->weights1[w].ds[jj];
+        }
+        int num = pair->pair_weight.num;
+        if (num) {
+            DOUBLE costheta = pair->costheta.ds[jj];
+            DOUBLE *pair_sep = pair->pair_weight.sep;
+            if (costheta >= pair_sep[num-1] || (costheta < pair_sep[0])) {
+                ;
+            }
+            else {
+                DOUBLE *pair_weight = pair->pair_weight.weight;
+                for (int kbin=num-2;kbin>=0;kbin--) {
+                    if(costheta >= pair_sep[kbin]) {
+                        DOUBLE frac = (costheta - pair_sep[kbin])/(pair_sep[kbin+1] - pair_sep[kbin]);
+                        weight *= (1 - frac) * pair_weight[kbin] + frac * pair_weight[kbin+1];
+                        break;
+                    }
+                }
+            }
+        }
+        m_weight.ds[jj] = weight;
+    }
+    return m_weight.s;
 }
 #endif
 

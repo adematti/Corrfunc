@@ -44,6 +44,7 @@ static inline int countpairs_rp_pi_avx512_intrinsics_DOUBLE(const int64_t N0, DO
 
     const int32_t need_rpavg = src_rpavg != NULL;
     const int32_t need_weightavg = src_weightavg != NULL;
+    int32_t need_costheta = need_weightavg;
     const DOUBLE sqr_rpmax=rpmax*rpmax;
     AVX512_FLOATS m_inv_rpstep = AVX512_SETZERO_FLOAT();
     AVX512_FLOATS m_rpmin_invstep = AVX512_SETZERO_FLOAT();
@@ -84,8 +85,16 @@ static inline int countpairs_rp_pi_avx512_intrinsics_DOUBLE(const int64_t N0, DO
         local_w0 = *weights0;
         local_w1 = *weights1;
 
-        pair.num_weights = local_w0.num_weights;
-        avx512_weight_func   = get_avx512_weight_func_by_method_DOUBLE(weight_method);
+        set_pair_struct_DOUBLE(&pair, &local_w0, &local_w1, &pair_weight);
+        need_costheta = pair_weight.num;
+        avx512_weight_func = get_avx512_weight_func_by_method_DOUBLE(weight_method);
+    }
+    DOUBLE *norm1 = NULL;
+    if (need_costheta) {
+        norm1 = (DOUBLE *) my_malloc(N1,sizeof(DOUBLE));
+        for(int64_t i=0;i<N1;i++) {
+            norm1[i] = SQRT(x1[i]*x1[i] + y1[i]*y1[i] + z1[i]*z1[i]);
+        }
     }
 
     const DOUBLE *zstart = z1, *zend = z1 + N1;
@@ -100,6 +109,8 @@ static inline int countpairs_rp_pi_avx512_intrinsics_DOUBLE(const int64_t N0, DO
             // The advancement of the local_w0.weights[w] pointer should always mirror x0.
             pair.weights0[w].a512 = AVX512_SET_FLOAT(*(local_w0.weights[w])++);
         }
+        DOUBLE norm0 = ZERO;
+        if (need_costheta) norm0 = SQRT(xpos*xpos + ypos*ypos + zpos*zpos);
 
 #if 0
         /* are there any pairs possible with this particle and ANY
@@ -173,17 +184,24 @@ static inline int countpairs_rp_pi_avx512_intrinsics_DOUBLE(const int64_t N0, DO
 
         for(int64_t j=n_off;j<N1;j+=AVX512_NVEC){
             AVX512_MASK m_mask_left = (N1 - j) >= AVX512_NVEC ? ~0:masks_per_misalignment_value_DOUBLE[N1-j];
-            const AVX512_FLOATS m_x1 = AVX512_MASKZ_LOAD_FLOATS_UNALIGNED(m_mask_left, localx1);
-            const AVX512_FLOATS m_y1 = AVX512_MASKZ_LOAD_FLOATS_UNALIGNED(m_mask_left, localy1);
-            const AVX512_FLOATS m_z1 = AVX512_MASKZ_LOAD_FLOATS_UNALIGNED(m_mask_left, localz1);
-
-            localx1 += AVX512_NVEC;//this might actually exceed the allocated range but we will never dereference that
-            localy1 += AVX512_NVEC;
-            localz1 += AVX512_NVEC;
 
             const AVX512_FLOATS m_xpos    = AVX512_SET_FLOAT(xpos);
             const AVX512_FLOATS m_ypos    = AVX512_SET_FLOAT(ypos);
             const AVX512_FLOATS m_zpos    = AVX512_SET_FLOAT(zpos);
+            const AVX512_FLOATS m_norm0   = AVX512_SET_FLOAT(norm0);
+
+            const AVX512_FLOATS m_x1 = AVX512_MASKZ_LOAD_FLOATS_UNALIGNED(m_mask_left, localx1);
+            const AVX512_FLOATS m_y1 = AVX512_MASKZ_LOAD_FLOATS_UNALIGNED(m_mask_left, localy1);
+            const AVX512_FLOATS m_z1 = AVX512_MASKZ_LOAD_FLOATS_UNALIGNED(m_mask_left, localz1);
+            if(need_costheta) {
+                const AVX512_FLOATS m_norm1 = AVX512_MASKZ_LOAD_FLOATS_UNALIGNED(m_mask_left, norm1 + j);
+                pair.costheta.a512 = AVX512_MASKZ_ADD_FLOATS(m_mask_left, AVX512_MASKZ_ADD_FLOATS(AVX512_MASKZ_MULTIPLY_FLOATS(m_mask_left, m_x1, m_xpos), AVX512_MASKZ_MULTIPLY_FLOATS(m_mask_left, m_y1, m_ypos)), AVX512_MASKZ_MULTIPLY_FLOATS(m_mask_left, m_z1, m_zpos));
+                pair.costheta.a512 = AVX512_MASKZ_DIVIDE_FLOATS(m_mask_left, pair.costheta.a512, AVX512_MASKZ_MULTIPLY_FLOATS(m_mask_left, m_norm1, m_norm0));
+            }
+
+            localx1 += AVX512_NVEC;//this might actually exceed the allocated range but we will never dereference that
+            localy1 += AVX512_NVEC;
+            localz1 += AVX512_NVEC;
 
             union int16 union_finalbin;
             union float16 union_mDperp;
@@ -330,6 +348,7 @@ static inline int countpairs_rp_pi_avx_intrinsics_DOUBLE(const int64_t N0, DOUBL
 
     const int32_t need_rpavg = src_rpavg != NULL;
     const int32_t need_weightavg = src_weightavg != NULL;
+    int32_t need_costheta = need_weightavg;
     const DOUBLE sqr_rpmin=rpmin*rpmin, sqr_rpmax=rpmax*rpmax;
     DOUBLE inv_rpstep=0., rpmin_invstep=0.;
     const AVX_FLOATS m_zero = AVX_SETZERO_FLOAT();
@@ -376,10 +395,17 @@ static inline int countpairs_rp_pi_avx_intrinsics_DOUBLE(const int64_t N0, DOUBL
         local_w0 = *weights0;
         local_w1 = *weights1;
 
-        pair.num_weights = local_w0.num_weights;
-
+        set_pair_struct_DOUBLE(&pair, &local_w0, &local_w1, &pair_weight);
+        need_costheta = pair_weight.num;
         avx_weight_func = get_avx_weight_func_by_method_DOUBLE(weight_method);
         fallback_weight_func = get_weight_func_by_method_DOUBLE(weight_method);
+    }
+    DOUBLE *norm1 = NULL;
+    if (need_costheta) {
+        norm1 = (DOUBLE *) my_malloc(N1,sizeof(DOUBLE));
+        for(int64_t i=0;i<N1;i++) {
+            norm1[i] = SQRT(x1[i]*x1[i] + y1[i]*y1[i] + z1[i]*z1[i]);
+        }
     }
 
     const DOUBLE *zstart = z1, *zend = z1 + N1;
@@ -393,6 +419,8 @@ static inline int countpairs_rp_pi_avx_intrinsics_DOUBLE(const int64_t N0, DOUBL
             // The advancement of the local_w0.weights[w] pointer should always mirror x0.
             pair.weights0[w].a = AVX_SET_FLOAT(*(local_w0.weights[w])++);
         }
+        DOUBLE norm0 = ZERO;
+        if (need_costheta) norm0 = SQRT(xpos*xpos + ypos*ypos + zpos*zpos);
 
 #if 0
         /* are there any pairs possible with this particle and ANY
@@ -467,6 +495,7 @@ static inline int countpairs_rp_pi_avx_intrinsics_DOUBLE(const int64_t N0, DOUBL
             const AVX_FLOATS m_xpos    = AVX_SET_FLOAT(xpos);
             const AVX_FLOATS m_ypos    = AVX_SET_FLOAT(ypos);
             const AVX_FLOATS m_zpos    = AVX_SET_FLOAT(zpos);
+            const AVX_FLOATS m_norm0   = AVX_SET_FLOAT(norm0);
 
             union int8 union_finalbin;
             union float8 union_mDperp;
@@ -475,6 +504,12 @@ static inline int countpairs_rp_pi_avx_intrinsics_DOUBLE(const int64_t N0, DOUBL
             const AVX_FLOATS m_x1 = AVX_LOAD_FLOATS_UNALIGNED(localx1);
             const AVX_FLOATS m_y1 = AVX_LOAD_FLOATS_UNALIGNED(localy1);
             const AVX_FLOATS m_z1 = AVX_LOAD_FLOATS_UNALIGNED(localz1);
+
+            if(need_costheta) {
+                const AVX_FLOATS m_norm1 = AVX_LOAD_FLOATS_UNALIGNED(norm1 + j);
+                pair.costheta.a = AVX_ADD_FLOATS(AVX_ADD_FLOATS(AVX_MULTIPLY_FLOATS(m_xpos, m_x1), AVX_MULTIPLY_FLOATS(m_ypos, m_y1)), AVX_MULTIPLY_FLOATS(m_zpos, m_z1));
+                pair.costheta.a = AVX_DIVIDE_FLOATS(pair.costheta.a, AVX_MULTIPLY_FLOATS(m_norm0, m_norm1));
+            }
 
             localx1 += AVX_NVEC;//this might actually exceed the allocated range but we will never dereference that
             localy1 += AVX_NVEC;
@@ -600,6 +635,13 @@ static inline int countpairs_rp_pi_avx_intrinsics_DOUBLE(const int64_t N0, DOUBL
 
         //remainder loop
         for(;j<N1;j++){
+
+            if(need_costheta) {
+                DOUBLE localnorm1 = norm1[j];
+                pair.costheta.d = (*localx1)*xpos + (*localy1)*ypos + (*localz1)*zpos;
+                pair.costheta.d /= localnorm1*norm0;
+            }
+
             DOUBLE dz = *localz1++ - zpos;
             const DOUBLE dx = *localx1++ - xpos;
             const DOUBLE dy = *localy1++ - ypos;
@@ -693,6 +735,7 @@ static inline int countpairs_rp_pi_sse_intrinsics_DOUBLE(const int64_t N0, DOUBL
 
     const int32_t need_rpavg = src_rpavg != NULL;
     const int32_t need_weightavg = src_weightavg != NULL;
+    int32_t need_costheta = need_weightavg;
     const DOUBLE sqr_rpmin=rpmin*rpmin, sqr_rpmax=rpmax*rpmax;
     DOUBLE inv_rpstep=0., rpmin_invstep=0.;
     SSE_FLOATS m_inv_rpstep = SSE_SETZERO_FLOAT();
@@ -732,14 +775,21 @@ static inline int countpairs_rp_pi_sse_intrinsics_DOUBLE(const int64_t N0, DOUBL
     sse_weight_func_t_DOUBLE sse_weight_func = NULL;
     weight_func_t_DOUBLE fallback_weight_func = NULL;
     if(need_weightavg){
-      // Same particle list, new copy of num_weights pointers into that list
-      local_w0 = *weights0;
-      local_w1 = *weights1;
+        // Same particle list, new copy of num_weights pointers into that list
+        local_w0 = *weights0;
+        local_w1 = *weights1;
 
-      pair.num_weights = local_w0.num_weights;
-
-      sse_weight_func = get_sse_weight_func_by_method_DOUBLE(weight_method);
-      fallback_weight_func = get_weight_func_by_method_DOUBLE(weight_method);
+        set_pair_struct_DOUBLE(&pair, &local_w0, &local_w1, &pair_weight);
+        need_costheta = pair_weight.num;
+        sse_weight_func = get_sse_weight_func_by_method_DOUBLE(weight_method);
+        fallback_weight_func = get_weight_func_by_method_DOUBLE(weight_method);
+    }
+    DOUBLE *norm1 = NULL;
+    if (need_costheta) {
+        norm1 = (DOUBLE *) my_malloc(N1,sizeof(DOUBLE));
+        for(int64_t i=0;i<N1;i++) {
+            norm1[i] = SQRT(x1[i]*x1[i] + y1[i]*y1[i] + z1[i]*z1[i]);
+        }
     }
 
     const DOUBLE dpi = pimax/npibin;
@@ -756,6 +806,8 @@ static inline int countpairs_rp_pi_sse_intrinsics_DOUBLE(const int64_t N0, DOUBL
             // The advancement of the local_w0.weights[w] pointer should always mirror x0.
             pair.weights0[w].s = SSE_SET_FLOAT(*local_w0.weights[w]++);
         }
+        DOUBLE norm0 = ZERO;
+        if (need_costheta) norm0 = SQRT(xpos*xpos + ypos*ypos + zpos*zpos);
 
 #if 0
         /* are there any pairs possible with this particle and ANY
@@ -834,10 +886,17 @@ static inline int countpairs_rp_pi_sse_intrinsics_DOUBLE(const int64_t N0, DOUBL
             const SSE_FLOATS m_xpos = SSE_SET_FLOAT(xpos);
             const SSE_FLOATS m_ypos = SSE_SET_FLOAT(ypos);
             const SSE_FLOATS m_zpos = SSE_SET_FLOAT(zpos);
+            const SSE_FLOATS m_norm0 = SSE_SET_FLOAT(norm0);
 
             const SSE_FLOATS m_x1 = SSE_LOAD_FLOATS_UNALIGNED(localx1);
             const SSE_FLOATS m_y1 = SSE_LOAD_FLOATS_UNALIGNED(localy1);
             const SSE_FLOATS m_z1 = SSE_LOAD_FLOATS_UNALIGNED(localz1);
+
+            if(need_costheta) {
+                const SSE_FLOATS m_norm1 = SSE_LOAD_FLOATS_UNALIGNED(norm1 + j);
+                pair.costheta.s = SSE_ADD_FLOATS(SSE_ADD_FLOATS(SSE_MULTIPLY_FLOATS(m_xpos, m_x1), SSE_MULTIPLY_FLOATS(m_ypos, m_y1)), SSE_MULTIPLY_FLOATS(m_zpos, m_z1));
+                pair.costheta.s = SSE_DIVIDE_FLOATS(pair.costheta.s, SSE_MULTIPLY_FLOATS(m_norm0, m_norm1));
+            }
 
             localx1 += SSE_NVEC;
             localy1 += SSE_NVEC;
@@ -866,7 +925,7 @@ static inline int countpairs_rp_pi_sse_intrinsics_DOUBLE(const int64_t N0, DOUBL
             const SSE_FLOATS m_ydiff = SSE_SUBTRACT_FLOATS(m_y1, m_ypos);  //(y[j] - y0)
             SSE_FLOATS m_zdiff = SSE_SUBTRACT_FLOATS(m_z1, m_zpos);  //z2[j:j+NVEC-1] - z1
             const SSE_FLOATS m_neg_pimax_mask = SSE_COMPARE_FLOATS_GT(m_zdiff,-m_pimax);
-            if(SSE_TEST_COMPARISON(m_neg_pimax_mask)==0) {
+            if(SSE_TEST_COMPARISON(m_neg_pimax_mask) == 0) {
                 continue;
             }
             m_zdiff = SSE_MAX_FLOATS(m_zdiff,SSE_SUBTRACT_FLOATS(m_zero,m_zdiff));//dz = fabs(dz) => dz = max(dz, -dz);
@@ -966,6 +1025,13 @@ static inline int countpairs_rp_pi_sse_intrinsics_DOUBLE(const int64_t N0, DOUBL
 
 
         for(;j<N1;j++) {
+
+            if(need_costheta) {
+                DOUBLE localnorm1 = norm1[j];
+                pair.costheta.d = (*localx1)*xpos + (*localy1)*ypos + (*localz1)*zpos;
+                pair.costheta.d /= localnorm1*norm0;
+            }
+
             const DOUBLE dx = *localx1++ - xpos;
             const DOUBLE dy = *localy1++ - ypos;
             DOUBLE dz = *localz1++ - zpos;
