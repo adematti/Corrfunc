@@ -38,15 +38,14 @@ def xi(boxsize, nthreads, binfile, X, Y, Z,
 
     Parameters
     ----------
-
-    boxsize: double
+    boxsize : double
         A double-precision value for the boxsize of the simulation
         in same units as the particle positions and the ``r`` bins.
 
-    nthreads: integer
+    nthreads : integer
         Number of threads to use.
 
-    binfile: string or an list/array of floats
+    binfile : string or an list/array of floats
         For string input: filename specifying the ``r`` bins for
         ``xi``. The file should contain white-space separated values
         of (rmin, rmax)  for each ``r`` wanted. The bins need to be
@@ -58,7 +57,7 @@ def xi(boxsize, nthreads, binfile, X, Y, Z,
         input specifying **14** (logarithmic) bins between 0.1 and 10.0. This
         array does not need to be sorted.
 
-    X/Y/Z: arraytype, real (float/double)
+    X/Y/Z : arraytype, real (float/double)
         Particle positions in the 3 axes. Must be within [0, boxsize]
         and specified in the same units as ``rp_bins`` and boxsize. All
         3 arrays must be of the same floating-point type.
@@ -68,15 +67,15 @@ def xi(boxsize, nthreads, binfile, X, Y, Z,
         precision arrays (C float type); or in double-precision if XYZ
         are double precision arrays (C double type).
 
-    weights: array_like, real (float/double), optional
+    weights : array_like, real (float/double), optional
         A scalar, or an array of weights of shape (n_weights, n_positions) or
         (n_positions,). ``weight_type`` specifies how these weights are used;
         results are returned in the ``weightavg`` field.
 
-    verbose: boolean (default false)
+    verbose : boolean (default false)
         Boolean flag to control output of informational messages
 
-    output_ravg: boolean (default false)
+    output_ravg : boolean (default false)
         Boolean flag to output the average ``r`` for each bin. Code will
         run slower if you set this flag.
 
@@ -85,32 +84,32 @@ def xi(boxsize, nthreads, binfile, X, Y, Z,
         you need accurate ``rpavg`` values, then pass in double precision
         arrays for the particle positions.
 
-    (xyz)bin_refine_factor: integer, default is (2,2,1); typically within [1-3]
+    (xyz)bin_refine_factor : integer, default is (2,2,1); typically within [1-3]
         Controls the refinement on the cell sizes. Can have up to a 20% impact
         on runtime.
 
-    max_cells_per_dim: integer, default is 100, typical values in [50-300]
+    max_cells_per_dim : integer, default is 100, typical values in [50-300]
         Controls the maximum number of cells per dimension. Total number of
         cells can be up to (max_cells_per_dim)^3. Only increase if ``rmax`` is
         too small relative to the boxsize (and increasing helps the runtime).
 
-    copy_particles: boolean (default True)
+    copy_particles : boolean (default True)
         Boolean flag to make a copy of the particle positions
         If set to False, the particles will be re-ordered in-place
 
         .. versionadded:: 2.3.0
 
-    enable_min_sep_opt: boolean (default true)
+    enable_min_sep_opt : boolean (default true)
         Boolean flag to allow optimizations based on min. separation between
         pairs of cells. Here to allow for comparison studies.
 
         .. versionadded:: 2.3.0
 
-    c_api_timer: boolean (default false)
+    c_api_timer : boolean (default false)
         Boolean flag to measure actual time spent in the C libraries. Here
         to allow for benchmarking and scaling studies.
 
-    isa: string (default ``fastest``)
+    isa : string (default ``fastest``)
         Controls the runtime dispatch for the instruction set to use. Options
         are: [``fastest``, ``avx512f``, ``avx``, ``sse42``, ``fallback``]
 
@@ -123,7 +122,7 @@ def xi(boxsize, nthreads, binfile, X, Y, Z,
         you *are* benchmarking, then the string supplied here gets translated
         into an ``enum`` for the instruction set defined in ``utils/defs.h``.
 
-    weight_type: string, optional, Default: None.
+    weight_type : string, optional, Default: None.
         The type of weighting to apply.  One of ["pair_product", None].
 
     bin_type : string, case-insensitive (default ``custom``)
@@ -154,9 +153,8 @@ def xi(boxsize, nthreads, binfile, X, Y, Z,
         default weight value if denominator is zero).
 
     Returns
-    --------
-
-    results: Numpy structured array
+    -------
+    results : Numpy structured array
         A numpy structured array containing [rmin, rmax, ravg, xi, npairs,
         weightavg] for each radial specified in the ``binfile``. If
         ``output_ravg`` is not set then ``ravg`` will be set to 0.0 for all
@@ -164,13 +162,12 @@ def xi(boxsize, nthreads, binfile, X, Y, Z,
         function while ``npairs`` contains the number of pairs in that bin.
         If using weights, ``xi`` will be weighted while ``npairs`` will not be.
 
-    api_time: float, optional
+    api_time : float, optional
         Only returned if ``c_api_timer`` is set.  ``api_time`` measures only
         the time spent within the C library and ignores all python overhead.
 
     Example
-    --------
-
+    -------
     >>> from __future__ import print_function
     >>> import numpy as np
     >>> from os.path import dirname, abspath, join as pjoin

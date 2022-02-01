@@ -158,6 +158,7 @@ int main(int argc, char **argv)
                                       autocorr,
                                       binfile,
                                       pimax,
+                                      (int) pimax,
                                       cosmology,
                                       &results,
                                       &options, NULL);

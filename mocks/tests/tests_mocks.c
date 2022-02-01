@@ -64,6 +64,7 @@ int test_DDrppi_mocks(const char *correct_outputfile)
                                       autocorr,
                                       binfile,
                                       pimax,
+                                      (int) pimax,
                                       cosmology_flag,
                                       &results,
                                       &options,

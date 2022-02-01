@@ -1260,6 +1260,7 @@ static PyObject *countpairs_countpairs_rp_pi_mocks(PyObject *self, PyObject *arg
     int nthreads=4;
     int cosmology=1;
     double pimax;
+    int npibins;
     char *binfile, *weighting_method_str = NULL;
     PyObject *pair_weight_obj=NULL, *sep_pair_weight_obj=NULL, *attrs_pair_weight=NULL;
 
@@ -1268,6 +1269,7 @@ static PyObject *countpairs_countpairs_rp_pi_mocks(PyObject *self, PyObject *arg
         "cosmology",
         "nthreads",
         "pimax",
+        "npibins",
         "binfile",
         "RA1",
         "DEC1",
@@ -1297,8 +1299,8 @@ static PyObject *countpairs_countpairs_rp_pi_mocks(PyObject *self, PyObject *arg
         NULL
     };
 
-    if ( ! PyArg_ParseTupleAndKeywords(args, kwargs, "iiidsO!O!O!|OO!O!O!ObbbbbbbhbbbisO!O!OI", kwlist,
-                                       &autocorr,&cosmology,&nthreads,&pimax,&binfile,
+    if ( ! PyArg_ParseTupleAndKeywords(args, kwargs, "iiidisO!O!O!|OO!O!O!ObbbbbbbhbbbisO!O!OI", kwlist,
+                                       &autocorr,&cosmology,&nthreads,&pimax,&npibins,&binfile,
                                        &PyArray_Type,&x1_obj,
                                        &PyArray_Type,&y1_obj,
                                        &PyArray_Type,&z1_obj,
@@ -1476,6 +1478,7 @@ static PyObject *countpairs_countpairs_rp_pi_mocks(PyObject *self, PyObject *arg
                                   autocorr,
                                   binfile,
                                   pimax,
+                                  npibins,
                                   cosmology,
                                   &results,
                                   &options,
@@ -1509,7 +1512,7 @@ static PyObject *countpairs_countpairs_rp_pi_mocks(PyObject *self, PyObject *arg
     /* Build the output list */
     PyObject *ret = PyList_New(0);//create an empty list
     double rlow=results.rupp[0];
-    const double dpi = pimax/(double)results.npibin ;
+    const double dpi = pimax/(double)results.npibin;
 
     for(int i=1;i<results.nbin;i++) {
         for(int j=0;j<results.npibin;j++) {

@@ -198,6 +198,7 @@ int main(int argc, char **argv)
                                       autocorr,
                                       binfile,
                                       pimax,
+                                      (int) pimax,
                                       &results,
                                       &options, NULL);
         if(status != EXIT_SUCCESS) {

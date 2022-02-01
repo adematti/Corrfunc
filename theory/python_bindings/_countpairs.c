@@ -1605,6 +1605,7 @@ static PyObject *countpairs_countpairs_rp_pi(PyObject *self, PyObject *args, PyO
     int nthreads=4;
 
     double pimax;
+    int npibins;
     char *binfile, *weighting_method_str = NULL;
     PyObject *pair_weight_obj=NULL, *sep_pair_weight_obj=NULL, *attrs_pair_weight=NULL;
 
@@ -1623,6 +1624,7 @@ static PyObject *countpairs_countpairs_rp_pi(PyObject *self, PyObject *args, PyO
         "autocorr",
         "nthreads",
         "pimax",
+        "npibins",
         "binfile",
         "X1",
         "Y1",
@@ -1652,8 +1654,8 @@ static PyObject *countpairs_countpairs_rp_pi(PyObject *self, PyObject *args, PyO
         NULL
     };
 
-    if ( ! PyArg_ParseTupleAndKeywords(args, kwargs, "iidsO!O!O!|OO!O!O!ObbdbbbbhbbbisO!O!OI", kwlist,
-                                       &autocorr,&nthreads,&pimax,&binfile,
+    if ( ! PyArg_ParseTupleAndKeywords(args, kwargs, "iidisO!O!O!|OO!O!O!ObbdbbbbhbbbisO!O!OI", kwlist,
+                                       &autocorr,&nthreads,&pimax,&npibins,&binfile,
                                        &PyArray_Type,&x1_obj,
                                        &PyArray_Type,&y1_obj,
                                        &PyArray_Type,&z1_obj,
@@ -1828,6 +1830,7 @@ static PyObject *countpairs_countpairs_rp_pi(PyObject *self, PyObject *args, PyO
                                   autocorr,
                                   binfile,
                                   pimax,
+                                  npibins,
                                   &results,
                                   &options,
                                   &extra);

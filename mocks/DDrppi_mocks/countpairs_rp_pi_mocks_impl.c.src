@@ -205,6 +205,7 @@ int countpairs_mocks_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1, DOUBLE
                             const int autocorr,
                             const char *binfile,
                             const DOUBLE pimax,
+                            const int npibin,
                             const int cosmology,
                             results_countpairs_mocks *results,
                             struct config_options *options, struct extra_options *extra)
@@ -275,8 +276,6 @@ int countpairs_mocks_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1, DOUBLE
             break;/* all factors have been reset -> no point continuing with the loop */
         }
     }
-
-    const int npibin = (int) pimax;
 
     /* setup interrupt handler -> mostly useful during the python execution.
        Let's Ctrl-C abort the extension  */

@@ -138,6 +138,7 @@ int countpairs_rp_pi_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z
                             const int autocorr,
                             const char *binfile,
                             const DOUBLE pimax,
+                            const int npibin,
                             results_countpairs_rp_pi *results,
                             struct config_options *options,
                             struct extra_options *extra)
@@ -184,8 +185,6 @@ int countpairs_rp_pi_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z
         fprintf(stderr,"Warning: Max. cells per dimension is set to 0 - resetting to `NLATMAX' = %d\n", NLATMAX);
         options->max_cells_per_dim = NLATMAX;
     }
-
-    const int npibin = (int) pimax;
 
     /* setup interrupt handler -> mostly useful during the python execution.
        Let's Ctrl-C abort the extension  */

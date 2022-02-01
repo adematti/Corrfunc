@@ -77,7 +77,7 @@ def test_linear_binning_mocks_DDrppi(points_mock, linbins, isa, nthreads, autoco
     ra,dec,cz,w = points_mock['data']
 
     _test_bin_types(DDrppi_mocks, autocorr, cosmology, nthreads,
-                    pimax, linbins,
+                    linbins, pimax, int(pimax),
                     ra, dec, cz, weights1=w,
                     output_rpavg=True, verbose=True,
                     isa=isa, ravg_name='rpavg')
@@ -89,7 +89,7 @@ def test_linear_binning_mocks_DDsmu(points_mock, linbins, isa, nthreads, autocor
     ra,dec,cz,w = points_mock['data']
 
     _test_bin_types(DDsmu_mocks, autocorr, cosmology, nthreads,
-                    mu_max, nmu_bins, linbins,
+                    linbins, mu_max, nmu_bins,
                     ra, dec, cz, weights1=w,
                     output_savg=True, verbose=True,
                     isa=isa, ravg_name='savg')
@@ -125,8 +125,8 @@ def test_linear_binning_theory_DDrppi(points, linbins, isa, nthreads, autocorr=T
     x,y,z,w = points['data']
     boxsize = points['boxsize']
 
-    _test_bin_types(DDrppi, autocorr, nthreads, pimax,
-                    linbins, x, y, z, weights1=w,
+    _test_bin_types(DDrppi, autocorr, nthreads,
+                    linbins, pimax, int(pimax), x, y, z, weights1=w,
                     verbose=True, periodic=periodic,
                     boxsize=boxsize, isa=isa,
                     output_rpavg=True, ravg_name='rpavg')
@@ -153,8 +153,8 @@ def test_linear_binning_theory_wp(points, linbins, isa, nthreads, autocorr=True,
     x,y,z,w = points['data']
     boxsize = points['boxsize']
 
-    _test_bin_types(wp, boxsize, pimax, nthreads,
-                    linbins, x, y, z, weights=w,
+    _test_bin_types(wp, boxsize, nthreads,
+                    linbins, pimax, x, y, z, weights=w,
                     verbose=True, isa=isa,
                     output_rpavg=True, ravg_name='rpavg')
 

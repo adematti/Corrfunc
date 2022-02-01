@@ -47,7 +47,7 @@ def test_DDrppi(gals_Mr19, isa, nthreads):
     periodic = 1
 
     x,y,z,w = gals_Mr19
-    results_DDrppi = DDrppi(autocorr, nthreads, pimax, binfile, x, y, z,
+    results_DDrppi = DDrppi(autocorr, nthreads, binfile, pimax, int(pimax), x, y, z,
                             weights1=w, weight_type='pair_product',
                             periodic=periodic, boxsize=boxsize,
                             output_rpavg=True, verbose=True,
@@ -94,7 +94,7 @@ def test_wp(gals_Mr19, isa, nthreads):
                      "../../theory/tests/", "bins")
 
     x,y,z,w = gals_Mr19
-    results_wp = wp(boxsize, pimax, nthreads, binfile,
+    results_wp = wp(boxsize, nthreads, binfile, pimax,
                     x, y, z,
                     weights=w, weight_type='pair_product',
                     output_rpavg=True, verbose=True,

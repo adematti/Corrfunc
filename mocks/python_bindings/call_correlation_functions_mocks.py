@@ -86,7 +86,7 @@ def main():
 
     print("\nRunning 2-D correlation function xi(rp,pi)")
     results_DDrppi, _ = rp_pi_mocks(autocorr, cosmology, nthreads,
-                                    pimax, binfile,
+                                    pimax, int(pimax), binfile,
                                     ra, dec, cz, weights1=weights,
                                     output_rpavg=True, verbose=True,
                                     weight_type='pair_product')
@@ -103,7 +103,7 @@ def main():
 
     print("\nRunning 2-D correlation function xi(rp,pi) with different bin refinement")
     results_DDrppi, _ = rp_pi_mocks(autocorr, cosmology, nthreads,
-                                    pimax, binfile,
+                                    pimax, int(pimax), binfile,
                                     ra, dec, cz,
                                     output_rpavg=True,
                                     xbin_refine_factor=3,

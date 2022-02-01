@@ -122,6 +122,7 @@ int test_nonperiodic_DDrppi(const char *correct_outputfile)
                                       autocorr,
                                       binfile,
                                       pimax,
+                                      (int) pimax,
                                       &results,
                                       &options,
                                       &extra);

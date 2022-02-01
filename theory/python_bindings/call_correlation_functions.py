@@ -255,7 +255,7 @@ def main():
     print("\nRunning 2-D correlation function DD(rp,pi)")
     results_DDrppi, _ = DDrppi(autocorr=autocorr,
                                nthreads=nthreads,
-                               pimax=pimax,
+                               pimax=pimax, npibins=int(pimax),
                                binfile=binfile,
                                X1=x, Y1=y, Z1=z, weights1=w,
                                X2=x, Y2=y, Z2=z, weights2=w,

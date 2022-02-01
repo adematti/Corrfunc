@@ -38,14 +38,13 @@ def DDtheta_mocks(autocorr, nthreads, binfile,
 
 
     .. note:: This module only returns pair counts and not the actual
-       correlation function :math:`\\omega(\theta)`. See
+       correlation function :math:`\\omega(\\theta)`. See
        :py:mod:`Corrfunc.utils.convert_3d_counts_to_cf` for computing
-       :math:`\\omega(\theta)` from the pair counts returned.
+       :math:`\\omega(\\theta)` from the pair counts returned.
 
 
     Parameters
     ----------
-
     autocorr : boolean, required
         Boolean flag for auto/cross-correlation. If autocorr is set to 1,
         then the second set of particle positions are not required.
@@ -53,7 +52,7 @@ def DDtheta_mocks(autocorr, nthreads, binfile,
     nthreads : integer
         Number of threads to use.
 
-    binfile: string or an list/array of floats. Units: degrees.
+    binfile : string or an list/array of floats. Units: degrees.
         For string input: filename specifying the ``theta`` bins for
         ``DDtheta_mocks``. The file should contain white-space separated values
         of (thetamin, thetamax)  for each ``theta`` wanted. The bins need to be
@@ -164,13 +163,13 @@ def DDtheta_mocks(autocorr, nthreads, binfile,
         is too small relative to the boxsize (and increasing helps the
         runtime).
 
-    copy_particles: boolean (default True)
+    copy_particles : boolean (default True)
         Boolean flag to make a copy of the particle positions
         If set to False, the particles will be re-ordered in-place
 
         .. versionadded:: 2.3.0
 
-    enable_min_sep_opt: boolean (default true)
+    enable_min_sep_opt : boolean (default true)
         Boolean flag to allow optimizations based on min. separation between
         pairs of cells. Here to allow for comparison studies.
 
@@ -180,7 +179,7 @@ def DDtheta_mocks(autocorr, nthreads, binfile,
         Boolean flag to measure actual time spent in the C libraries. Here
         to allow for benchmarking and scaling studies.
 
-    isa: string, case-insensitive (default ``fastest``)
+    isa : string, case-insensitive (default ``fastest``)
         Controls the runtime dispatch for the instruction set to use. Options
         are: [``fastest``, ``avx512f``, ``avx``, ``sse42``, ``fallback``]
 
@@ -228,8 +227,7 @@ def DDtheta_mocks(autocorr, nthreads, binfile,
         default weight value if denominator is zero).
 
     Returns
-    --------
-
+    -------
     results : Numpy structured array
         A numpy structured array containing [thetamin, thetamax, thetaavg,
         npairs, weightavg] for each angular bin specified in the ``binfile``.
@@ -243,7 +241,6 @@ def DDtheta_mocks(autocorr, nthreads, binfile,
 
     Example
     -------
-
     >>> from __future__ import print_function
     >>> import numpy as np
     >>> import time

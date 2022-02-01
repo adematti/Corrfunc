@@ -23,7 +23,7 @@ def test_DDrppi_mocks(Mr19_mock_northonly, isa, nthreads):
 
     ra,dec,cz,w = Mr19_mock_northonly
     results_DDrppi_mocks = DDrppi_mocks(autocorr, cosmology, nthreads,
-                                        pimax, binfile,
+                                        binfile, pimax, int(pimax),
                                         ra, dec, cz, weights1=w,
                                         weight_type='pair_product',
                                         output_rpavg=True, verbose=True,
@@ -47,7 +47,7 @@ def test_DDsmu_mocks(Mr19_randoms_northonly, isa, nthreads):
 
     ra,dec,cz,w = Mr19_randoms_northonly
     results_DDsmu_mocks = DDsmu_mocks(autocorr, cosmology, nthreads,
-                                      mu_max, nmu_bins, binfile,
+                                      binfile, mu_max, nmu_bins,
                                       ra, dec, cz, weights1=w,
                                       weight_type='pair_product',
                                       output_savg=True, verbose=True,

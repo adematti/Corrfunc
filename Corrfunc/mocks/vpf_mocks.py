@@ -31,7 +31,6 @@ def vpf_mocks(rmax, nbins, nspheres, numpN,
 
     Parameters
     ----------
-
     rmax : double
         Maximum radius of the sphere to place on the particles
 
@@ -197,8 +196,7 @@ def vpf_mocks(rmax, nbins, nspheres, numpN,
         ``enum`` for the instruction set defined in ``utils/defs.h``.
 
     Returns
-    --------
-
+    -------
     results : Numpy structured array
         A numpy structured array containing [rmax, pN[numpN]] with ``nbins``
         elements. Each row contains the maximum radius of the sphere and the
@@ -214,8 +212,7 @@ def vpf_mocks(rmax, nbins, nspheres, numpN,
 
 
     Example
-    --------
-
+    -------
     >>> from __future__ import print_function
     >>> import math
     >>> from os.path import dirname, abspath, join as pjoin
