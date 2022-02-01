@@ -49,7 +49,6 @@ static inline int wp_avx512_intrinsics_DOUBLE(DOUBLE *x0, DOUBLE *y0, DOUBLE *z0
     }
     const int32_t need_rpavg = src_rpavg != NULL;
     const int32_t need_weightavg = src_weightavg != NULL;
-    int32_t need_costheta = need_weightavg;
     const DOUBLE sqr_rpmax=rpmax*rpmax;
     AVX512_FLOATS m_inv_rpstep = AVX512_SETZERO_FLOAT();
     AVX512_FLOATS m_rpmin_invstep = AVX512_SETZERO_FLOAT();
@@ -79,15 +78,7 @@ static inline int wp_avx512_intrinsics_DOUBLE(DOUBLE *x0, DOUBLE *y0, DOUBLE *z0
         local_w1 = *weights1;
 
         set_pair_struct_DOUBLE(&pair, &local_w0, &local_w1, &pair_weight);
-        need_costheta = pair_weight.num;
         avx512_weight_func = get_avx512_weight_func_by_method_DOUBLE(weight_method);
-    }
-    DOUBLE *norm1 = NULL;
-    if (need_costheta) {
-        norm1 = (DOUBLE *) my_malloc(N1,sizeof(DOUBLE));
-        for(int64_t i=0;i<N1;i++) {
-            norm1[i] = SQRT(x1[i]*x1[i] + y1[i]*y1[i] + z1[i]*z1[i]);
-        }
     }
 
     const DOUBLE *zstart = z1, *zend = z1 + N1;
@@ -101,8 +92,6 @@ static inline int wp_avx512_intrinsics_DOUBLE(DOUBLE *x0, DOUBLE *y0, DOUBLE *z0
             // The advancement of the local_w0.weights[w] pointer should always mirror x0.
             pair.weights0[w].a512 = AVX512_SET_FLOAT(*(local_w0.weights[w])++);
         }
-        DOUBLE norm0 = ZERO;
-        if (need_costheta) norm0 = SQRT(xpos*xpos + ypos*ypos + zpos*zpos);
 
 #if 0
         /* are there any pairs possible with this particle and ANY
@@ -175,19 +164,12 @@ static inline int wp_avx512_intrinsics_DOUBLE(DOUBLE *x0, DOUBLE *y0, DOUBLE *z0
         const AVX512_FLOATS m_xpos  = AVX512_SET_FLOAT(xpos);
         const AVX512_FLOATS m_ypos  = AVX512_SET_FLOAT(ypos);
         const AVX512_FLOATS m_zpos  = AVX512_SET_FLOAT(zpos);
-        const AVX512_FLOATS m_norm0 = AVX512_SET_FLOAT(norm0);
 
         for(int64_t j=n_off;j<N1;j+=AVX512_NVEC) {
             AVX512_MASK m_mask_left = (N1 - j) >= AVX512_NVEC ? ~0:masks_per_misalignment_value_DOUBLE[N1-j];
             const AVX512_FLOATS m_x1 = AVX512_MASKZ_LOAD_FLOATS_UNALIGNED(m_mask_left, localx1);
             const AVX512_FLOATS m_y1 = AVX512_MASKZ_LOAD_FLOATS_UNALIGNED(m_mask_left, localy1);
             const AVX512_FLOATS m_z1 = AVX512_MASKZ_LOAD_FLOATS_UNALIGNED(m_mask_left, localz1);
-
-            if(need_costheta) {
-                const AVX512_FLOATS m_norm1 = AVX512_MASKZ_LOAD_FLOATS_UNALIGNED(m_mask_left, norm1 + j);
-                pair.costheta.a512 = AVX512_MASKZ_ADD_FLOATS(m_mask_left, AVX512_MASKZ_ADD_FLOATS(AVX512_MASKZ_MULTIPLY_FLOATS(m_mask_left, m_x1, m_xpos), AVX512_MASKZ_MULTIPLY_FLOATS(m_mask_left, m_y1, m_ypos)), AVX512_MASKZ_MULTIPLY_FLOATS(m_mask_left, m_z1, m_zpos));
-                pair.costheta.a512 = AVX512_MASKZ_DIVIDE_FLOATS(m_mask_left, pair.costheta.a512, AVX512_MASKZ_MULTIPLY_FLOATS(m_mask_left, m_norm1, m_norm0));
-            }
 
             union int16 union_rpbin;
             union float16 union_mDperp;
@@ -368,7 +350,6 @@ static inline int wp_avx2_intrinsics_DOUBLE(DOUBLE *x0, DOUBLE *y0, DOUBLE *z0, 
     }
     const int32_t need_rpavg = src_rpavg != NULL;
     const int32_t need_weightavg = src_weightavg != NULL;
-    int32_t need_costheta = need_weightavg;
     const DOUBLE sqr_rpmin=rpmin*rpmin, sqr_rpmax=rpmax*rpmax;
     DOUBLE inv_rpstep=0., rpmin_invstep=0.;
     const AVX2_FLOATS m_zero = AVX2_SETZERO_FLOAT();
@@ -407,16 +388,8 @@ static inline int wp_avx2_intrinsics_DOUBLE(DOUBLE *x0, DOUBLE *y0, DOUBLE *z0, 
         local_w1 = *weights1;
 
         set_pair_struct_DOUBLE(&pair, &local_w0, &local_w1, &pair_weight);
-        need_costheta = pair_weight.num;
         avx_weight_func = get_avx_weight_func_by_method_DOUBLE(weight_method);
         fallback_weight_func = get_weight_func_by_method_DOUBLE(weight_method);
-    }
-    DOUBLE *norm1 = NULL;
-    if (need_costheta) {
-        norm1 = (DOUBLE *) my_malloc(N1,sizeof(DOUBLE));
-        for(int64_t i=0;i<N1;i++) {
-            norm1[i] = SQRT(x1[i]*x1[i] + y1[i]*y1[i] + z1[i]*z1[i]);
-        }
     }
 
     const DOUBLE *zstart = z1, *zend = z1 + N1;
@@ -430,8 +403,6 @@ static inline int wp_avx2_intrinsics_DOUBLE(DOUBLE *x0, DOUBLE *y0, DOUBLE *z0, 
             // The advancement of the local_w0.weights[w] pointer should always mirror x0.
             pair.weights0[w].a = AVX2_SET_FLOAT(*(local_w0.weights[w])++);
         }
-        DOUBLE norm0 = ZERO;
-        if (need_costheta) norm0 = SQRT(xpos*xpos + ypos*ypos + zpos*zpos);
 
 #if 0
         /* are there any pairs possible with this particle and ANY
@@ -505,7 +476,6 @@ static inline int wp_avx2_intrinsics_DOUBLE(DOUBLE *x0, DOUBLE *y0, DOUBLE *z0, 
             const AVX2_FLOATS m_xpos    = AVX2_SET_FLOAT(xpos);
             const AVX2_FLOATS m_ypos    = AVX2_SET_FLOAT(ypos);
             const AVX2_FLOATS m_zpos    = AVX2_SET_FLOAT(zpos);
-            const AVX2_FLOATS m_norm0   = AVX2_SET_FLOAT(norm0);
 
             union int8 union_rpbin;
             union float8 union_mDperp;
@@ -514,12 +484,6 @@ static inline int wp_avx2_intrinsics_DOUBLE(DOUBLE *x0, DOUBLE *y0, DOUBLE *z0, 
             const AVX2_FLOATS m_x1 = AVX2_LOAD_FLOATS_UNALIGNED(localx1);
             const AVX2_FLOATS m_y1 = AVX2_LOAD_FLOATS_UNALIGNED(localy1);
             const AVX2_FLOATS m_z1 = AVX2_LOAD_FLOATS_UNALIGNED(localz1);
-
-            if(need_costheta) {
-                const AVX2_FLOATS m_norm1 = AVX2_LOAD_FLOATS_UNALIGNED(norm1 + j);
-                pair.costheta.a = AVX2_ADD_FLOATS(AVX2_ADD_FLOATS(AVX2_MULTIPLY_FLOATS(m_xpos, m_x1), AVX2_MULTIPLY_FLOATS(m_ypos, m_y1)), AVX2_MULTIPLY_FLOATS(m_zpos, m_z1));
-                pair.costheta.a = AVX2_DIVIDE_FLOATS(pair.costheta.a, AVX2_MULTIPLY_FLOATS(m_norm0, m_norm1));
-            }
 
 #ifdef COUNT_VECTORIZED
             vectorized_npairs += AVX2_NVEC;
@@ -654,11 +618,6 @@ static inline int wp_avx2_intrinsics_DOUBLE(DOUBLE *x0, DOUBLE *y0, DOUBLE *z0, 
 #ifdef COUNT_VECTORIZED
             serial_npairs++;
 #endif
-            if(need_costheta) {
-                DOUBLE localnorm1 = norm1[j];
-                pair.costheta.d = (*localx1)*xpos + (*localy1)*ypos + (*localz1)*zpos;
-                pair.costheta.d /= localnorm1*norm0;
-            }
 
             const DOUBLE dz = *localz1++ - zpos;
             const DOUBLE dx = *localx1++ - xpos;
@@ -760,7 +719,6 @@ static inline int wp_avx_intrinsics_DOUBLE(DOUBLE *x0, DOUBLE *y0, DOUBLE *z0, c
     }
     const int32_t need_rpavg = src_rpavg != NULL;
     const int32_t need_weightavg = src_weightavg != NULL;
-    int32_t need_costheta = need_weightavg;
     const DOUBLE sqr_rpmin=rpmin*rpmin, sqr_rpmax=rpmax*rpmax;
     DOUBLE inv_rpstep=0., rpmin_invstep=0.;
     AVX_FLOATS m_inv_rpstep = AVX_SETZERO_FLOAT();
@@ -798,16 +756,8 @@ static inline int wp_avx_intrinsics_DOUBLE(DOUBLE *x0, DOUBLE *y0, DOUBLE *z0, c
         local_w1 = *weights1;
 
         set_pair_struct_DOUBLE(&pair, &local_w0, &local_w1, &pair_weight);
-        need_costheta = pair_weight.num;
         avx_weight_func = get_avx_weight_func_by_method_DOUBLE(weight_method);
         fallback_weight_func = get_weight_func_by_method_DOUBLE(weight_method);
-    }
-    DOUBLE *norm1 = NULL;
-    if (need_costheta) {
-        norm1 = (DOUBLE *) my_malloc(N1,sizeof(DOUBLE));
-        for(int64_t i=0;i<N1;i++) {
-            norm1[i] = SQRT(x1[i]*x1[i] + y1[i]*y1[i] + z1[i]*z1[i]);
-        }
     }
 
     const DOUBLE *zstart = z1, *zend = z1 + N1;
@@ -821,8 +771,6 @@ static inline int wp_avx_intrinsics_DOUBLE(DOUBLE *x0, DOUBLE *y0, DOUBLE *z0, c
             // The advancement of the local_w0.weights[w] pointer should always mirror x0.
             pair.weights0[w].a = AVX_SET_FLOAT(*(local_w0.weights[w])++);
         }
-        DOUBLE norm0 = ZERO;
-        if (need_costheta) norm0 = SQRT(xpos*xpos + ypos*ypos + zpos*zpos);
 
 #if 0
         /* are there any pairs possible with this particle and ANY
@@ -898,7 +846,6 @@ static inline int wp_avx_intrinsics_DOUBLE(DOUBLE *x0, DOUBLE *y0, DOUBLE *z0, c
             const AVX_FLOATS m_xpos    = AVX_SET_FLOAT(xpos);
             const AVX_FLOATS m_ypos    = AVX_SET_FLOAT(ypos);
             const AVX_FLOATS m_zpos    = AVX_SET_FLOAT(zpos);
-            const AVX_FLOATS m_norm0   = AVX_SET_FLOAT(norm0);
 
             union int8 union_rpbin;
             union float8 union_mDperp;
@@ -907,12 +854,6 @@ static inline int wp_avx_intrinsics_DOUBLE(DOUBLE *x0, DOUBLE *y0, DOUBLE *z0, c
             const AVX_FLOATS m_x1 = AVX_LOAD_FLOATS_UNALIGNED(localx1);
             const AVX_FLOATS m_y1 = AVX_LOAD_FLOATS_UNALIGNED(localy1);
             const AVX_FLOATS m_z1 = AVX_LOAD_FLOATS_UNALIGNED(localz1);
-
-            if(need_costheta) {
-                const AVX_FLOATS m_norm1 = AVX_LOAD_FLOATS_UNALIGNED(norm1 + j);
-                pair.costheta.a = AVX_ADD_FLOATS(AVX_ADD_FLOATS(AVX_MULTIPLY_FLOATS(m_xpos, m_x1), AVX_MULTIPLY_FLOATS(m_ypos, m_y1)), AVX_MULTIPLY_FLOATS(m_zpos, m_z1));
-                pair.costheta.a = AVX_DIVIDE_FLOATS(pair.costheta.a, AVX_MULTIPLY_FLOATS(m_norm0, m_norm1));
-            }
 
 #ifdef COUNT_VECTORIZED
             vectorized_npairs += AVX_NVEC;
@@ -1057,11 +998,6 @@ static inline int wp_avx_intrinsics_DOUBLE(DOUBLE *x0, DOUBLE *y0, DOUBLE *z0, c
 #ifdef COUNT_VECTORIZED
             serial_npairs++;
 #endif
-            if(need_costheta) {
-                DOUBLE localnorm1 = norm1[j];
-                pair.costheta.d = (*localx1)*xpos + (*localy1)*ypos + (*localz1)*zpos;
-                pair.costheta.d /= localnorm1*norm0;
-            }
 
             const DOUBLE dz = *localz1++ - zpos;
             const DOUBLE dx = *localx1++ - xpos;
@@ -1155,7 +1091,6 @@ static inline int wp_sse_intrinsics_DOUBLE(DOUBLE *x0, DOUBLE *y0, DOUBLE *z0, c
 
     const int32_t need_rpavg = src_rpavg != NULL;
     const int32_t need_weightavg = src_weightavg != NULL;
-    int32_t need_costheta = need_weightavg;
     const DOUBLE sqr_rpmin=rpmin*rpmin, sqr_rpmax=rpmax*rpmax;
     DOUBLE inv_rpstep=0., rpmin_invstep=0.;
     SSE_FLOATS m_inv_rpstep = SSE_SETZERO_FLOAT();
@@ -1202,16 +1137,8 @@ static inline int wp_sse_intrinsics_DOUBLE(DOUBLE *x0, DOUBLE *y0, DOUBLE *z0, c
         local_w1 = *weights1;
 
         set_pair_struct_DOUBLE(&pair, &local_w0, &local_w1, &pair_weight);
-        need_costheta = pair_weight.num;
         sse_weight_func = get_sse_weight_func_by_method_DOUBLE(weight_method);
         fallback_weight_func = get_weight_func_by_method_DOUBLE(weight_method);
-    }
-    DOUBLE *norm1 = NULL;
-    if (need_costheta) {
-        norm1 = (DOUBLE *) my_malloc(N1,sizeof(DOUBLE));
-        for(int64_t i=0;i<N1;i++) {
-            norm1[i] = SQRT(x1[i]*x1[i] + y1[i]*y1[i] + z1[i]*z1[i]);
-        }
     }
 
     const DOUBLE *zstart = z1, *zend = z1 + N1;
@@ -1225,8 +1152,6 @@ static inline int wp_sse_intrinsics_DOUBLE(DOUBLE *x0, DOUBLE *y0, DOUBLE *z0, c
             // The advancement of the local_w0.weights[w] pointer should always mirror x0.
             pair.weights0[w].s = SSE_SET_FLOAT(*local_w0.weights[w]++);
         }
-        DOUBLE norm0 = ZERO;
-        if (need_costheta) norm0 = SQRT(xpos*xpos + ypos*ypos + zpos*zpos);
 
 #if 0
         /* are there any pairs possible with this particle and ANY
@@ -1302,17 +1227,10 @@ static inline int wp_sse_intrinsics_DOUBLE(DOUBLE *x0, DOUBLE *y0, DOUBLE *z0, c
             const SSE_FLOATS m_xpos = SSE_SET_FLOAT(xpos);
             const SSE_FLOATS m_ypos = SSE_SET_FLOAT(ypos);
             const SSE_FLOATS m_zpos = SSE_SET_FLOAT(zpos);
-            const SSE_FLOATS m_norm0 = SSE_SET_FLOAT(norm0);
 
             const SSE_FLOATS m_x1 = SSE_LOAD_FLOATS_UNALIGNED(localx1);
             const SSE_FLOATS m_y1 = SSE_LOAD_FLOATS_UNALIGNED(localy1);
             const SSE_FLOATS m_z1 = SSE_LOAD_FLOATS_UNALIGNED(localz1);
-
-            if(need_costheta) {
-                const SSE_FLOATS m_norm1 = SSE_LOAD_FLOATS_UNALIGNED(norm1 + j);
-                pair.costheta.s = SSE_ADD_FLOATS(SSE_ADD_FLOATS(SSE_MULTIPLY_FLOATS(m_xpos, m_x1), SSE_MULTIPLY_FLOATS(m_ypos, m_y1)), SSE_MULTIPLY_FLOATS(m_zpos, m_z1));
-                pair.costheta.s = SSE_DIVIDE_FLOATS(pair.costheta.s, SSE_MULTIPLY_FLOATS(m_norm0, m_norm1));
-            }
 
 #ifdef COUNT_VECTORIZED
             vectorized_npairs += SSE_NVEC;
@@ -1445,12 +1363,6 @@ static inline int wp_sse_intrinsics_DOUBLE(DOUBLE *x0, DOUBLE *y0, DOUBLE *z0, c
 #ifdef COUNT_VECTORIZED
             serial_npairs++;
 #endif
-            if(need_costheta) {
-                DOUBLE localnorm1 = norm1[j];
-                pair.costheta.d = (*localx1)*xpos + (*localy1)*ypos + (*localz1)*zpos;
-                pair.costheta.d /= localnorm1*norm0;
-            }
-
             const DOUBLE dx = *localx1++ - xpos;
             const DOUBLE dy = *localy1++ - ypos;
             const DOUBLE dz = *localz1++ - zpos;
@@ -1543,7 +1455,6 @@ static inline int wp_fallback_DOUBLE(DOUBLE *x0, DOUBLE *y0, DOUBLE *z0, const w
     DOUBLE rpavg[nbin], weightavg[nbin];
     const int32_t need_rpavg = src_rpavg != NULL;
     const int32_t need_weightavg = src_weightavg != NULL;
-    int32_t need_costheta = need_weightavg;
     const DOUBLE sqr_rpmin=rpmin*rpmin, sqr_rpmax=rpmax*rpmax;
     DOUBLE inv_rpstep=0., rpmin_invstep=0.;
     if (bin_type == BIN_LIN) {
@@ -1571,15 +1482,7 @@ static inline int wp_fallback_DOUBLE(DOUBLE *x0, DOUBLE *y0, DOUBLE *z0, const w
         local_w1 = *weights1;
 
         set_pair_struct_DOUBLE(&pair, &local_w0, &local_w1, &pair_weight);
-        need_costheta = pair_weight.num;
         weight_func = get_weight_func_by_method_DOUBLE(weight_method);
-    }
-    DOUBLE *norm1 = NULL;
-    if (need_costheta) {
-        norm1 = (DOUBLE *) my_malloc(N1,sizeof(DOUBLE));
-        for(int64_t i=0;i<N1;i++) {
-            norm1[i] = SQRT(x1[i]*x1[i] + y1[i]*y1[i] + z1[i]*z1[i]);
-        }
     }
 
     /* naive implementation that is guaranteed to compile */
@@ -1591,9 +1494,6 @@ static inline int wp_fallback_DOUBLE(DOUBLE *x0, DOUBLE *y0, DOUBLE *z0, const w
         for(int w = 0; w < pair.num_weights; w++){
             pair.weights0[w].d = *local_w0.weights[w]++;
         }
-        DOUBLE norm0 = 0;
-        if (need_costheta) norm0 = SQRT(xpos*xpos + ypos*ypos + zpos*zpos);
-
 
 #if 0
         /* are there any pairs possible with this particle and ANY
@@ -1669,11 +1569,6 @@ static inline int wp_fallback_DOUBLE(DOUBLE *x0, DOUBLE *y0, DOUBLE *z0, const w
 #ifdef COUNT_VECTORIZED
             serial_npairs++;
 #endif
-            if(need_costheta) {
-                DOUBLE localnorm1 = norm1[n_off + j];
-                pair.costheta.d = (*localx1)*xpos + (*localy1)*ypos + (*localz1)*zpos;
-                pair.costheta.d /= localnorm1*norm0;
-            }
 
             const DOUBLE dx = *localx1++ - xpos;
             const DOUBLE dy = *localy1++ - ypos;

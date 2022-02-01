@@ -312,6 +312,7 @@ def DDrppi(autocorr, nthreads, pimax, binfile, X1, Y1, Z1, weights1=None,
         weights2 = [convert_to_native_endian(arr, warn=True) for arr in weights2]
 
     if pair_weights is not None:
+        if periodic: raise ValueError('Cannot use pair_weights if periodic=True')
         pair_weights = convert_to_native_endian(pair_weights, warn=True)
         sep_pair_weights = convert_to_native_endian(sep_pair_weights, warn=True)
 
