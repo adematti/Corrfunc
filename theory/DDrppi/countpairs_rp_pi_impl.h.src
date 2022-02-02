@@ -39,7 +39,7 @@ extern "C" {
                                        const int64_t ND2, DOUBLE *X2, DOUBLE *Y2, DOUBLE *Z2,
                                        const int numthreads,
                                        const int autocorr,
-                                       const char *binfile,
+                                       binarray *bins,
                                        const DOUBLE pimax,
                                        const int npibins,
                                        results_countpairs_rp_pi *results,

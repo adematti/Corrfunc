@@ -135,7 +135,7 @@ xi_func_ptr_DOUBLE xi_driver_DOUBLE(const struct config_options *options)
 int countpairs_xi_DOUBLE(const int64_t ND, DOUBLE * restrict X, DOUBLE * restrict Y, DOUBLE * restrict Z,
                          const double boxsize,
                          const int numthreads,
-                         const char *binfile,
+                         binarray *bins,
                          results_countpairs_xi *results,
                          struct config_options *options,
                          struct extra_options *extra)
@@ -200,16 +200,15 @@ int countpairs_xi_DOUBLE(const int64_t ND, DOUBLE * restrict X, DOUBLE * restric
     /***********************
      *initializing the  bins
      ************************/
-    double *rupp;
-    int nbins;
-    double rmin,rmax;
-    setup_bins(binfile,&rmin,&rmax,&nbins,&rupp);
+    double *rupp = bins->edges;
+    int nbins = bins->nedges;
+    double rmin=bins->edges[0], rmax=bins->edges[bins->nedges-1];
     if( ! (rmin >= 0.0 && rmax > 0.0 && rmin < rmax && nbins > 0)) {
         fprintf(stderr,"Error: Could not setup with R bins correctly. (rmin = %lf, rmax = %lf, with nbins = %d). Expected non-zero rmin/rmax with rmax > rmin and nbins >=1 \n",
                 rmin, rmax, nbins);
         return EXIT_FAILURE;
     }
-    detect_bin_type(rupp, nbins, &(options->bin_type), options->verbose);
+    detect_bin_type(bins, &(options->bin_type), options->verbose);
 
     if(get_bin_refine_scheme(options) == BINNING_DFL) {
         if(rmax < 0.05*boxsize) {
@@ -285,7 +284,6 @@ int countpairs_xi_DOUBLE(const int64_t ND, DOUBLE * restrict X, DOUBLE * restric
                                                                          options->periodic);
     if(all_cell_pairs == NULL) {
         free_cellarray_DOUBLE(lattice, totncells);
-        free(rupp);
         return EXIT_FAILURE;
     }
 
@@ -294,7 +292,6 @@ int countpairs_xi_DOUBLE(const int64_t ND, DOUBLE * restrict X, DOUBLE * restric
     xi_func_ptr_DOUBLE xi_function_DOUBLE = xi_driver_DOUBLE(options);
     if(xi_function_DOUBLE == NULL) {
         free_cellarray_DOUBLE(lattice, totncells);
-        free(rupp);
         return EXIT_FAILURE;
     }
 
@@ -321,7 +318,6 @@ int countpairs_xi_DOUBLE(const int64_t ND, DOUBLE * restrict X, DOUBLE * restric
         if(need_weightavg) {
             matrix_free((void**) all_weightavg, numthreads);
         }
-        free(rupp);
         return EXIT_FAILURE;
     }
 #else
@@ -443,7 +439,6 @@ int countpairs_xi_DOUBLE(const int64_t ND, DOUBLE * restrict X, DOUBLE * restric
     free_cellarray_DOUBLE(lattice, totncells);
     if(abort_status != EXIT_SUCCESS || interrupt_status_xi_DOUBLE != EXIT_SUCCESS) {
         /* Cleanup memory here if aborting */
-        free(rupp);
 #if defined(_OPENMP)
         matrix_free((void **) all_npairs,numthreads);
         if(options->need_avg_sep) {
@@ -571,7 +566,6 @@ int countpairs_xi_DOUBLE(const int64_t ND, DOUBLE * restrict X, DOUBLE * restric
     if(results->npairs == NULL || results->rupp == NULL ||
        results->ravg == NULL || results->xi == NULL || results->weightavg == NULL) {
         free_results_xi(results);
-        free(rupp);
         return EXIT_FAILURE;
     }
 
@@ -623,8 +617,6 @@ int countpairs_xi_DOUBLE(const int64_t ND, DOUBLE * restrict X, DOUBLE * restric
         }
         rlow=results->rupp[i];
     }
-
-    free(rupp);
 
     /* reset interrupt handlers to default */
     RESET_INTERRUPT_HANDLERS();

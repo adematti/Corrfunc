@@ -156,7 +156,8 @@ int main(int argc, char *argv[])
     }
     fprintf(stderr,"\t\t -------------------------------------\n");
 
-
+    binarray bins;
+    read_binfile(binfile, &bins);
 
     /*---Read-data1-file----------------------------------*/
     gettimeofday(&t0,NULL);
@@ -231,7 +232,7 @@ int main(int argc, char *argv[])
                             ND2,x2,y2,z2,
                             nthreads,
                             autocorr,
-                            binfile,
+                            &bins,
                             &results,
                             &options,
                             &extra);/* This is for ABI compatibility */
@@ -247,6 +248,7 @@ int main(int argc, char *argv[])
           free(weights2[w]);
         }
     }
+    free_binarray(&bins);
     if(status != EXIT_SUCCESS) {
       return status;
     }

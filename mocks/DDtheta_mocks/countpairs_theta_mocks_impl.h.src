@@ -41,7 +41,7 @@ extern int countpairs_theta_mocks_DOUBLE(const int64_t ND1, DOUBLE *phi1, DOUBLE
                                          const int64_t ND2, DOUBLE *phi2, DOUBLE *theta2,
                                          const int numthreads,
                                          const int autocorr,
-                                         const char *binfile,
+                                         binarray *bins,
                                          results_countpairs_theta *results,
                                          struct config_options *options, struct extra_options *extra);
 

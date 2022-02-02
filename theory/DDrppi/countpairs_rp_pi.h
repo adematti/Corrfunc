@@ -30,7 +30,7 @@ extern "C" {
                                 const int64_t ND2, void *X2, void *Y2, void *Z2,
                                 const int numthreads,
                                 const int autocorr,
-                                const char *binfile,
+                                binarray *bins,
                                 const double pimax,
                                 const int npibins,
                                 results_countpairs_rp_pi *results,

@@ -31,7 +31,7 @@ extern "C" {
                               const int64_t ND2, void *theta2, void *phi2, void *czD2,
                               const int numthreads,
                               const int autocorr,
-                              const char *sbinfile,
+                              binarray *bins,
                               const double mu_max,
                               const int nmu_bins,
                               const int cosmology,

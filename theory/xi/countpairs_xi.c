@@ -33,7 +33,7 @@ void free_results_xi(results_countpairs_xi *results)
 int countpairs_xi(const int64_t ND, void * restrict X, void * restrict Y, void * restrict Z,
                   const double boxsize,
                   const int numthreads,
-                  const char *binfile,
+                  binarray *bins,
                   results_countpairs_xi *results,
                   struct config_options *options,
                   struct extra_options *extra)
@@ -52,7 +52,7 @@ int countpairs_xi(const int64_t ND, void * restrict X, void * restrict Y, void *
         return countpairs_xi_float(ND, (float *) X, (float *) Y, (float *) Z,
                                    boxsize,
                                    numthreads,
-                                   binfile,
+                                   bins,
                                    results,
                                    options,
                                    extra);
@@ -60,7 +60,7 @@ int countpairs_xi(const int64_t ND, void * restrict X, void * restrict Y, void *
         return countpairs_xi_double(ND, (double *) X, (double *) Y, (double *) Z,
                                     boxsize,
                                     numthreads,
-                                    binfile,
+                                    bins,
                                     results,
                                     options,
                                     extra);

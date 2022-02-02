@@ -129,7 +129,8 @@ int main(int argc, char **argv)
             return status;
         }
     }
-
+    binarray bins;
+    read_binfile(binfile, &bins);
 
     //Read-in the data
     const int64_t ND1 = read_positions(file,fileformat,sizeof(*ra1),3, &ra1, &dec1, &cz1);
@@ -156,7 +157,7 @@ int main(int argc, char **argv)
                                       ND2,ra2,dec2,cz2,
                                       nthreads,
                                       autocorr,
-                                      binfile,
+                                      &bins,
                                       pimax,
                                       (int) pimax,
                                       cosmology,
@@ -204,7 +205,7 @@ int main(int argc, char **argv)
                                            ND2,ra2,dec2,cz2,
                                            nthreads,
                                            autocorr,
-                                           binfile,
+                                           &bins,
                                            mu_max,
                                            nmu_bins,
                                            cosmology,
@@ -252,7 +253,7 @@ int main(int argc, char **argv)
                                             ND2,ra2,dec2,
                                             nthreads,
                                             autocorr,
-                                            binfile,
+                                            &bins,
                                             &results,
                                             &options, NULL);
         if(status != EXIT_SUCCESS) {
@@ -328,5 +329,6 @@ int main(int argc, char **argv)
 
 
     free(ra1);free(dec1);free(cz1);
+    free_binarray(&bins);
     return EXIT_SUCCESS;
 }

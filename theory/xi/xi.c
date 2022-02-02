@@ -47,7 +47,7 @@ int main(int argc, char *argv[])
     char *file=NULL,*fileformat=NULL,*weights_file=NULL,*weights_fileformat=NULL;;
     char *binfile=NULL;
     char *weight_method_str=NULL;
-    
+
     weight_method_t weight_method = NONE;
     int num_weights = 0;
 
@@ -92,7 +92,7 @@ int main(int argc, char *argv[])
         }
         return EXIT_FAILURE;
     }
-    
+
     /* Validate optional arguments */
     int noptargs_given = argc - (nargs + 1);
     if(noptargs_given != 0 && noptargs_given != 3){
@@ -126,7 +126,7 @@ int main(int argc, char *argv[])
          return EXIT_FAILURE;
        }
        num_weights = get_num_weights_by_method(weight_method);
-      
+
        weights_file = argv[nargs + 2];
        weights_fileformat = argv[nargs + 3];
     }
@@ -144,6 +144,8 @@ int main(int argc, char *argv[])
     }
     fprintf(stderr,"\t\t -------------------------------------\n");
 
+    binarray bins;
+    read_binfile(binfile, &bins);
 
     gettimeofday(&t0,NULL);
     /*---Read-data1-file----------------------------------*/
@@ -157,14 +159,14 @@ int main(int argc, char *argv[])
         assert(y1[i] >= 0.0 && y1[i] <= boxsize && "ypos is within limits [0, boxsize]");
         assert(z1[i] >= 0.0 && z1[i] <= boxsize && "zpos is within limits [0, boxsize]");
     }
-    
+
     /* Read weights file */
     if(weights_file != NULL){
         gettimeofday(&t0,NULL);
         int64_t wND1 = read_columns_into_array(weights_file, weights_fileformat, sizeof(DOUBLE), num_weights, (void **) weights1);
         gettimeofday(&t1,NULL);
         read_time += ADD_DIFF_TIME(t0,t1);
-      
+
         if(wND1 != ND1){
           fprintf(stderr, "Error: read %"PRId64" lines from %s, but read %"PRId64" from %s\n", wND1, weights_file, ND1, file);
           return EXIT_FAILURE;
@@ -176,7 +178,7 @@ int main(int argc, char *argv[])
     gettimeofday(&t0,NULL);
     results_countpairs_xi results;
     struct config_options options = get_config_options();
-    
+
     /* Pack weights into extra options */
     struct extra_options extra = get_extra_options(weight_method);
     for(int w = 0; w < num_weights; w++){
@@ -189,7 +191,7 @@ int main(int argc, char *argv[])
     int status = countpairs_xi(ND1, x1, y1, z1,
                                boxsize,
                                nthreads,
-                               binfile,
+                               &bins,
                                &results,
                                &options,
                                &extra);
@@ -197,6 +199,8 @@ int main(int argc, char *argv[])
     for(int w = 0; w < num_weights; w++){
         free(weights1[w]);
     }
+    free_binarray(&bins);
+
     if(status != EXIT_SUCCESS) {
         return status;
     }

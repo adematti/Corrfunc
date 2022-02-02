@@ -137,7 +137,7 @@ int countpairs_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z1,
                       const int64_t ND2, DOUBLE *X2, DOUBLE *Y2, DOUBLE *Z2,
                       const int numthreads,
                       const int autocorr,
-                      const char *binfile,
+                      binarray *bins,
                       results_countpairs *results,
                       struct config_options *options,
                       struct extra_options *extra)
@@ -195,17 +195,16 @@ int countpairs_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z1,
     /***********************
      *initializing the bins
      ************************/
-    double *rupp=NULL;
-    int nrpbin ;
-    double rpmin,rpmax;
-    setup_bins(binfile,&rpmin,&rpmax,&nrpbin,&rupp);
-    if( ! (rpmin >=0.0 && rpmax > 0.0 && rpmin < rpmax && nrpbin > 0)) {
+    double *rupp = bins->edges;
+    int nrpbin = bins->nedges;
+    double rpmin=bins->edges[0], rpmax=bins->edges[bins->nedges-1];
+    if( ! (rpmin >= 0.0 && rpmax > 0.0 && rpmin < rpmax && nrpbin > 0)) {
         fprintf(stderr,"Error: Could not setup with R bins correctly. (rmin = %lf, rmax = %lf, with nbins = %d). "
                 "Expected non-zero rmin/rmax with rmax > rmin and nbins >=1 \n",
                 rpmin, rpmax, nrpbin);
         return EXIT_FAILURE;
     }
-    detect_bin_type(rupp, nrpbin, &(options->bin_type), options->verbose);
+    detect_bin_type(bins, &(options->bin_type), options->verbose);
 
     //Find the min/max of the data
     DOUBLE xmin, xmax, ymin, ymax, zmin, zmax;
@@ -299,7 +298,7 @@ int countpairs_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z1,
     }
 
     cellarray_DOUBLE *lattice2 = NULL;
-    if(autocorr==0) {
+    if(autocorr == 0) {
         int ngrid2_x=0,ngrid2_y=0,ngrid2_z=0;
         lattice2 = gridlink_DOUBLE(ND2, X2, Y2, Z2, &(extra->weights1),
                                    xmin, xmax, ymin, ymax, zmin, zmax,
@@ -336,7 +335,6 @@ int countpairs_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z1,
         if(autocorr == 0) {
             free_cellarray_DOUBLE(lattice2, totncells);
         }
-        free(rupp);
         return EXIT_FAILURE;
     }
 
@@ -347,7 +345,6 @@ int countpairs_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z1,
         if(autocorr == 0) {
             free_cellarray_DOUBLE(lattice2, totncells);
         }
-        free(rupp);
         return EXIT_FAILURE;
     }
 
@@ -379,7 +376,6 @@ int countpairs_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z1,
         if(need_weightavg) {
             matrix_free((void**) all_weightavg, numthreads);
         }
-        free(rupp);
         return EXIT_FAILURE;
     }
 #else
@@ -516,7 +512,6 @@ int countpairs_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z1,
     }
     if(abort_status != EXIT_SUCCESS || interrupt_status_DOUBLE != EXIT_SUCCESS) {
         /* Cleanup memory here if aborting */
-        free(rupp);
 #if defined(_OPENMP)
         matrix_free((void **) all_npairs, numthreads);
         if(options->need_avg_sep) {
@@ -630,13 +625,12 @@ int countpairs_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z1,
     //Pack in the results
     results->nbin = nrpbin;
     results->npairs = my_malloc(sizeof(*(results->npairs)), nrpbin);
-    results->rupp   = my_malloc(sizeof(*(results->rupp))  , nrpbin);
-    results->rpavg  = my_calloc(sizeof(*(results->rpavg))  , nrpbin);
-    results->weightavg  = my_calloc(sizeof(*(results->weightavg))  , nrpbin);
+    results->rupp   = my_malloc(sizeof(*(results->rupp)), nrpbin);
+    results->rpavg  = my_calloc(sizeof(*(results->rpavg)), nrpbin);
+    results->weightavg  = my_calloc(sizeof(*(results->weightavg)), nrpbin);
     if(results->npairs == NULL || results->rupp == NULL ||
        results->rpavg == NULL || results->weightavg == NULL) {
         free_results(results);
-        free(rupp);
         return EXIT_FAILURE;
     }
 
@@ -652,9 +646,6 @@ int countpairs_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z1,
             results->weightavg[i] = weightavg[i];
         }
     }
-
-    /* only the rupp is left to be freed */
-    free(rupp);
 
     /* reset interrupt handlers to default */
     RESET_INTERRUPT_HANDLERS();

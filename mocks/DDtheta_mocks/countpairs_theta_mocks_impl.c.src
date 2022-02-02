@@ -184,7 +184,7 @@ static inline int countpairs_theta_mocks_brute_force_DOUBLE(const int64_t N0, DO
                                                             const int64_t N1, DOUBLE *x1, DOUBLE *y1, DOUBLE *z1,
                                                             const int numthreads,
                                                             const DOUBLE thetamax, const DOUBLE thetamin, const int nthetabin,
-                                                            const DOUBLE *theta_upp,
+                                                            const double *theta_upp,
                                                             const DOUBLE *costheta_upp,
                                                             results_countpairs_theta *results,
                                                             struct config_options *options,
@@ -459,7 +459,7 @@ int countpairs_theta_mocks_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1,
                                   const int64_t ND2, DOUBLE *ra2, DOUBLE *dec2,
                                   const int numthreads,
                                   const int autocorr,
-                                  const char *binfile,
+                                  binarray *bins,
                                   results_countpairs_theta *results,
                                   struct config_options *options, struct extra_options *extra)
 {
@@ -530,16 +530,15 @@ int countpairs_theta_mocks_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1,
        Let's Ctrl-C abort the extension  */
     SETUP_INTERRUPT_HANDLERS(interrupt_handler_wtheta_mocks_DOUBLE);
 
-    DOUBLE *theta_upp;
-    int nthetabin;
-    DOUBLE thetamin,thetamax;
-    setup_bins_DOUBLE(binfile,&thetamin,&thetamax,&nthetabin,&theta_upp);
+    double *theta_upp = bins->edges;
+    int nthetabin = bins->nedges;
+    double thetamin=bins->edges[0], thetamax=bins->edges[bins->nedges-1];
     if( ! (thetamin >= 0.0 && thetamax > 0.0 && thetamin < thetamax && thetamax <= 180.0 && nthetabin >= 1) ) {
         fprintf(stderr,"Error: Could not setup with theta bins correctly. (thetamin = %lf, thetamax = %lf, with nbins = %d). Expected non-zero rmin/rmax with thetamax > "
                 "thetamin and nbins >=1 \n",thetamin, thetamax, nthetabin);
         return EXIT_FAILURE;
     }
-    detect_bin_type_DOUBLE(theta_upp, nthetabin, &(options->bin_type), options->verbose);
+    detect_bin_type(bins, &(options->bin_type), options->verbose);
 
 
 #if defined(_OPENMP)
@@ -662,7 +661,6 @@ int countpairs_theta_mocks_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1,
                 free(extra->weights1.weights[w]);
             }
         }
-        free(theta_upp);
 
         // Free the temporary weights copy and restore the original pointers
         for(int64_t w = 0; w < extra->weights0.num_weights; w++){
@@ -896,7 +894,6 @@ int countpairs_theta_mocks_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1,
                 free(extra->weights1.weights[w]);
             }
         }
-        free(theta_upp);
 
         // Free the temporary weights copy and restore the original pointers
         for(int64_t w = 0; w < extra->weights0.num_weights; w++){
@@ -928,7 +925,6 @@ int countpairs_theta_mocks_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1,
     /* runtime dispatch - get the function pointer */
     countpairs_theta_mocks_func_ptr_DOUBLE countpairs_theta_mocks_function_DOUBLE = countpairs_theta_mocks_driver_DOUBLE(options);
     if(countpairs_theta_mocks_function_DOUBLE == NULL) {
-        free(theta_upp);
         free_cellarray_mocks_DOUBLE(lattice1,totncells);
         if(autocorr==0) {
             free_cellarray_mocks_DOUBLE(lattice2,totncells);
@@ -1074,7 +1070,6 @@ int countpairs_theta_mocks_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1,
 
     if(abort_status != EXIT_SUCCESS || interrupt_status_wtheta_mocks_DOUBLE != EXIT_SUCCESS) {
         /* Cleanup memory here if aborting */
-        free(theta_upp);
 #if defined(_OPENMP)
         matrix_free((void **) all_npairs, numthreads);
         if(options->need_avg_sep) {
@@ -1190,7 +1185,6 @@ int countpairs_theta_mocks_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1,
     if(results->npairs == NULL || results->theta_upp == NULL || results->theta_avg == NULL || results->weightavg == NULL) {
         fprintf(stderr,"Error: Could not allocate memory for %d nbins to hold the results of the pair-counting\n", nthetabin);
         free_results_countpairs_theta(results);
-        free(theta_upp);
         return EXIT_FAILURE;
     }
 
@@ -1206,7 +1200,6 @@ int countpairs_theta_mocks_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1,
             results->weightavg[i] = weightavg[i];
         }
     }
-    free(theta_upp);
 
     /* reset interrupt handlers to default */
     RESET_INTERRUPT_HANDLERS();

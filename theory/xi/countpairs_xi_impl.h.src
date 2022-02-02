@@ -36,7 +36,7 @@ extern "C" {
     extern int countpairs_xi_DOUBLE(const int64_t ND1, DOUBLE * restrict X1, DOUBLE * restrict Y1, DOUBLE * restrict Z1,
                                     const double boxsize,
                                     const int numthreads,
-                                    const char *binfile,
+                                    binarray *bins,
                                     results_countpairs_xi *results,
                                     struct config_options *options,
                                     struct extra_options *extra);

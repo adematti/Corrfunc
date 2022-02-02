@@ -286,7 +286,7 @@ def DDsmu(autocorr, nthreads, binfile, mumax, nmubins,
 
     import numpy as np
     from Corrfunc.utils import translate_isa_string_to_enum, translate_bin_type_string_to_enum,\
-        return_file_with_rbins, convert_to_native_endian,\
+        get_edges, convert_to_native_endian,\
         sys_pipes, process_weights
 
     from future.utils import bytes_to_native_str
@@ -341,7 +341,7 @@ def DDsmu(autocorr, nthreads, binfile, mumax, nmubins,
 
     integer_isa = translate_isa_string_to_enum(isa)
     integer_bin_type = translate_bin_type_string_to_enum(bin_type)
-    sbinfile, delete_after_use = return_file_with_rbins(binfile)
+    sbinfile = get_edges(binfile)
     with sys_pipes():
         extn_results = DDsmu_extn(autocorr, nthreads,
                                   sbinfile,
@@ -365,10 +365,6 @@ def DDsmu(autocorr, nthreads, binfile, mumax, nmubins,
         raise RuntimeError(msg)
     else:
         extn_results, api_time = extn_results
-
-    if delete_after_use:
-        import os
-        os.remove(sbinfile)
 
     results_dtype = np.dtype([(bytes_to_native_str(b'smin'), np.float64),
                               (bytes_to_native_str(b'smax'), np.float64),

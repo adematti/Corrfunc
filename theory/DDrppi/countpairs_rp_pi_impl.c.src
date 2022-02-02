@@ -136,7 +136,7 @@ int countpairs_rp_pi_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z
                             const int64_t ND2, DOUBLE *X2, DOUBLE *Y2, DOUBLE *Z2,
                             const int numthreads,
                             const int autocorr,
-                            const char *binfile,
+                            binarray *bins,
                             const DOUBLE pimax,
                             const int npibin,
                             results_countpairs_rp_pi *results,
@@ -193,16 +193,15 @@ int countpairs_rp_pi_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z
     /***********************
      *initializing the  bins
      ************************/
-    double *rupp;
-    int nrpbin ;
-    double rpmin,rpmax;
-    setup_bins(binfile,&rpmin,&rpmax,&nrpbin,&rupp);
+    double *rupp = bins->edges;
+    int nrpbin = bins->nedges;
+    double rpmin=bins->edges[0], rpmax=bins->edges[bins->nedges-1];
     if( ! (rpmin >= 0.0 && rpmax > 0.0 && rpmin < rpmax && nrpbin > 0)) {
         fprintf(stderr,"Error: Could not setup with R bins correctly. (rmin = %lf, rmax = %lf, with nbins = %d). Expected non-zero rmin/rmax with rmax > rmin and nbins >=1 \n",
                 rpmin, rpmax, nrpbin);
         return EXIT_FAILURE;
     }
-    detect_bin_type(rupp, nrpbin, &(options->bin_type), options->verbose);
+    detect_bin_type(bins, &(options->bin_type), options->verbose);
 
     DOUBLE rupp_sqr[nrpbin];
     const int64_t totnbins = (npibin+1)*(nrpbin+1);
@@ -338,7 +337,6 @@ int countpairs_rp_pi_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z
         if(autocorr == 0) {
             free_cellarray_DOUBLE(lattice2, totncells);
         }
-        free(rupp);
         return EXIT_FAILURE;
     }
 
@@ -349,7 +347,6 @@ int countpairs_rp_pi_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z
         if(autocorr == 0) {
             free_cellarray_DOUBLE(lattice2, totncells);
         }
-        free(rupp);
         return EXIT_FAILURE;
     }
 
@@ -379,7 +376,6 @@ int countpairs_rp_pi_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z
         if(need_weightavg) {
             matrix_free((void**) all_weightavg, numthreads);
         }
-        free(rupp);
         return EXIT_FAILURE;
     }
 #else
@@ -509,7 +505,6 @@ int countpairs_rp_pi_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z
 
     if(abort_status != EXIT_SUCCESS || interrupt_status_DDrppi_DOUBLE != EXIT_SUCCESS) {
         /* Cleanup memory here if aborting */
-        free(rupp);
 #if defined(_OPENMP)
         matrix_free((void **) all_npairs, numthreads);
         if(options->need_avg_sep) {
@@ -632,7 +627,6 @@ int countpairs_rp_pi_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z
     if(results->npairs == NULL || results->rupp == NULL ||
        results->rpavg == NULL || results->weightavg == NULL) {
         free_results_rp_pi(results);
-        free(rupp);
         return EXIT_FAILURE;
     }
 
@@ -657,7 +651,6 @@ int countpairs_rp_pi_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z
             }
         }
     }
-    free(rupp);
 
     /* reset interrupt handlers to default */
     RESET_INTERRUPT_HANDLERS();

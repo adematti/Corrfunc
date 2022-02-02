@@ -16,7 +16,7 @@ extern "C" {
 #include <stdint.h> //for uint64_t
 
     //define the results structure
-    typedef struct{
+    typedef struct {
         uint64_t *npairs;
         double *rupp;
         double *rpavg;
@@ -30,7 +30,7 @@ extern "C" {
                          const int64_t ND2, void *theta2, void *phi2, void *czD2,
                          const int numthreads,
                          const int autocorr,
-                         const char *binfile,
+                         binarray* bins,
                          const double pimax,
                          const int npibins,
                          const int cosmology,

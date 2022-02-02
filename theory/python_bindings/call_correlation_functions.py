@@ -17,6 +17,7 @@ except ImportError:
     raise
 
 from os.path import dirname, abspath, exists, splitext, join as pjoin
+from os.path import exists as file_exists
 import time
 import numpy as np
 
@@ -187,6 +188,49 @@ def read_catalog(filebase=None):
         raise IOError("Could not locate file {0}", filebase)
 
 
+def get_edges(binfile):
+    """
+    Helper function to return edges corresponding to ``binfile``.
+
+    Parameters
+    -----------
+    binfile : string or array-like
+       Expected to be a path to a bin file (two columns, lower and upper) or an array containing the bins.
+
+    Returns
+    -------
+    edges : array
+    """
+    if isinstance(binfile, str):
+        if file_exists(binfile):
+            # The equivalent of read_binfile() in io.c
+            with open(binfile, 'r') as file:
+                binfile = []
+                for iline, line in enumerate(file):
+                    lowhi = line.split()
+                    if len(lowhi) == 2:
+                        low, hi = lowhi
+                        if iline == 0:
+                            binfile.append(low)
+                        binfile.append(hi)
+                    else:
+                        break
+        else:
+            msg = "Could not find file = `{0}` containing the bins"\
+                    .format(binfile)
+            raise IOError(msg)
+
+    # For a valid bin specifier, there must be at least 1 bin.
+    if len(binfile) >= 1:
+        binfile = np.array(binfile, dtype='f8')
+        binfile.sort()
+        return binfile
+
+    msg = "Input `binfile` was not a valid array (>= 1 element)."\
+          "Num elements = {0}".format(len(binfile))
+    raise TypeError(msg)
+
+
 def main():
     tstart = time.time()
     t0 = tstart
@@ -201,6 +245,7 @@ def main():
     pimax = 40.0
     binfile = pjoin(dirname(abspath(_countpairs.__file__)),
                     "../tests/", "bins")
+    binfile = get_edges(binfile)
     autocorr = 1
     periodic = 1
     numbins_to_print = 5
@@ -255,8 +300,8 @@ def main():
     print("\nRunning 2-D correlation function DD(rp,pi)")
     results_DDrppi, _ = DDrppi(autocorr=autocorr,
                                nthreads=nthreads,
-                               pimax=pimax, npibins=int(pimax),
                                binfile=binfile,
+                               pimax=pimax, npibins=int(pimax),
                                X1=x, Y1=y, Z1=z, weights1=w,
                                X2=x, Y2=y, Z2=z, weights2=w,
                                periodic=periodic,
@@ -306,8 +351,8 @@ def main():
 
 
     print("\nRunning 2-D projected correlation function wp(rp)")
-    results_wp, _, _ = wp(boxsize=boxsize, pimax=pimax, nthreads=nthreads,
-                          binfile=binfile, X=x, Y=y, Z=z,
+    results_wp, _, _ = wp(boxsize=boxsize, nthreads=nthreads,
+                          binfile=binfile, pimax=pimax, X=x, Y=y, Z=z,
                           weights=w, weight_type='pair_product',
                           verbose=True, output_rpavg=True)
     print("\n#            ******    wp: first {0} bins  *******         "

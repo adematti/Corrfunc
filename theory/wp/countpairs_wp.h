@@ -15,7 +15,7 @@ extern "C" {
 
 #include "defs.h"
 #include <stdint.h>
-    
+
     //define the results structure
     typedef struct{
         uint64_t *npairs;
@@ -26,11 +26,11 @@ extern "C" {
         double pimax;
         int nbin;
     } results_countpairs_wp;
-    
+
     extern int countpairs_wp(const int64_t ND1, void * restrict X1, void * restrict Y1, void * restrict Z1,
                              const double boxsize,
                              const int numthreads,
-                             const char *binfile,
+                             binarray *bins,
                              const double pimax,
                              results_countpairs_wp *result,
                              struct config_options *options,

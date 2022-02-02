@@ -9,6 +9,7 @@ Requires: numpy
 """
 from __future__ import print_function
 from os.path import dirname, abspath, join as pjoin
+from os.path import exists as file_exists
 import time
 import numpy as np
 
@@ -39,6 +40,49 @@ def read_text_file(filename, encoding="utf-8"):
         with open(filename, 'r') as f:
             r = f.read()
     return r
+
+
+def get_edges(binfile):
+    """
+    Helper function to return edges corresponding to ``binfile``.
+
+    Parameters
+    -----------
+    binfile : string or array-like
+       Expected to be a path to a bin file (two columns, lower and upper) or an array containing the bins.
+
+    Returns
+    -------
+    edges : array
+    """
+    if isinstance(binfile, str):
+        if file_exists(binfile):
+            # The equivalent of read_binfile() in io.c
+            with open(binfile, 'r') as file:
+                binfile = []
+                for iline, line in enumerate(file):
+                    lowhi = line.split()
+                    if len(lowhi) == 2:
+                        low, hi = lowhi
+                        if iline == 0:
+                            binfile.append(low)
+                        binfile.append(hi)
+                    else:
+                        break
+        else:
+            msg = "Could not find file = `{0}` containing the bins"\
+                    .format(binfile)
+            raise IOError(msg)
+
+    # For a valid bin specifier, there must be at least 1 bin.
+    if len(binfile) >= 1:
+        binfile = np.array(binfile, dtype='f8')
+        binfile.sort()
+        return binfile
+
+    msg = "Input `binfile` was not a valid array (>= 1 element)."\
+          "Num elements = {0}".format(len(binfile))
+    raise TypeError(msg)
 
 
 def main():
@@ -80,13 +124,14 @@ def main():
     pimax = 40.0
     binfile = pjoin(dirname(abspath(__file__)),
                     "../tests/", "bins")
+    binfile = get_edges(binfile)
     autocorr = 1
     numbins_to_print = 5
     cosmology = 1
 
     print("\nRunning 2-D correlation function xi(rp,pi)")
     results_DDrppi, _ = rp_pi_mocks(autocorr, cosmology, nthreads,
-                                    pimax, int(pimax), binfile,
+                                    binfile, pimax, int(pimax),
                                     ra, dec, cz, weights1=weights,
                                     output_rpavg=True, verbose=True,
                                     weight_type='pair_product')
@@ -103,7 +148,7 @@ def main():
 
     print("\nRunning 2-D correlation function xi(rp,pi) with different bin refinement")
     results_DDrppi, _ = rp_pi_mocks(autocorr, cosmology, nthreads,
-                                    pimax, int(pimax), binfile,
+                                    binfile, pimax, int(pimax),
                                     ra, dec, cz,
                                     output_rpavg=True,
                                     xbin_refine_factor=3,
@@ -126,7 +171,7 @@ def main():
 
     print("\nRunning 2-D correlation function xi(s,mu)")
     results_DDsmu, _ = s_mu_mocks(autocorr, cosmology, nthreads,
-                                  mu_max, nmu_bins, binfile,
+                                  binfile, mu_max, nmu_bins,
                                   ra, dec, cz, weights1=weights,
                                   output_savg=True, verbose=True,
                                   weight_type='pair_product')
@@ -143,6 +188,7 @@ def main():
 
     binfile = pjoin(dirname(abspath(__file__)),
                     "../tests/", "angular_bins")
+    binfile = get_edges(binfile)
     print("\nRunning angular correlation function w(theta)")
     results_wtheta, _ = theta_mocks(autocorr, nthreads, binfile,
                                     ra, dec, weights1=weights,

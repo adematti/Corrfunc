@@ -203,7 +203,7 @@ int countpairs_mocks_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1, DOUBLE
                             const int64_t ND2, DOUBLE *ra2, DOUBLE *dec2, DOUBLE *czD2,
                             const int numthreads,
                             const int autocorr,
-                            const char *binfile,
+                            binarray *bins,
                             const DOUBLE pimax,
                             const int npibin,
                             const int cosmology,
@@ -293,16 +293,15 @@ int countpairs_mocks_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1, DOUBLE
     /***********************
      *initializing the  bins
      ************************/
-    double *rupp;
-    int nrpbin;
-    double rpmin,rpmax;
-    setup_bins(binfile,&rpmin,&rpmax,&nrpbin,&rupp);
+    double *rupp = bins->edges;
+    int nrpbin = bins->nedges;
+    double rpmin=bins->edges[0], rpmax=bins->edges[bins->nedges-1];
     if( ! (rpmin > 0.0 && rpmax > 0.0 && rpmin < rpmax && nrpbin > 0)) {
         fprintf(stderr,"Error: Could not setup with R bins correctly. (rmin = %lf, rmax = %lf, with nbins = %d). Expected non-zero rmin/rmax with rmax > rmin and nbins >=1 \n",
                 rpmin, rpmax, nrpbin);
         return EXIT_FAILURE;
     }
-    detect_bin_type(rupp, nrpbin, &(options->bin_type), options->verbose);
+    detect_bin_type(bins, &(options->bin_type), options->verbose);
 
     const DOUBLE sqr_max_sep = rpmax*rpmax + pimax*pimax;
     const DOUBLE max_sep = SQRT(sqr_max_sep);
@@ -534,7 +533,6 @@ int countpairs_mocks_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1, DOUBLE
         if(autocorr == 0) {
             free_cellarray_mocks_DOUBLE(lattice2, totncells);
         }
-        free(rupp);
         return EXIT_FAILURE;
     }
 
@@ -686,7 +684,6 @@ int countpairs_mocks_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1, DOUBLE
 
     if(abort_status != EXIT_SUCCESS || interrupt_status_DDrppi_mocks_DOUBLE != EXIT_SUCCESS) {
         /* Cleanup memory here if aborting */
-        free(rupp);
 #if defined(_OPENMP)
         matrix_free((void **) all_npairs, numthreads);
         if(options->need_avg_sep) {
@@ -804,7 +801,6 @@ int countpairs_mocks_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1, DOUBLE
     results->weightavg  = my_calloc(sizeof(double)  , totnbins);
     if(results->npairs == NULL || results->rupp == NULL || results->rpavg == NULL || results->weightavg == NULL) {
         free_results_mocks(results);
-        free(rupp);
         return EXIT_FAILURE;
     }
 
@@ -815,7 +811,6 @@ int countpairs_mocks_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1, DOUBLE
             if( index >= totnbins ) {
                 fprintf(stderr, "ERROR: In %s> index = %d must be in range [0, %d)\n", __FUNCTION__, index, totnbins);
                 free_results_mocks(results);
-                free(rupp);
                 return EXIT_FAILURE;
             }
             results->npairs[index] = npairs[index];
@@ -829,7 +824,6 @@ int countpairs_mocks_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1, DOUBLE
             }
         }
     }
-    free(rupp);
 
     /* reset interrupt handlers to default */
     RESET_INTERRUPT_HANDLERS();

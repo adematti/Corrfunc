@@ -13,6 +13,9 @@ from os.path import exists as file_exists
 import wurlitzer
 from contextlib import contextmanager
 
+import numpy as np
+
+
 __all__ = ['convert_3d_counts_to_cf', 'convert_rp_pi_counts_to_wp',
            'translate_isa_string_to_enum', 'translate_bin_type_string_to_enum',
             'return_file_with_rbins', 'fix_ra_dec', 'fix_cz', 'compute_nbins', 'gridlink_sphere', ]
@@ -321,63 +324,46 @@ def convert_rp_pi_counts_to_wp(ND1, ND2, NR1, NR2,
     return wp
 
 
-def return_file_with_rbins(rbins):
+def get_edges(binfile):
     """
-    Helper function to ensure that the ``binfile`` required by the Corrfunc
-    extensions is a actually a string.
-
-    Checks if the input is a string and file; return if True. If not, and
-    the input is an array, then a temporary file is created and the contents
-    of rbins is written out.
+    Helper function to return edges corresponding to ``binfile``.
 
     Parameters
     -----------
-    rbins: string or array-like
-       Expected to be a string or an array containing the bins
+    binfile : string or array-like
+       Expected to be a path to a bin file (two columns, lower and upper) or an array containing the bins.
 
     Returns
-    ---------
-    binfile: string, filename
-       If the input ``rbins`` was a valid filename, then returns the same
-       string. If ``rbins`` was an array, then this function creates a
-       temporary file with the contents of the ``rbins`` arrays. This
-       temporary filename is returned
-
+    -------
+    edges : array
     """
-
-    is_string = False
-    delete_after_use = False
-    try:
-        if isinstance(rbins, basestring):
-            is_string = True
-    except NameError:
-        if isinstance(rbins, str):
-            is_string = True
-
-    if is_string:
-        if file_exists(rbins):
-            delete_after_use = False
-            return rbins, delete_after_use
+    if isinstance(binfile, str):
+        if file_exists(binfile):
+            # The equivalent of read_binfile() in io.c
+            with open(binfile, 'r') as file:
+                binfile = []
+                for iline, line in enumerate(file):
+                    lowhi = line.split()
+                    if len(lowhi) == 2:
+                        low, hi = lowhi
+                        if iline == 0:
+                            binfile.append(low)
+                        binfile.append(hi)
+                    else:
+                        break
         else:
             msg = "Could not find file = `{0}` containing the bins"\
-                  .format(rbins)
+                    .format(binfile)
             raise IOError(msg)
 
     # For a valid bin specifier, there must be at least 1 bin.
-    if len(rbins) >= 1:
-        import tempfile
-        rbins = sorted(rbins)
-        with tempfile.NamedTemporaryFile(delete=False, mode='w') as f:
-            for i in range(len(rbins) - 1):
-                f.write("{0} {1}\n".format(rbins[i], rbins[i + 1]))
-
-            tmpfilename = f.name
-
-        delete_after_use = True
-        return tmpfilename, delete_after_use
+    if len(binfile) >= 1:
+        binfile = np.array(binfile, dtype='f8')
+        binfile.sort()
+        return binfile
 
     msg = "Input `binfile` was not a valid array (>= 1 element)."\
-          "Num elements = {0}".format(len(rbins))
+          "Num elements = {0}".format(len(binfile))
     raise TypeError(msg)
 
 

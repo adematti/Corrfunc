@@ -1078,7 +1078,7 @@ static inline int countpairs_fallback_DOUBLE(const int64_t N0, DOUBLE *x0, DOUBL
         for(int w = 0; w < pair.num_weights; w++){
             pair.weights0[w].d = *local_w0.weights[w]++;
         }
-        DOUBLE norm0 = 0;
+        DOUBLE norm0 = ZERO;
         if (need_costheta) norm0 = SQRT(xpos*xpos + ypos*ypos + zpos*zpos);
         DOUBLE max_dz = max_all_dz;
 

@@ -157,7 +157,7 @@ def find_fastest_wp_bin_refs(boxsize, nthreads, binfile, pimax, X, Y, Z,
         raise ImportError(msg)
 
     from Corrfunc.utils import translate_isa_string_to_enum,\
-        return_file_with_rbins
+        get_edges
 
     import itertools
     import numpy as np
@@ -165,7 +165,7 @@ def find_fastest_wp_bin_refs(boxsize, nthreads, binfile, pimax, X, Y, Z,
     import time
 
     integer_isa = translate_isa_string_to_enum(isa)
-    rbinfile, delete_after_use = return_file_with_rbins(binfile)
+    rbinfile = get_edges(binfile)
     bin_refs = np.arange(1, maxbinref + 1)
     bin_ref_perms = itertools.product(bin_refs, bin_refs, bin_refs)
     dtype = np.dtype([(bytes_to_native_str(b'nx'), np.int),
@@ -217,10 +217,6 @@ def find_fastest_wp_bin_refs(boxsize, nthreads, binfile, pimax, X, Y, Z,
         all_runtimes[ii]['nz'] = nz
         all_runtimes[ii]['avg_time'] = avg_runtime
         all_runtimes[ii]['sigma_time'] = runtime_disp
-
-    if delete_after_use:
-        import os
-        os.remove(rbinfile)
 
     all_runtimes.sort(order=('avg_time', 'sigma_time'))
     results = (all_runtimes[0]['nx'],
@@ -500,7 +496,7 @@ def wp(boxsize, nthreads, binfile, pimax, X, Y, Z,
     import numpy as np
     from future.utils import bytes_to_native_str
     from Corrfunc.utils import translate_isa_string_to_enum, translate_bin_type_string_to_enum,\
-        return_file_with_rbins, convert_to_native_endian,\
+        get_edges, convert_to_native_endian,\
         sys_pipes, process_weights
 
     weights, _ = process_weights(weights, None, X, None, weight_type, autocorr=True)
@@ -521,10 +517,10 @@ def wp(boxsize, nthreads, binfile, pimax, X, Y, Z,
 
     integer_isa = translate_isa_string_to_enum(isa)
     integer_bin_type = translate_bin_type_string_to_enum(bin_type)
-    rbinfile, delete_after_use = return_file_with_rbins(binfile)
+    rbinfile = get_edges(binfile)
     with sys_pipes():
-      extn_results = wp_extn(boxsize, pimax, nthreads,
-                             rbinfile,
+      extn_results = wp_extn(boxsize, nthreads,
+                             rbinfile, pimax,
                              X, Y, Z,
                              verbose=verbose,
                              output_rpavg=output_rpavg,
@@ -543,10 +539,6 @@ def wp(boxsize, nthreads, binfile, pimax, X, Y, Z,
         raise RuntimeError(msg)
     else:
         extn_results, api_time, cell_time = extn_results
-
-    if delete_after_use:
-        import os
-        os.remove(rbinfile)
 
     results_dtype = np.dtype([(bytes_to_native_str(b'rmin'), np.float64),
                               (bytes_to_native_str(b'rmax'), np.float64),

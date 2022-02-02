@@ -31,7 +31,7 @@
 
 #include "macros.h"
 #include "utils.h"
-#include "defs.h"
+//#include "defs.h"
 
 #ifdef __MACH__ // OS X does not have clock_gettime, use clock_get_time
 #include <mach/mach_time.h> /* mach_absolute_time -> really fast */
@@ -40,6 +40,7 @@
 #ifdef _OPENMP
 #include <omp.h>
 #endif
+
 
 void get_max_float(const int64_t ND1, const float *cz1, float *czmax)
 {
@@ -50,6 +51,7 @@ void get_max_float(const int64_t ND1, const float *cz1, float *czmax)
     *czmax = max;
 }
 
+
 void get_max_double(const int64_t ND1, const double *cz1, double *czmax)
 {
     double max=*czmax;
@@ -57,213 +59,6 @@ void get_max_double(const int64_t ND1, const double *cz1, double *czmax)
         if(cz1[i] > max) max = cz1[i];
     }
     *czmax = max;
-}
-
-int detect_bin_type(const double *rupp, int nbin, bin_type_t *bin_type, uint8_t verbose)
-{
-    if (*bin_type == BIN_AUTO) {
-        // if linear spacing, return BIN_LIN, else BIN_CUSTOM
-        const double atol = 1e-8; // same tol as numpy.allclose
-        const double rtol = 1e-5;
-        double rmin = rupp[0];
-        double rstep = (rupp[nbin-1] - rupp[0])/(nbin - 1);
-        *bin_type = BIN_LIN;
-        for (int ii=1; ii<nbin; ii++) {
-            double pred = rmin + rstep*ii;
-            if ((fabs(rupp[ii] - pred) > atol)||(fabs((rupp[ii] - pred)/pred) > rtol)) {
-                *bin_type = BIN_CUSTOM;
-                break;
-            }
-        }
-    }
-    if (verbose) {
-        if (*bin_type == BIN_LIN) fprintf(stderr,"Linear binning\n");
-        else fprintf(stderr,"Custom binning\n");
-    }
-    return EXIT_SUCCESS;
-}
-
-int detect_bin_type_double(const double *rupp, int nbin, bin_type_t *bin_type, uint8_t verbose)
-{
-    if (*bin_type == BIN_AUTO) {
-        // if linear spacing, return BIN_LIN, else BIN_CUSTOM
-        const double atol = 1e-8; // same tol as numpy.allclose
-        const double rtol = 1e-5;
-        double rmin = rupp[0];
-        double rstep = (rupp[nbin-1] - rupp[0])/(nbin - 1);
-        *bin_type = BIN_LIN;
-        for (int ii=1; ii<nbin; ii++) {
-            double pred = rmin + rstep*ii;
-            if ((fabs(rupp[ii] - pred) > atol)||(fabs((rupp[ii] - pred)/pred) > rtol)) {
-                *bin_type = BIN_CUSTOM;
-                break;
-            }
-        }
-    }
-    if (verbose) {
-        if (*bin_type == BIN_LIN) fprintf(stderr,"Linear binning\n");
-        else fprintf(stderr,"Custom binning\n");
-    }
-    return EXIT_SUCCESS;
-}
-
-int detect_bin_type_float(const float *rupp, int nbin, bin_type_t *bin_type, uint8_t verbose)
-{
-    if (*bin_type == BIN_AUTO) {
-        // if linear spacing, return BIN_LIN, else BIN_CUSTOM
-        const float atol = 1e-8; // same tol as numpy.allclose
-        const float rtol = 1e-5;
-        float rmin = rupp[0];
-        float rstep = (rupp[nbin-1] - rupp[0])/(nbin - 1);
-        *bin_type = BIN_LIN;
-        for (int ii=1; ii<nbin; ii++) {
-            float pred = rmin + rstep*ii;
-            if ((fabs(rupp[ii] - pred) > atol)||(fabs((rupp[ii] - pred)/pred) > rtol)) {
-                *bin_type = BIN_CUSTOM;
-                break;
-            }
-        }
-    }
-    if (verbose) {
-        if (*bin_type == BIN_LIN) fprintf(stderr,"Linear binning\n");
-        else fprintf(stderr,"Custom binning\n");
-    }
-    return EXIT_SUCCESS;
-}
-
-int setup_bins(const char *fname, double *rmin, double *rmax, int *nbin, double **rupp)
-{
-    //set up the bins according to the binned data file
-    //the form of the data file should be <rlow  rhigh ....>
-    const int MAXBUFSIZE=1000;
-    char buf[MAXBUFSIZE];
-    FILE *fp=NULL;
-    double low,hi;
-    const char comment='#';
-    const int nitems=2;
-    int nread=0;
-    *nbin = ((int) getnumlines(fname,comment))+1;
-    *rupp = my_calloc(sizeof(double),*nbin+1);
-
-    fp = my_fopen(fname,"r");
-    if(fp == NULL) {
-        free(*rupp);
-        return EXIT_FAILURE;
-    }
-    int index=1;
-    while(1) {
-        if(fgets(buf,MAXBUFSIZE,fp)!=NULL) {
-            nread=sscanf(buf,"%lf %lf",&low,&hi);
-            if(nread==nitems) {
-
-                if(index==1) {
-                    *rmin=low;
-                    (*rupp)[0]=low;
-                }
-
-                (*rupp)[index] = hi;
-                index++;
-            }
-        } else {
-            break;
-        }
-    }
-    *rmax = (*rupp)[index-1];
-    fclose(fp);
-
-    (*rupp)[*nbin] = *rmax;
-    (*rupp)[*nbin-1] = *rmax;
-
-    return EXIT_SUCCESS;
-}
-
-int setup_bins_double(const char *fname, double *rmin, double *rmax, int *nbin, double **rupp)
-{
-    //set up the bins according to the binned data file
-    //the form of the data file should be <rlow  rhigh ....>
-    const int MAXBUFSIZE=1000;
-    char buf[MAXBUFSIZE];
-    double low,hi;
-    const char comment='#';
-    const int nitems=2;
-    int nread=0;
-    *nbin = ((int) getnumlines(fname,comment))+1;
-    *rupp = my_calloc(sizeof(double),*nbin+1);
-
-    FILE *fp = my_fopen(fname,"r");
-    if(fp == NULL) {
-        free(*rupp);
-        return EXIT_FAILURE;
-    }
-    int index=1;
-    while(1) {
-        if(fgets(buf,MAXBUFSIZE,fp)!=NULL) {
-            nread=sscanf(buf,"%lf %lf",&low,&hi);
-            if(nread==nitems) {
-                if(index==1) {
-                    *rmin=low;
-                    (*rupp)[0]=low;
-                }
-
-                (*rupp)[index] = hi;
-                index++;
-            }
-        } else {
-            break;
-        }
-    }
-    *rmax = (*rupp)[index-1];
-    fclose(fp);
-
-    (*rupp)[*nbin] = *rmax;
-    (*rupp)[*nbin-1] = *rmax;
-
-    return EXIT_SUCCESS;
-}
-
-int setup_bins_float(const char *fname, float *rmin, float *rmax, int *nbin, float **rupp)
-{
-    //set up the bins according to the binned data file
-    //the form of the data file should be <rlow  rhigh ....>
-    const int MAXBUFSIZE=1000;
-    char buf[MAXBUFSIZE];
-    float low,hi;
-    const char comment='#';
-    const int nitems=2;
-    int nread=0;
-    *nbin = ((int) getnumlines(fname,comment))+1;
-    *rupp = my_calloc(sizeof(float),*nbin+1);
-
-    FILE *fp = my_fopen(fname,"r");
-    if(fp == NULL) {
-        free(*rupp);
-        return EXIT_FAILURE;
-    }
-    int index=1;
-    while(1) {
-        if(fgets(buf,MAXBUFSIZE,fp)!=NULL) {
-            nread=sscanf(buf,"%f %f",&low,&hi);
-            if(nread==nitems) {
-
-                if(index==1) {
-                    *rmin=low;
-                    (*rupp)[0]=low;
-                }
-
-                (*rupp)[index] = hi;
-                index++;
-            }
-        } else {
-            break;
-        }
-    }
-    *rmax = (*rupp)[index-1];
-    fclose(fp);
-
-    (*rupp)[*nbin] =* rmax;
-    (*rupp)[*nbin-1] =* rmax;
-
-    return EXIT_SUCCESS;
 }
 
 
@@ -334,6 +129,7 @@ size_t my_fwrite(void *ptr, size_t size, size_t nmemb, FILE *stream)
     return nwritten;
 }
 
+
 size_t my_fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
 {
     size_t nread;
@@ -346,6 +142,7 @@ size_t my_fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
     }
     return nread;
 }
+
 
 int my_fseek(FILE *stream, long offset, int whence)
 {
@@ -377,6 +174,7 @@ int my_snprintf(char *buffer,int len,const char *format, ...)
     return nwritten;
 }
 
+
 int is_big_endian(void)
 {
     union {
@@ -386,6 +184,7 @@ int is_big_endian(void)
 
     return e.c[0];
 }
+
 
 void byte_swap(char * const in, const size_t size, char *out)
 {
@@ -408,7 +207,6 @@ void byte_swap(char * const in, const size_t size, char *out)
     }
 
 }
-
 
 
 //Taken from the inter-webs: http://stackoverflow.com/questions/1024389/print-an-int-in-binary-representation-using-c
@@ -571,7 +369,7 @@ void* my_malloc(size_t size,int64_t N)
 
 
 
-void* my_calloc(size_t size,int64_t N)
+void* my_calloc(size_t size, int64_t N)
 {
     void *x = calloc((size_t) N, size);
     if (x==NULL)    {
@@ -677,8 +475,6 @@ void matrix_free(void **m,int64_t nrow)
 }
 
 
-
-
 void *** volume_malloc(size_t size,int64_t nrow,int64_t ncol,int64_t nframe)
 {
     void ***v = (void ***) my_malloc(sizeof(void **),nrow);
@@ -782,7 +578,7 @@ void volume_free(void ***v,int64_t nrow,int64_t ncol)
 
 
 
-int64_t getnumlines(const char *fname,const char comment)
+int64_t getnumlines(const char *fname, const char comment)
 {
     const int MAXLINESIZE = 10000;
     int64_t nlines=0;
@@ -812,33 +608,6 @@ int64_t getnumlines(const char *fname,const char comment)
     }
     fclose(fp);
     return nlines;
-}
-
-
-int test_all_files_present(const int nfiles, ...)
-{
-    /* sets i'th bit for i'th missing file
-       return value is 0 *iff* all files are present
-       and readable.
-    */
-
-    int absent=0;
-    va_list filenames;
-    va_start(filenames, nfiles);
-    XASSERT(nfiles <= 31, "Can only test for 31 files simultaneously. nfiles = %d \n",nfiles);
-    for(int i=0;i<nfiles;i++) {
-        const char *f = va_arg(filenames, const char *);
-        FILE *fp = fopen(f,"r");
-        if(fp == NULL) {
-            absent |= 1;
-        } else {
-            fclose(fp);
-        }
-        absent <<= 1;
-    }
-    va_end(filenames);
-
-    return absent;
 }
 
 

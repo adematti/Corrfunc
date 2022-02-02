@@ -357,7 +357,7 @@ def DDrppi_mocks(autocorr, cosmology, nthreads, binfile, pimax, npibins,
 
     import numpy as np
     from Corrfunc.utils import translate_isa_string_to_enum, translate_bin_type_string_to_enum,\
-        fix_ra_dec, return_file_with_rbins, convert_to_native_endian,\
+        fix_ra_dec, get_edges, convert_to_native_endian,\
         sys_pipes, process_weights
     from future.utils import bytes_to_native_str
 
@@ -401,10 +401,10 @@ def DDrppi_mocks(autocorr, cosmology, nthreads, binfile, pimax, npibins,
 
     integer_isa = translate_isa_string_to_enum(isa)
     integer_bin_type = translate_bin_type_string_to_enum(bin_type)
-    rbinfile, delete_after_use = return_file_with_rbins(binfile)
+    rbinfile = get_edges(binfile)
     with sys_pipes():
         extn_results = DDrppi_extn(autocorr, cosmology, nthreads,
-                                   pimax, npibins, rbinfile,
+                                   rbinfile, pimax, npibins,
                                    RA1, DEC1, CZ1,
                                    is_comoving_dist=is_comoving_dist,
                                    verbose=verbose,
@@ -424,10 +424,6 @@ def DDrppi_mocks(autocorr, cosmology, nthreads, binfile, pimax, npibins,
         raise RuntimeError(msg)
     else:
         extn_results, api_time = extn_results
-
-    if delete_after_use:
-        import os
-        os.remove(rbinfile)
 
     results_dtype = np.dtype([(bytes_to_native_str(b'rmin'), np.float64),
                               (bytes_to_native_str(b'rmax'), np.float64),

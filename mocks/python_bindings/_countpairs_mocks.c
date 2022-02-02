@@ -980,6 +980,7 @@ static int64_t check_dims_and_datatype(PyObject *module, PyArrayObject *x1_obj, 
     return nx1;
 }
 
+
 static int check_weights(PyObject *module, PyObject *weights_obj, weight_struct *weight_st, const weight_method_t method, const int64_t nx, size_t element_size)
 {
     int status = EXIT_SUCCESS;
@@ -1078,6 +1079,7 @@ finally:
     return status;
 }
 
+
 static int check_pair_weight(PyObject *module, pair_weight_struct *pair_weight_st, PyObject *sep_obj, PyObject *weight_obj, size_t element_size, PyObject *weight_attrs)
 {
     int status = EXIT_SUCCESS;
@@ -1147,6 +1149,7 @@ finally:
     Py_XDECREF(weight);
     return status;
 }
+
 
 static int64_t check_dims_and_datatype_ra_dec(PyObject *module, PyArrayObject *x1_obj, PyArrayObject *y1_obj, size_t *element_size)
 {
@@ -1225,6 +1228,22 @@ static int64_t check_dims_and_datatype_ra_dec(PyObject *module, PyArrayObject *x
 }
 
 
+static int check_binarray(PyObject *module, binarray* bins, PyArrayObject *bins_obj) {
+
+    char msg[1024];
+
+    /* All the arrays should be 1-D*/
+    const int ndims = PyArray_NDIM(bins_obj);
+
+    if(ndims != 1) {
+        snprintf(msg, 1024, "ERROR: Expected 1-D numpy arrays.\nFound ndims = %d instead", ndims);
+        countpairs_mocks_error_out(module, msg);
+        return EXIT_FAILURE;
+    }
+    return set_binarray(bins, (double *) PyArray_DATA(bins_obj), (int) PyArray_SIZE(bins_obj));
+}
+
+
 static PyObject *countpairs_countpairs_rp_pi_mocks(PyObject *self, PyObject *args, PyObject *kwargs)
 {
     //Error-handling is global in python2 -> stored in struct module_state _struct declared at the top of this file
@@ -1240,6 +1259,7 @@ static PyObject *countpairs_countpairs_rp_pi_mocks(PyObject *self, PyObject *arg
     //x2->ra (ph2), y2-> declination (theta2), z2->cz (cz2)
     PyArrayObject *x1_obj=NULL, *y1_obj=NULL, *z1_obj=NULL;
     PyArrayObject *x2_obj=NULL, *y2_obj=NULL, *z2_obj=NULL;
+    PyArrayObject *bins_obj=NULL;
     PyObject *weights1_obj=NULL, *weights2_obj=NULL;
 
     struct config_options options = get_config_options();
@@ -1261,16 +1281,16 @@ static PyObject *countpairs_countpairs_rp_pi_mocks(PyObject *self, PyObject *arg
     int cosmology=1;
     double pimax;
     int npibins;
-    char *binfile, *weighting_method_str = NULL;
+    char *weighting_method_str = NULL;
     PyObject *pair_weight_obj=NULL, *sep_pair_weight_obj=NULL, *attrs_pair_weight=NULL;
 
     static char *kwlist[] = {
         "autocorr",
         "cosmology",
         "nthreads",
+        "binfile",
         "pimax",
         "npibins",
-        "binfile",
         "RA1",
         "DEC1",
         "CZ1",
@@ -1299,8 +1319,10 @@ static PyObject *countpairs_countpairs_rp_pi_mocks(PyObject *self, PyObject *arg
         NULL
     };
 
-    if ( ! PyArg_ParseTupleAndKeywords(args, kwargs, "iiidisO!O!O!|OO!O!O!ObbbbbbbhbbbisO!O!OI", kwlist,
-                                       &autocorr,&cosmology,&nthreads,&pimax,&npibins,&binfile,
+    if ( ! PyArg_ParseTupleAndKeywords(args, kwargs, "iiiO!diO!O!O!|OO!O!O!ObbbbbbbhbbbisO!O!OI", kwlist,
+                                       &autocorr,&cosmology,&nthreads,
+                                       &PyArray_Type,&bins_obj,
+                                       &pimax,&npibins,
                                        &PyArray_Type,&x1_obj,
                                        &PyArray_Type,&y1_obj,
                                        &PyArray_Type,&z1_obj,
@@ -1464,6 +1486,12 @@ static PyObject *countpairs_countpairs_rp_pi_mocks(PyObject *self, PyObject *arg
     if(wstatus != EXIT_SUCCESS) {
         Py_RETURN_NONE;
     }
+    binarray bins;
+    wstatus = check_binarray(module, &bins, bins_obj);
+
+    if(wstatus != EXIT_SUCCESS) {
+        Py_RETURN_NONE;
+    }
 
     options.float_type = element_size;
 
@@ -1476,7 +1504,7 @@ static PyObject *countpairs_countpairs_rp_pi_mocks(PyObject *self, PyObject *arg
                                   ND2,phiD2,thetaD2,czD2,
                                   nthreads,
                                   autocorr,
-                                  binfile,
+                                  &bins,
                                   pimax,
                                   npibins,
                                   cosmology,
@@ -1491,6 +1519,7 @@ static PyObject *countpairs_countpairs_rp_pi_mocks(PyObject *self, PyObject *arg
     /* Clean up. */
     Py_DECREF(x1_array);Py_DECREF(y1_array);Py_DECREF(z1_array);//x1 should absolutely not be NULL
     Py_XDECREF(x2_array);Py_XDECREF(y2_array);Py_XDECREF(z2_array);//x2 might be NULL depending on value of autocorr
+    free_binarray(&bins);
 
     if(status != EXIT_SUCCESS) {
         Py_RETURN_NONE;
@@ -1547,6 +1576,7 @@ static PyObject *countpairs_countpairs_s_mu_mocks(PyObject *self, PyObject *args
     //x2->ra (ph2), y2-> declination (theta2), z2->cz (cz2)
     PyArrayObject *x1_obj=NULL, *y1_obj=NULL, *z1_obj=NULL;
     PyArrayObject *x2_obj=NULL, *y2_obj=NULL, *z2_obj=NULL;
+    PyArrayObject *bins_obj=NULL;
     PyObject *weights1_obj=NULL, *weights2_obj=NULL;
 
     struct config_options options = get_config_options();
@@ -1567,16 +1597,16 @@ static PyObject *countpairs_countpairs_s_mu_mocks(PyObject *self, PyObject *args
     int cosmology=1;
     int nmu_bins=10;
     double mu_max=1.0;
-    char *binfile, *weighting_method_str = NULL;
+    char *weighting_method_str = NULL;
     PyObject *pair_weight_obj=NULL, *sep_pair_weight_obj=NULL, *attrs_pair_weight=NULL;
 
     static char *kwlist[] = {
         "autocorr",
         "cosmology",
         "nthreads",
+        "binfile",
         "mu_max",
         "nmu_bins",
-        "binfile",
         "RA1",
         "DEC1",
         "CZ1",
@@ -1605,8 +1635,10 @@ static PyObject *countpairs_countpairs_s_mu_mocks(PyObject *self, PyObject *args
         NULL
     };
 
-    if ( ! PyArg_ParseTupleAndKeywords(args, kwargs, "iiidisO!O!O!|OO!O!O!ObbbbbbbhbbbisO!O!OI", kwlist,
-                                       &autocorr,&cosmology,&nthreads,&mu_max,&nmu_bins,&binfile,
+    if ( ! PyArg_ParseTupleAndKeywords(args, kwargs, "iiiO!diO!O!O!|OO!O!O!ObbbbbbbhbbbisO!O!OI", kwlist,
+                                       &autocorr,&cosmology,&nthreads,
+                                       &PyArray_Type,&bins_obj,
+                                       &mu_max,&nmu_bins,
                                        &PyArray_Type,&x1_obj,
                                        &PyArray_Type,&y1_obj,
                                        &PyArray_Type,&z1_obj,
@@ -1770,6 +1802,12 @@ static PyObject *countpairs_countpairs_s_mu_mocks(PyObject *self, PyObject *args
     if(wstatus != EXIT_SUCCESS) {
         Py_RETURN_NONE;
     }
+    binarray bins;
+    wstatus = check_binarray(module, &bins, bins_obj);
+
+    if(wstatus != EXIT_SUCCESS) {
+        Py_RETURN_NONE;
+    }
 
     options.float_type = element_size;
 
@@ -1782,7 +1820,7 @@ static PyObject *countpairs_countpairs_s_mu_mocks(PyObject *self, PyObject *args
                                        ND2,phiD2,thetaD2,czD2,
                                        nthreads,
                                        autocorr,
-                                       binfile,
+                                       &bins,
                                        mu_max,
                                        nmu_bins,
                                        cosmology,
@@ -1797,6 +1835,7 @@ static PyObject *countpairs_countpairs_s_mu_mocks(PyObject *self, PyObject *args
     /* Clean up. */
     Py_DECREF(x1_array);Py_DECREF(y1_array);Py_DECREF(z1_array);//x1 should absolutely not be NULL
     Py_XDECREF(x2_array);Py_XDECREF(y2_array);Py_XDECREF(z2_array);//x2 might be NULL depending on value of autocorr
+    free_binarray(&bins);
 
     if(status != EXIT_SUCCESS) {
         Py_RETURN_NONE;
@@ -1851,10 +1890,11 @@ static PyObject *countpairs_countpairs_theta_mocks(PyObject *self, PyObject *arg
 
     PyArrayObject *x1_obj=NULL, *y1_obj=NULL;
     PyArrayObject *x2_obj=NULL, *y2_obj=NULL;
+    PyArrayObject *bins_obj=NULL;
     PyObject *weights1_obj=NULL, *weights2_obj=NULL;
 
     int nthreads=1;
-    char *binfile, *weighting_method_str = NULL;;
+    char *weighting_method_str = NULL;;
     PyObject *pair_weight_obj=NULL, *sep_pair_weight_obj=NULL, *attrs_pair_weight=NULL;
 
     int autocorr=0;
@@ -1900,8 +1940,9 @@ static PyObject *countpairs_countpairs_theta_mocks(PyObject *self, PyObject *arg
     };
 
 
-    if ( ! PyArg_ParseTupleAndKeywords(args, kwargs, "iisO!O!|OO!O!ObbbbbbbhbbbisO!O!OI", kwlist,
-                                       &autocorr,&nthreads,&binfile,
+    if ( ! PyArg_ParseTupleAndKeywords(args, kwargs, "iiO!O!O!|OO!O!ObbbbbbbhbbbisO!O!OI", kwlist,
+                                       &autocorr,&nthreads,
+                                       &PyArray_Type,&bins_obj,
                                        &PyArray_Type,&x1_obj,
                                        &PyArray_Type,&y1_obj,
                                        &weights1_obj,
@@ -2052,6 +2093,12 @@ static PyObject *countpairs_countpairs_theta_mocks(PyObject *self, PyObject *arg
     if(wstatus != EXIT_SUCCESS) {
         Py_RETURN_NONE;
     }
+    binarray bins;
+    wstatus = check_binarray(module, &bins, bins_obj);
+
+    if(wstatus != EXIT_SUCCESS) {
+        Py_RETURN_NONE;
+    }
 
     NPY_BEGIN_THREADS_DEF;
     NPY_BEGIN_THREADS;
@@ -2063,7 +2110,7 @@ static PyObject *countpairs_countpairs_theta_mocks(PyObject *self, PyObject *arg
                                         ND2,phiD2,thetaD2,
                                         nthreads,
                                         autocorr,
-                                        binfile,
+                                        &bins,
                                         &results,
                                         &options,
                                         &extra);
@@ -2076,6 +2123,7 @@ static PyObject *countpairs_countpairs_theta_mocks(PyObject *self, PyObject *arg
     /* Clean up. */
     Py_DECREF(x1_array);Py_DECREF(y1_array);//x1/y1 (representing ra1,dec1) should not be NULL
     Py_XDECREF(x2_array);Py_XDECREF(y2_array);//x2/y2 may be NULL (in case of autocorr)
+    free_binarray(&bins);
 
     if(status != EXIT_SUCCESS) {
         Py_RETURN_NONE;

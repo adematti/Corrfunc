@@ -16,6 +16,7 @@
 
 #include "macros.h"
 #include "cpu_features.h"
+#include "utils.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -346,12 +347,15 @@ static inline struct config_options get_config_options(void)
 
 #define EXTRA_OPTIONS_HEADER_SIZE     (1024)
 
+
 #define MAX_NUM_WEIGHTS 10
+
 
 typedef enum {
     FLOAT_TYPE,
     INT_TYPE
 } weight_type_t;
+
 
 typedef struct
 {
@@ -359,6 +363,7 @@ typedef struct
     uint8_t num_weights;
     uint8_t num_integer_weights;
 } weight_struct;
+
 
 typedef struct
 {
@@ -368,6 +373,7 @@ typedef struct
     int8_t noffset;
     double default_value;
 } pair_weight_struct;
+
 
 typedef enum {
   NONE=-42, /* default */
@@ -486,6 +492,58 @@ static inline int get_weight_method_by_name(const char *name, weight_method_t *m
     }
 
     return EXIT_FAILURE;
+}
+
+
+typedef struct {
+    double *edges;
+    int nedges;
+} binarray;
+
+
+static inline int set_binarray(binarray *bins, double* edges, int nedges)
+{
+    bins->nedges = nedges;
+    bins->edges = (double *) malloc(sizeof(double) * bins->nedges);
+    if (bins->edges == NULL){
+        fprintf(stderr,"malloc for %d bins failed...\n",bins->nedges);
+        return EXIT_FAILURE;
+    }
+    //bins->edges = (double *) my_malloc(sizeof(double), (int64_t) bins->nedges);
+    for (int ii=0; ii<bins->nedges; ii++) bins->edges[ii] = edges[ii];
+    return EXIT_SUCCESS;
+}
+
+
+static inline int detect_bin_type(binarray *bins, bin_type_t *bin_type, uint8_t verbose)
+{
+    if (*bin_type == BIN_AUTO) {
+        // if linear spacing, return BIN_LIN, else BIN_CUSTOM
+        const double atol = 1e-8; // same tol as numpy.allclose
+        const double rtol = 1e-5;
+        double rmin = bins->edges[0];
+        double rstep = (bins->edges[bins->nedges-1] - bins->edges[0])/(bins->nedges - 1);
+        *bin_type = BIN_LIN;
+        for (int ii=1; ii<bins->nedges; ii++) {
+            double pred = rmin + rstep*ii;
+            if ((fabs(bins->edges[ii] - pred) > atol)||(fabs(bins->edges[ii] - pred) > rtol * fabs(pred))) {
+                *bin_type = BIN_CUSTOM;
+                break;
+            }
+        }
+    }
+    if (verbose) {
+        if (*bin_type == BIN_LIN) fprintf(stderr,"Linear binning\n");
+        else fprintf(stderr,"Custom binning\n");
+    }
+    return EXIT_SUCCESS;
+}
+
+
+static inline int free_binarray(binarray *bins)
+{
+    free(bins->edges);
+    return EXIT_SUCCESS;
 }
 
 

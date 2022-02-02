@@ -25,6 +25,8 @@ int test_custom_and_linear_bins(void);
 int64_t ND1;
 double *X1=NULL,*Y1=NULL,*Z1=NULL,*weights1=NULL;
 
+binarray bins_lin;
+
 char current_file1[MAXLEN+1];
 
 
@@ -49,7 +51,7 @@ int test_periodic_DD(const char *correct_outputfile)
                                 ND1,X1,Y1,Z1,
                                 nthreads,
                                 autocorr,
-                                binfile_lin,
+                                &bins_lin,
                                 &results,
                                 &options,
                                 &extra);
@@ -186,6 +188,8 @@ int test_custom_and_linear_bins(void)
             if (status != EXIT_SUCCESS) {
                 return status;
             }
+            binarray bins;
+            read_binfile(linear_binfile, &bins);
             for(int iset=num_instructions-1;iset>=0;iset--) {
                 fprintf(stderr,"[rmin, rmax, nbins] = [%0.2f, %0.2f, %0d], isa = %10s ",rmin, rmax, nbins, isa_name[iset]);
                 results_countpairs results_reference, results_linear;
@@ -201,7 +205,7 @@ int test_custom_and_linear_bins(void)
                                     ND1,X1,Y1,Z1,
                                     nthreads,
                                     autocorr,
-                                    linear_binfile,
+                                    &bins,
                                     &results_reference,
                                     &options,
                                     &extra);
@@ -214,7 +218,7 @@ int test_custom_and_linear_bins(void)
                                     ND1,X1,Y1,Z1,
                                     nthreads,
                                     autocorr,
-                                    linear_binfile,
+                                    &bins,
                                     &results_linear,
                                     &options,
                                     &extra);
@@ -230,6 +234,7 @@ int test_custom_and_linear_bins(void)
                     fprintf(stderr,ANSI_COLOR_GREEN "PASSED" ANSI_COLOR_RESET"\n");
                 }
             }
+            free_binarray(&bins);
         }
     }
     fprintf(stderr,ANSI_COLOR_RESET"ntests run = %d nfailed = %d"ANSI_COLOR_RESET"\n", ntests, nfailed);
@@ -262,6 +267,8 @@ int main(int argc, char **argv)
     //set the globals
     ND1 = read_positions(file,fileformat, sizeof(double), 4, &X1, &Y1, &Z1, &weights1);
     nthreads = get_nthreads_from_affinity();
+
+    read_binfile(binfile_lin, &bins_lin);
 
     strncpy(current_file1,file,MAXLEN);
     reset_bin_refine_factors(&options);
@@ -346,5 +353,6 @@ int main(int argc, char **argv)
     }
 
     free(X1);free(Y1);free(Z1);free(weights1);
+    free_binarray(&bins_lin);
     return failed;
 }

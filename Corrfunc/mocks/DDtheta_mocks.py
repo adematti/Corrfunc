@@ -304,7 +304,7 @@ def DDtheta_mocks(autocorr, nthreads, binfile,
 
     import numpy as np
     from Corrfunc.utils import translate_isa_string_to_enum, translate_bin_type_string_to_enum,\
-        fix_ra_dec, return_file_with_rbins, convert_to_native_endian,\
+        fix_ra_dec, get_edges, convert_to_native_endian,\
         sys_pipes, process_weights
     from future.utils import bytes_to_native_str
 
@@ -351,7 +351,7 @@ def DDtheta_mocks(autocorr, nthreads, binfile,
 
     integer_isa = translate_isa_string_to_enum(isa)
     integer_bin_type = translate_bin_type_string_to_enum(bin_type)
-    rbinfile, delete_after_use = return_file_with_rbins(binfile)
+    rbinfile = get_edges(binfile)
     with sys_pipes():
         extn_results = DDtheta_mocks_extn(autocorr, nthreads, rbinfile,
                                           RA1, DEC1,
@@ -373,10 +373,6 @@ def DDtheta_mocks(autocorr, nthreads, binfile,
         raise RuntimeError(msg)
     else:
         extn_results, api_time = extn_results
-
-    if delete_after_use:
-        import os
-        os.remove(rbinfile)
 
     results_dtype = np.dtype([(bytes_to_native_str(b'thetamin'), np.float64),
                               (bytes_to_native_str(b'thetamax'), np.float64),
@@ -410,7 +406,7 @@ def find_fastest_DDtheta_mocks_bin_refs(autocorr, nthreads, binfile,
     nthreads : integer
         Number of threads to use.
 
-    binfile: string or an list/array of floats. Units: degrees.
+    binfile : string or an list/array of floats. Units: degrees.
         For string input: filename specifying the ``theta`` bins for
         ``DDtheta_mocks``. The file should contain white-space separated values
         of (thetamin, thetamax)  for each ``theta`` wanted. The bins need to be
@@ -463,7 +459,7 @@ def find_fastest_DDtheta_mocks_bin_refs(autocorr, nthreads, binfile,
         need accurate ``thetaavg`` values, then pass in double precision arrays
         for ``RA/DEC``.
 
-    isa: string, case-insensitive (default ``fastest``)
+    isa : string, case-insensitive (default ``fastest``)
         Controls the runtime dispatch for the instruction set to use. Options
         are: [``fastest``, ``avx512f``, ``avx``, ``sse42``, ``fallback``]
 
@@ -478,12 +474,12 @@ def find_fastest_DDtheta_mocks_bin_refs(autocorr, nthreads, binfile,
         benchmarking, then the string supplied here gets translated into an
         ``enum`` for the instruction set defined in ``utils/defs.h``.
 
-    max_cells_per_dim: integer, default is 100, typical values in [50-300]
+    max_cells_per_dim : integer, default is 100, typical values in [50-300]
         Controls the maximum number of cells per dimension. Total number of
         cells can be up to (max_cells_per_dim)^2. Only increase if ``rpmax`` is
         too small relative to the boxsize (and increasing helps the runtime).
 
-    maxbinref: integer (default 3)
+    maxbinref : integer (default 3)
         The maximum ``bin refine factor`` to use along each dimension.
 
         Runtime of module scales as ``maxbinref^2``, so change the value of
@@ -492,12 +488,12 @@ def find_fastest_DDtheta_mocks_bin_refs(autocorr, nthreads, binfile,
         Note that ``max_cells_per_dim`` might need to be increased
         to accommodate really large ``maxbinref``.
 
-    nrepeats: integer (default 3)
+    nrepeats : integer (default 3)
         Number of times to repeat the timing for an individual run. Accounts
         for the dispersion in runtimes on computers with multiple user
         processes.
 
-    return_runtimes: boolean (default ``false``)
+    return_runtimes : boolean (default ``false``)
         If set, also returns the array of runtimes.
 
     Returns
@@ -507,7 +503,6 @@ def find_fastest_DDtheta_mocks_bin_refs(autocorr, nthreads, binfile,
         produces the fastest code.
 
     runtimes : numpy structured array
-
         Only returned if ``return_runtimes`` is set, then the return value
         is a tuple containing ((nRA, nDEC), runtimes). ``runtimes`` is a
         ``numpy`` structured array containing the fields, [``nRA``, ``nDEC``,
@@ -560,7 +555,7 @@ def find_fastest_DDtheta_mocks_bin_refs(autocorr, nthreads, binfile,
 
     import numpy as np
     from Corrfunc.utils import translate_isa_string_to_enum, fix_ra_dec,\
-        return_file_with_rbins, convert_to_native_endian, process_weights
+        get_edges, convert_to_native_endian, process_weights
     from future.utils import bytes_to_native_str
     import itertools
     import time
@@ -585,7 +580,7 @@ def find_fastest_DDtheta_mocks_bin_refs(autocorr, nthreads, binfile,
             kwargs[k] = v
 
     integer_isa = translate_isa_string_to_enum(isa)
-    rbinfile, delete_after_use = return_file_with_rbins(binfile)
+    rbinfile = get_edges(binfile)
     bin_refs = np.arange(1, maxbinref + 1)
     if link_in_ra:
         bin_ref_perms = itertools.product(bin_refs, bin_refs)
@@ -664,10 +659,6 @@ def find_fastest_DDtheta_mocks_bin_refs(autocorr, nthreads, binfile,
         all_runtimes[ii]['nDEC'] = nDEC
         all_runtimes[ii]['avg_time'] = avg_runtime
         all_runtimes[ii]['sigma_time'] = runtime_disp
-
-    if delete_after_use:
-        import os
-        os.remove(rbinfile)
 
     all_runtimes.sort(order=('avg_time', 'sigma_time'))
     results = (all_runtimes[0]['nRA'],

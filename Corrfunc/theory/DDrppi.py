@@ -282,7 +282,7 @@ def DDrppi(autocorr, nthreads, binfile, pimax, npibins, X1, Y1, Z1, weights1=Non
 
     import numpy as np
     from Corrfunc.utils import translate_isa_string_to_enum, translate_bin_type_string_to_enum,\
-        return_file_with_rbins, convert_to_native_endian,\
+        get_edges, convert_to_native_endian,\
         sys_pipes, process_weights
     from future.utils import bytes_to_native_str
 
@@ -328,11 +328,11 @@ def DDrppi(autocorr, nthreads, binfile, pimax, npibins, X1, Y1, Z1, weights1=Non
 
     integer_isa = translate_isa_string_to_enum(isa)
     integer_bin_type = translate_bin_type_string_to_enum(bin_type)
-    rbinfile, delete_after_use = return_file_with_rbins(binfile)
+    rbinfile = get_edges(binfile)
 
     with sys_pipes():
       extn_results = DDrppi_extn(autocorr, nthreads,
-                                 pimax, npibins, rbinfile,
+                                 rbinfile, pimax, npibins,
                                  X1, Y1, Z1,
                                  periodic=periodic,
                                  verbose=verbose,
@@ -351,10 +351,6 @@ def DDrppi(autocorr, nthreads, binfile, pimax, npibins, X1, Y1, Z1, weights1=Non
         raise RuntimeError(msg)
     else:
         extn_results, api_time = extn_results
-
-    if delete_after_use:
-        import os
-        os.remove(rbinfile)
 
     results_dtype = np.dtype([(bytes_to_native_str(b'rmin'), np.float64),
                               (bytes_to_native_str(b'rmax'), np.float64),

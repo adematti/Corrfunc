@@ -1079,6 +1079,7 @@ static int64_t check_dims_and_datatype(PyObject *module, PyArrayObject *x1_obj, 
     return nx1;
 }
 
+
 static int print_kwlist_into_msg(char *msg, const size_t totsize, size_t len, char *kwlist[], const size_t nitems)
 {
     for(size_t i=0;i<nitems;i++) {
@@ -1197,6 +1198,7 @@ finally:
     return status;
 }
 
+
 static int check_pair_weight(PyObject *module, pair_weight_struct *pair_weight_st, PyObject *sep_obj, PyObject *weight_obj, size_t element_size, PyObject *weight_attrs)
 {
     int status = EXIT_SUCCESS;
@@ -1267,6 +1269,23 @@ finally:
     return status;
 }
 
+
+static int check_binarray(PyObject *module, binarray* bins, PyArrayObject *bins_obj) {
+
+    char msg[1024];
+
+    /* All the arrays should be 1-D*/
+    const int ndims = PyArray_NDIM(bins_obj);
+
+    if(ndims != 1) {
+        snprintf(msg, 1024, "ERROR: Expected 1-D numpy arrays.\nFound ndims = %d instead", ndims);
+        countpairs_error_out(module, msg);
+        return EXIT_FAILURE;
+    }
+    return set_binarray(bins, (double *) PyArray_DATA(bins_obj), (int) PyArray_SIZE(bins_obj));
+}
+
+
 static PyObject *countpairs_countpairs(PyObject *self, PyObject *args, PyObject *kwargs)
 {
     //Error-handling is global in python2 -> stored in struct module_state _struct declared at the top of this file
@@ -1279,11 +1298,12 @@ static PyObject *countpairs_countpairs(PyObject *self, PyObject *args, PyObject 
 #endif
     PyArrayObject *x1_obj=NULL, *y1_obj=NULL, *z1_obj=NULL;
     PyArrayObject *x2_obj=NULL, *y2_obj=NULL, *z2_obj=NULL;
+    PyArrayObject *bins_obj=NULL;
     PyObject *weights1_obj=NULL, *weights2_obj=NULL;
 
     int autocorr=0;
     int nthreads=4;
-    char *binfile, *weighting_method_str = NULL;
+    char *weighting_method_str = NULL;
 
     PyObject *pair_weight_obj=NULL, *sep_pair_weight_obj=NULL, *attrs_pair_weight=NULL;
 
@@ -1333,8 +1353,9 @@ static PyObject *countpairs_countpairs(PyObject *self, PyObject *args, PyObject 
     };
 
     // Note: type 'O!' doesn't allow for None to be passed, which we might want to do.
-    if ( ! PyArg_ParseTupleAndKeywords(args, kwargs, "iisO!O!O!|OO!O!O!ObbdbbbbhbbbisO!O!OI", kwlist,
-                                       &autocorr,&nthreads,&binfile,
+    if ( ! PyArg_ParseTupleAndKeywords(args, kwargs, "iiO!O!O!O!|OO!O!O!ObbdbbbbhbbbisO!O!OI", kwlist,
+                                       &autocorr,&nthreads,
+                                       &PyArray_Type,&bins_obj,
                                        &PyArray_Type,&x1_obj,
                                        &PyArray_Type,&y1_obj,
                                        &PyArray_Type,&z1_obj,
@@ -1543,6 +1564,13 @@ static PyObject *countpairs_countpairs(PyObject *self, PyObject *args, PyObject 
         Py_RETURN_NONE;
     }
 
+    binarray bins;
+    wstatus = check_binarray(module, &bins, bins_obj);
+
+    if(wstatus != EXIT_SUCCESS) {
+        Py_RETURN_NONE;
+    }
+
     NPY_BEGIN_THREADS_DEF;
     NPY_BEGIN_THREADS;
 
@@ -1553,7 +1581,7 @@ static PyObject *countpairs_countpairs(PyObject *self, PyObject *args, PyObject 
                             ND2,X2,Y2,Z2,
                             nthreads,
                             autocorr,
-                            binfile,
+                            &bins,
                             &results,
                             &options,
                             &extra);
@@ -1565,6 +1593,7 @@ static PyObject *countpairs_countpairs(PyObject *self, PyObject *args, PyObject 
     /* Clean up. */
     Py_DECREF(x1_array);Py_DECREF(y1_array);Py_DECREF(z1_array);
     Py_XDECREF(x2_array);Py_XDECREF(y2_array);Py_XDECREF(z2_array);
+    free_binarray(&bins);
 
     if(status != EXIT_SUCCESS) {
         Py_RETURN_NONE;
@@ -1589,6 +1618,7 @@ static PyObject *countpairs_countpairs(PyObject *self, PyObject *args, PyObject 
     return rettuple;
 }
 
+
 static PyObject *countpairs_countpairs_rp_pi(PyObject *self, PyObject *args, PyObject *kwargs)
 {
 #if PY_MAJOR_VERSION < 3
@@ -1600,13 +1630,14 @@ static PyObject *countpairs_countpairs_rp_pi(PyObject *self, PyObject *args, PyO
 #endif
     PyArrayObject *x1_obj=NULL, *y1_obj=NULL, *z1_obj=NULL;
     PyArrayObject *x2_obj=NULL, *y2_obj=NULL, *z2_obj=NULL;
+    PyArrayObject *bins_obj=NULL;
     PyObject *weights1_obj=NULL, *weights2_obj=NULL;
     int autocorr=0;
     int nthreads=4;
 
     double pimax;
     int npibins;
-    char *binfile, *weighting_method_str = NULL;
+    char *weighting_method_str = NULL;
     PyObject *pair_weight_obj=NULL, *sep_pair_weight_obj=NULL, *attrs_pair_weight=NULL;
 
     struct config_options options = get_config_options();
@@ -1623,9 +1654,9 @@ static PyObject *countpairs_countpairs_rp_pi(PyObject *self, PyObject *args, PyO
     static char *kwlist[] = {
         "autocorr",
         "nthreads",
+        "binfile",
         "pimax",
         "npibins",
-        "binfile",
         "X1",
         "Y1",
         "Z1",
@@ -1654,8 +1685,10 @@ static PyObject *countpairs_countpairs_rp_pi(PyObject *self, PyObject *args, PyO
         NULL
     };
 
-    if ( ! PyArg_ParseTupleAndKeywords(args, kwargs, "iidisO!O!O!|OO!O!O!ObbdbbbbhbbbisO!O!OI", kwlist,
-                                       &autocorr,&nthreads,&pimax,&npibins,&binfile,
+    if ( ! PyArg_ParseTupleAndKeywords(args, kwargs, "iiO!diO!O!O!|OO!O!O!ObbdbbbbhbbbisO!O!OI", kwlist,
+                                       &autocorr,&nthreads,
+                                       &PyArray_Type,&bins_obj,
+                                       &pimax,&npibins,
                                        &PyArray_Type,&x1_obj,
                                        &PyArray_Type,&y1_obj,
                                        &PyArray_Type,&z1_obj,
@@ -1817,6 +1850,12 @@ static PyObject *countpairs_countpairs_rp_pi(PyObject *self, PyObject *args, PyO
     if(wstatus != EXIT_SUCCESS) {
         Py_RETURN_NONE;
     }
+    binarray bins;
+    wstatus = check_binarray(module, &bins, bins_obj);
+
+    if(wstatus != EXIT_SUCCESS) {
+        Py_RETURN_NONE;
+    }
 
     NPY_BEGIN_THREADS_DEF;
     NPY_BEGIN_THREADS;
@@ -1828,7 +1867,7 @@ static PyObject *countpairs_countpairs_rp_pi(PyObject *self, PyObject *args, PyO
                                   ND2,X2,Y2,Z2,
                                   nthreads,
                                   autocorr,
-                                  binfile,
+                                  &bins,
                                   pimax,
                                   npibins,
                                   &results,
@@ -1842,6 +1881,7 @@ static PyObject *countpairs_countpairs_rp_pi(PyObject *self, PyObject *args, PyO
     /* Clean up. */
     Py_DECREF(x1_array);Py_DECREF(y1_array);Py_DECREF(z1_array);//x1 should absolutely not be NULL
     Py_XDECREF(x2_array);Py_XDECREF(y2_array);Py_XDECREF(z2_array);//x2 might be NULL depending on value of autocorr
+    free_binarray(&bins);
     if(status != EXIT_SUCCESS) {
         Py_RETURN_NONE;
     }
@@ -1870,6 +1910,7 @@ static PyObject *countpairs_countpairs_rp_pi(PyObject *self, PyObject *args, PyO
     return rettuple;
 }
 
+
 static PyObject *countpairs_countpairs_wp(PyObject *self, PyObject *args, PyObject *kwargs)
 {
 #if PY_MAJOR_VERSION < 3
@@ -1880,10 +1921,11 @@ static PyObject *countpairs_countpairs_wp(PyObject *self, PyObject *args, PyObje
     PyObject *module = self;
 #endif
     PyArrayObject *x1_obj=NULL, *y1_obj=NULL, *z1_obj=NULL;
+    PyArrayObject *bins_obj=NULL;
     PyObject *weights1_obj=NULL;
     double boxsize,pimax;
     int nthreads=1;
-    char *binfile, *weighting_method_str = NULL;
+    char *weighting_method_str = NULL;
     PyObject *pair_weight_obj=NULL, *sep_pair_weight_obj=NULL, *attrs_pair_weight=NULL;
     size_t element_size;
 
@@ -1902,9 +1944,9 @@ static PyObject *countpairs_countpairs_wp(PyObject *self, PyObject *args, PyObje
 
     static char *kwlist[] = {
         "boxsize",
-        "pimax",
         "nthreads",
         "binfile",
+        "pimax",
         "X",
         "Y",
         "Z",
@@ -1928,8 +1970,10 @@ static PyObject *countpairs_countpairs_wp(PyObject *self, PyObject *args, PyObje
         NULL
     };
 
-    if( ! PyArg_ParseTupleAndKeywords(args, kwargs, "ddisO!O!O!|OsbbbbbhbbbbiO!O!OI", kwlist,
-                                      &boxsize,&pimax,&nthreads,&binfile,
+    if( ! PyArg_ParseTupleAndKeywords(args, kwargs, "diO!dO!O!O!|OsbbbbbhbbbbiO!O!OI", kwlist,
+                                      &boxsize,&nthreads,
+                                      &PyArray_Type,&bins_obj,
+                                      &pimax,
                                       &PyArray_Type,&x1_obj,
                                       &PyArray_Type,&y1_obj,
                                       &PyArray_Type,&z1_obj,
@@ -2034,6 +2078,12 @@ static PyObject *countpairs_countpairs_wp(PyObject *self, PyObject *args, PyObje
     if(wstatus != EXIT_SUCCESS) {
         Py_RETURN_NONE;
     }
+    binarray bins;
+    wstatus = check_binarray(module, &bins, bins_obj);
+
+    if(wstatus != EXIT_SUCCESS) {
+        Py_RETURN_NONE;
+    }
 
     NPY_BEGIN_THREADS_DEF;
     NPY_BEGIN_THREADS;
@@ -2044,7 +2094,7 @@ static PyObject *countpairs_countpairs_wp(PyObject *self, PyObject *args, PyObje
     int status = countpairs_wp(ND1,X1,Y1,Z1,
                                boxsize,
                                nthreads,
-                               binfile,
+                               &bins,
                                pimax,
                                &results,
                                &options,
@@ -2056,6 +2106,7 @@ static PyObject *countpairs_countpairs_wp(PyObject *self, PyObject *args, PyObje
 
     /* Clean up. */
     Py_DECREF(x1_array);Py_DECREF(y1_array);Py_DECREF(z1_array);
+    free_binarray(&bins);
 
     if(status != EXIT_SUCCESS) {
         Py_RETURN_NONE;
@@ -2109,11 +2160,12 @@ static PyObject *countpairs_countpairs_xi(PyObject *self, PyObject *args, PyObje
     PyObject *module = self;
 #endif
 
-    PyArrayObject *x1_obj, *y1_obj, *z1_obj;
+    PyArrayObject *x1_obj=NULL, *y1_obj=NULL, *z1_obj=NULL;
+    PyArrayObject *bins_obj=NULL;
     PyObject *weights1_obj=NULL;
     double boxsize;
     int nthreads=4;
-    char *binfile, *weighting_method_str = NULL;
+    char *weighting_method_str = NULL;
     PyObject *pair_weight_obj=NULL, *sep_pair_weight_obj=NULL, *attrs_pair_weight=NULL;
 
     struct config_options options = get_config_options();
@@ -2154,8 +2206,9 @@ static PyObject *countpairs_countpairs_xi(PyObject *self, PyObject *args, PyObje
     };
 
 
-    if( ! PyArg_ParseTupleAndKeywords(args, kwargs, "disO!O!O!|OsbbbbbhbbbiO!O!OI", kwlist,
-                                      &boxsize,&nthreads,&binfile,
+    if( ! PyArg_ParseTupleAndKeywords(args, kwargs, "diO!O!O!O!|OsbbbbbhbbbiO!O!OI", kwlist,
+                                      &boxsize,&nthreads,
+                                      &PyArray_Type,&bins_obj,
                                       &PyArray_Type,&x1_obj,
                                       &PyArray_Type,&y1_obj,
                                       &PyArray_Type,&z1_obj,
@@ -2257,6 +2310,12 @@ static PyObject *countpairs_countpairs_xi(PyObject *self, PyObject *args, PyObje
     if(wstatus != EXIT_SUCCESS) {
         Py_RETURN_NONE;
     }
+    binarray bins;
+    wstatus = check_binarray(module, &bins, bins_obj);
+
+    if(wstatus != EXIT_SUCCESS) {
+        Py_RETURN_NONE;
+    }
 
     NPY_BEGIN_THREADS_DEF;
     NPY_BEGIN_THREADS;
@@ -2268,7 +2327,7 @@ static PyObject *countpairs_countpairs_xi(PyObject *self, PyObject *args, PyObje
     int status = countpairs_xi(ND1,X1,Y1,Z1,
                                boxsize,
                                nthreads,
-                               binfile,
+                               &bins,
                                &results,
                                &options,
                                &extra);
@@ -2279,6 +2338,7 @@ static PyObject *countpairs_countpairs_xi(PyObject *self, PyObject *args, PyObje
 
     /* Clean up. */
     Py_DECREF(x1_array);Py_DECREF(y1_array);Py_DECREF(z1_array);
+    free_binarray(&bins);
     if(status != EXIT_SUCCESS) {
         Py_RETURN_NONE;
     }
@@ -2321,13 +2381,14 @@ static PyObject *countpairs_countpairs_s_mu(PyObject *self, PyObject *args, PyOb
 #endif
     PyArrayObject *x1_obj=NULL, *y1_obj=NULL, *z1_obj=NULL;
     PyArrayObject *x2_obj=NULL, *y2_obj=NULL, *z2_obj=NULL;
+    PyArrayObject *bins_obj=NULL;
     PyObject *weights1_obj=NULL, *weights2_obj=NULL;
     int autocorr=0;
     int nthreads=4;
 
     double mu_max;
     int nmu_bins;
-    char *binfile, *weighting_method_str = NULL;
+    char *weighting_method_str = NULL;
     PyObject *pair_weight_obj=NULL, *sep_pair_weight_obj=NULL, *attrs_pair_weight=NULL;
 
     struct config_options options = get_config_options();
@@ -2377,8 +2438,10 @@ static PyObject *countpairs_countpairs_s_mu(PyObject *self, PyObject *args, PyOb
         NULL
     };
 
-    if ( ! PyArg_ParseTupleAndKeywords(args, kwargs, "iisdiO!O!O!|OO!O!O!ObbdbbbbbhbbbisO!O!OI", kwlist,
-                                       &autocorr,&nthreads,&binfile, &mu_max, &nmu_bins,
+    if ( ! PyArg_ParseTupleAndKeywords(args, kwargs, "iiO!diO!O!O!|OO!O!O!ObbdbbbbbhbbbisO!O!OI", kwlist,
+                                       &autocorr,&nthreads,
+                                       &PyArray_Type,&bins_obj,
+                                       &mu_max, &nmu_bins,
                                        &PyArray_Type,&x1_obj,
                                        &PyArray_Type,&y1_obj,
                                        &PyArray_Type,&z1_obj,
@@ -2541,6 +2604,12 @@ static PyObject *countpairs_countpairs_s_mu(PyObject *self, PyObject *args, PyOb
     if(wstatus != EXIT_SUCCESS) {
         Py_RETURN_NONE;
     }
+    binarray bins;
+    wstatus = check_binarray(module, &bins, bins_obj);
+
+    if(wstatus != EXIT_SUCCESS) {
+        Py_RETURN_NONE;
+    }
 
     NPY_BEGIN_THREADS_DEF;
     NPY_BEGIN_THREADS;
@@ -2552,7 +2621,7 @@ static PyObject *countpairs_countpairs_s_mu(PyObject *self, PyObject *args, PyOb
                                  ND2,X2,Y2,Z2,
                                  nthreads,
                                  autocorr,
-                                 binfile,
+                                 &bins,
                                  mu_max,
                                  nmu_bins,
                                  &results,
@@ -2566,6 +2635,7 @@ static PyObject *countpairs_countpairs_s_mu(PyObject *self, PyObject *args, PyOb
     /* Clean up. */
     Py_DECREF(x1_array);Py_DECREF(y1_array);Py_DECREF(z1_array);//x1 should absolutely not be NULL
     Py_XDECREF(x2_array);Py_XDECREF(y2_array);Py_XDECREF(z2_array);//x2 might be NULL depending on value of autocorr
+    free_binarray(&bins);
     if(status != EXIT_SUCCESS) {
         Py_RETURN_NONE;
     }

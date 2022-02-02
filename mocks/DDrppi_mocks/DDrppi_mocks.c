@@ -82,7 +82,7 @@ int main(int argc, char *argv[])
     int cosmology=1;
 
     /*---Read-arguments-----------------------------------*/
-    if(argc< (nargs+1)) {
+    if(argc < (nargs+1)) {
         Printhelp() ;
         fprintf(stderr,"\nFound: %d parameters\n ",argc-1);
         int i;
@@ -165,6 +165,8 @@ int main(int argc, char *argv[])
     }
     fprintf(stderr,"\t\t -------------------------------------\n");
 
+    binarray bins;
+    read_binfile(binfile, &bins);
 
     /*---Read-data1-file----------------------------------*/
     gettimeofday(&t0,NULL);
@@ -231,7 +233,7 @@ int main(int argc, char *argv[])
                                   ND2,phiD2,thetaD2,czD2,
                                   nthreads,
                                   autocorr,
-                                  binfile,
+                                  &bins,
                                   pimax,
                                   (int) pimax,
                                   cosmology,
@@ -249,6 +251,7 @@ int main(int argc, char *argv[])
           free(weights2[w]);
         }
     }
+    free_binarray(&bins);
 
     if(status != EXIT_SUCCESS) {
         return status;

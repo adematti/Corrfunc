@@ -204,7 +204,7 @@ int countpairs_mocks_s_mu_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1, D
                                  const int64_t ND2, DOUBLE *ra2, DOUBLE *dec2, DOUBLE *czD2,
                                  const int numthreads,
                                  const int autocorr,
-                                 const char *sbinfile,
+                                 binarray *bins,
                                  const double max_mu,
                                  const int nmu_bins,
                                  const int cosmology,
@@ -294,16 +294,15 @@ int countpairs_mocks_s_mu_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1, D
     /***********************
      *initializing the  bins
      ************************/
-    double *supp;
-    int nsbin;
-    double smin,smax;
-    setup_bins(sbinfile,&smin,&smax,&nsbin,&supp);
+    double *supp = bins->edges;
+    int nsbin = bins->nedges;
+    double smin=bins->edges[0], smax=bins->edges[bins->nedges-1];
     if( ! (smin > 0.0 && smax > 0.0 && smin < smax && nsbin > 0)) {
         fprintf(stderr,"Error: Could not setup with S bins correctly. (smin = %lf, smax = %lf, with nbins = %d). Expected non-zero smin/smax with smax > smin and nbins >=1 \n",
                 smin, smax, nsbin);
         return EXIT_FAILURE;
     }
-    detect_bin_type(supp, nsbin, &(options->bin_type), options->verbose);
+    detect_bin_type(bins, &(options->bin_type), options->verbose);
 
     if(max_mu <= 0.0 || max_mu > 1.0) {
         fprintf(stderr,"Error: max_mu (max. value for the cosine of the angle with line of sight) must be greater than 0 and at most 1).\n"
@@ -540,7 +539,6 @@ int countpairs_mocks_s_mu_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1, D
         if(autocorr == 0) {
             free_cellarray_mocks_DOUBLE(lattice2, totncells);
         }
-        free(supp);
         return EXIT_FAILURE;
     }
 
@@ -690,7 +688,6 @@ int countpairs_mocks_s_mu_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1, D
 
     if(abort_status != EXIT_SUCCESS || interrupt_status_DDsmu_mocks_DOUBLE != EXIT_SUCCESS) {
         /* Cleanup memory here if aborting */
-        free(supp);
 #if defined(_OPENMP)
         matrix_free((void **) all_npairs, numthreads);
         if(options->need_avg_sep) {
@@ -808,7 +805,6 @@ int countpairs_mocks_s_mu_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1, D
     results->weightavg  = my_calloc(sizeof(double)  , totnbins);
     if(results->npairs == NULL || results->supp == NULL || results->savg == NULL || results->weightavg == NULL) {
         free_results_mocks_s_mu(results);
-        free(supp);
         return EXIT_FAILURE;
     }
 
@@ -819,7 +815,6 @@ int countpairs_mocks_s_mu_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1, D
             if( index >= totnbins ) {
                 fprintf(stderr, "ERROR: In %s> index = %d must be in range [0, %d)\n", __FUNCTION__, index, totnbins);
                 free_results_mocks_s_mu(results);
-                free(supp);
                 return EXIT_FAILURE;
             }
             results->npairs[index] = npairs[index];
@@ -833,7 +828,6 @@ int countpairs_mocks_s_mu_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1, D
             }
         }
     }
-    free(supp);
 
     /* reset interrupt handlers to default */
     RESET_INTERRUPT_HANDLERS();

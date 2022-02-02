@@ -41,7 +41,7 @@ extern "C" {
                                       const int64_t ND2, DOUBLE *X2, DOUBLE *Y2, DOUBLE *Z2,
                                       const int numthreads,
                                       const int autocorr,
-                                      const char *sbinfile,
+                                      binarray *bins,
                                       const double mu_max,
                                       const int nmu_bins,
                                       results_countpairs_s_mu *results,

@@ -12,7 +12,7 @@
 extern "C" {
 #endif
 
-#include "defs.h" //for struct config_options 
+#include "defs.h" //for struct config_options
 #include <stdint.h> //for uint64_t
 
     //define the results structure
@@ -31,13 +31,13 @@ extern "C" {
                                const int64_t ND2, void *X2, void *Y2, void *Z2,
                                const int numthreads,
                                const int autocorr,
-                               const char *sbinfile,
+                               binarray *bins,
                                const double mu_max,
-                               const int nmu_bins, 
+                               const int nmu_bins,
                                results_countpairs_s_mu *results,
                                struct config_options *options,
                                struct extra_options *extra);
-    
+
     extern void free_results_s_mu(results_countpairs_s_mu *results);
 
 #ifdef __cplusplus
