@@ -205,7 +205,7 @@ int countpairs_s_mu_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z1
     int nsbin = bins->nedges;
     double smin=bins->edges[0], smax=bins->edges[bins->nedges-1];
     if( ! (smin >= 0.0 && smax > 0.0 && smin < smax && nsbin > 0)) {
-        fprintf(stderr,"Error: Could not setup with R bins correctly. (rmin = %lf, rmax = %lf, with nbins = %d). Expected non-zero rmin/rmax with rmax > rmin and nbins >=1 \n",
+        fprintf(stderr,"Error: Could not setup with s bins correctly. (rmin = %lf, rmax = %lf, with nbins = %d). Expected non-zero rmin/rmax with rmax > rmin and nbins >=1 \n",
                 smin, smax, nsbin);
         return EXIT_FAILURE;
     }
@@ -597,28 +597,25 @@ int countpairs_s_mu_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z1
         /* The comparison is '<=' rather than '==' only to silence
            the compiler  */
         if(supp[0] <= 0.0) {
-            int index = (nmu_bins + 1);//first valid s bin (with 0-dpi depth in pi)
             /* Then, add all the self-pairs. This ensures that
                a cross-correlation with two identical datasets
                produces the same result as the auto-correlation  */
-            npairs[index] += ND1;
+            npairs[nmu_bins+1] += ND1;
 
             // Increasing npairs affects savg and weightavg.
             // We don't need to add anything to savg; all the self-pairs have 0 separation!
             // The self-pairs have non-zero weight, though.  So, fix that here.
             if(need_weightavg){
                 // Keep in mind this is an autocorrelation (i.e. only one particle set to consider)
+                pair_struct_DOUBLE pair;
+                set_pair_struct_DOUBLE(&pair, (weight_struct_DOUBLE *) &(extra->weights0), (weight_struct_DOUBLE *) &(extra->weights0), &(extra->pair_weight));
                 weight_func_t_DOUBLE weight_func = get_weight_func_by_method_DOUBLE(extra->weight_method);
-                pair_struct_DOUBLE pair = {.num_weights = extra->weights0.num_weights,
-                                           .num_integer_weights = extra->weights0.num_integer_weights,
-                                           .dx.d=0., .dy.d=0., .dz.d=0.,  // always 0 separation
-                                           .parx.d=0., .pary.d=0., .parz.d=0.};
                 for(int64_t j = 0; j < ND1; j++){
                     for(int w = 0; w < pair.num_weights; w++){
                         pair.weights0[w].d = ((DOUBLE *) extra->weights0.weights[w])[j];
                         pair.weights1[w].d = ((DOUBLE *) extra->weights0.weights[w])[j];
                     }
-                    weightavg[1] += weight_func(&pair);
+                    weightavg[nmu_bins+1] += weight_func(&pair);
                 }
             }
         }

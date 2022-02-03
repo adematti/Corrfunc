@@ -199,7 +199,7 @@ int countpairs_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z1,
     int nrpbin = bins->nedges;
     double rpmin=bins->edges[0], rpmax=bins->edges[bins->nedges-1];
     if( ! (rpmin >= 0.0 && rpmax > 0.0 && rpmin < rpmax && nrpbin > 0)) {
-        fprintf(stderr,"Error: Could not setup with R bins correctly. (rmin = %lf, rmax = %lf, with nbins = %d). "
+        fprintf(stderr,"Error: Could not setup with r bins correctly. (rmin = %lf, rmax = %lf, with nbins = %d). "
                 "Expected non-zero rmin/rmax with rmax > rmin and nbins >=1 \n",
                 rpmin, rpmax, nrpbin);
         return EXIT_FAILURE;
@@ -507,7 +507,7 @@ int countpairs_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z1,
 
 
     free_cellarray_DOUBLE(lattice1, totncells);
-    if(autocorr==0) {
+    if(autocorr == 0) {
         free_cellarray_DOUBLE(lattice2, totncells);
     }
     if(abort_status != EXIT_SUCCESS || interrupt_status_DOUBLE != EXIT_SUCCESS) {
@@ -583,7 +583,7 @@ int countpairs_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z1,
         /* Is the min. requested separation 0.0 ?*/
         /* The comparison is '<=' rather than '==' only to silence
            the compiler  */
-        if(rupp[0] <= 0.0) {
+        if(rupp[0] <= 0.) {
             /* Then, add all the self-pairs. This ensures that
                a cross-correlation with two identical datasets
                produces the same result as the auto-correlation  */
@@ -594,11 +594,9 @@ int countpairs_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z1,
             // The self-pairs have non-zero weight, though.  So, fix that here.
             if(need_weightavg){
                 // Keep in mind this is an autocorrelation (i.e. only one particle set to consider)
+                pair_struct_DOUBLE pair;
+                set_pair_struct_DOUBLE(&pair, (weight_struct_DOUBLE *) &(extra->weights0), (weight_struct_DOUBLE *) &(extra->weights0), &(extra->pair_weight));
                 weight_func_t_DOUBLE weight_func = get_weight_func_by_method_DOUBLE(extra->weight_method);
-                pair_struct_DOUBLE pair = {.num_weights = extra->weights0.num_weights,
-                                           .num_integer_weights = extra->weights0.num_integer_weights,
-                                           .dx.d=0., .dy.d=0., .dz.d=0.,  // always 0 separation
-                                           .parx.d=0., .pary.d=0., .parz.d=0.};
                 for(int64_t j = 0; j < ND1; j++){
                     for(int w = 0; w < pair.num_weights; w++){
                         pair.weights0[w].d = ((DOUBLE *) extra->weights0.weights[w])[j];

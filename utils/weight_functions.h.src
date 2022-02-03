@@ -64,14 +64,17 @@ typedef struct
 
 
 // set pair_struct_DOUBLE from two weight_struct_DOUBLE
-static inline int set_pair_struct_DOUBLE(pair_struct_DOUBLE *pair, const weight_struct_DOUBLE *local_w0, const weight_struct_DOUBLE *local_w1, const pair_weight_struct *pair_w) {
-    pair->num_weights = local_w0->num_weights;
-    pair->num_integer_weights = local_w1->num_integer_weights;
+static inline int set_pair_struct_DOUBLE(pair_struct_DOUBLE *pair, const weight_struct_DOUBLE *weights0, const weight_struct_DOUBLE *weights1, const pair_weight_struct *pair_w) {
+    pair->num_weights = weights0->num_weights;
+    pair->num_integer_weights = weights1->num_integer_weights;
     pair->pair_weight.weight = pair_w->weight;
     pair->pair_weight.sep = pair_w->sep;
     pair->pair_weight.num = pair_w->num;
     pair->noffset = pair_w->noffset;
     pair->default_value = (DOUBLE) pair_w->default_value;
+    pair->dx.d = 0.; pair->dy.d = 0.; pair->dz.d = 0.;
+    pair->parx.d = 0.; pair->pary.d = 0.; pair->parz.d = 0.;
+    pair->costheta.d = 1.;
     return EXIT_SUCCESS;
 }
 
@@ -127,20 +130,20 @@ static inline DOUBLE inverse_bitwise_DOUBLE(pair_struct_DOUBLE *pair){
         nbits += POPCOUNT(*((LONG *) &(pair->weights0[w].d)) & *((LONG *) &(pair->weights1[w].d)));
     }
     DOUBLE weight = (nbits == 0) ? pair->default_value : 1./nbits;
-    for (int w=pair->num_integer_weights;w<pair->num_weights;w++) {
+    for (int w=pair->num_integer_weights; w<pair->num_weights; w++) {
         weight *= pair->weights0[w].d*pair->weights1[w].d;
     }
     int num = pair->pair_weight.num;
     if (num) {
         DOUBLE costheta = pair->costheta.d;
         DOUBLE *pair_sep = pair->pair_weight.sep;
-        if (costheta >= pair_sep[num-1] || (costheta < pair_sep[0])) {
+        if (costheta > pair_sep[num-1] || (costheta <= pair_sep[0])) {
             return weight;
         }
         else {
             DOUBLE *pair_weight = pair->pair_weight.weight;
-            for (int kbin=num-2;kbin>=0;kbin--) {
-                if(costheta >= pair_sep[kbin]) {
+            for (int kbin=0;kbin<num-1;kbin++) {
+                if(costheta <= pair_sep[kbin+1]) { // ]min, max], as costheta instead of theta
                     DOUBLE frac = (costheta - pair_sep[kbin])/(pair_sep[kbin+1] - pair_sep[kbin]);
                     weight *= (1 - frac) * pair_weight[kbin] + frac * pair_weight[kbin+1];
                     break;
@@ -168,20 +171,19 @@ static inline AVX512_FLOATS avx512_inverse_bitwise_DOUBLE(pair_struct_DOUBLE *pa
             nbits += POPCOUNT(*((LONG *) &(pair->weights0[w].da512[jj])) & *((LONG *) &(pair->weights1[w].da512[jj])));
         }
         DOUBLE weight = (nbits == 0) ? pair->default_value : 1./nbits;
-        for (int w=pair->num_integer_weights;w<pair->num_weights;w++) {
+        for (int w=pair->num_integer_weights; w<pair->num_weights; w++) {
             weight *= pair->weights0[w].da512[jj]*pair->weights1[w].da512[jj];
         }
         int num = pair->pair_weight.num;
         if (num) {
             DOUBLE costheta = pair->costheta.da512[jj];
             DOUBLE *pair_sep = pair->pair_weight.sep;
-            if (costheta >= pair_sep[num-1] || (costheta < pair_sep[0])) {
+            if (costheta > pair_sep[num-1] || (costheta <= pair_sep[0])) {
                 ;
             }
             else {
-                DOUBLE *pair_weight = pair->pair_weight.weight;
-                for (int kbin=num-2;kbin>=0;kbin--) {
-                    if(costheta >= pair_sep[kbin]) {
+                for (int kbin=0;kbin<num-1;kbin++) {
+                    if(costheta <= pair_sep[kbin+1]) { // ]min, max], as costheta instead of theta
                         DOUBLE frac = (costheta - pair_sep[kbin])/(pair_sep[kbin+1] - pair_sep[kbin]);
                         weight *= (1 - frac) * pair_weight[kbin] + frac * pair_weight[kbin+1];
                         break;
@@ -210,20 +212,20 @@ static inline AVX_FLOATS avx_inverse_bitwise_DOUBLE(pair_struct_DOUBLE *pair){
             nbits += POPCOUNT(*((LONG *) &(pair->weights0[w].da[jj])) & *((LONG *) &(pair->weights1[w].da[jj])));
         }
         DOUBLE weight = (nbits == 0) ? pair->default_value : 1./nbits;
-        for (int w=pair->num_integer_weights;w<pair->num_weights;w++) {
+        for (int w=pair->num_integer_weights; w<pair->num_weights; w++) {
             weight *= pair->weights0[w].da[jj]*pair->weights1[w].da[jj];
         }
         int num = pair->pair_weight.num;
         if (num) {
             DOUBLE costheta = pair->costheta.da[jj];
             DOUBLE *pair_sep = pair->pair_weight.sep;
-            if (costheta >= pair_sep[num-1] || (costheta < pair_sep[0])) {
+            if (costheta > pair_sep[num-1] || (costheta <= pair_sep[0])) {
                 ;
             }
             else {
                 DOUBLE *pair_weight = pair->pair_weight.weight;
-                for (int kbin=num-2;kbin>=0;kbin--) {
-                    if(costheta >= pair_sep[kbin]) {
+                for (int kbin=0;kbin<num-1;kbin++) {
+                    if(costheta <= pair_sep[kbin+1]) { // ]min, max], as costheta instead of theta
                         DOUBLE frac = (costheta - pair_sep[kbin])/(pair_sep[kbin+1] - pair_sep[kbin]);
                         weight *= (1 - frac) * pair_weight[kbin] + frac * pair_weight[kbin+1];
                         break;
@@ -254,20 +256,20 @@ static inline SSE_FLOATS sse_inverse_bitwise_DOUBLE(pair_struct_DOUBLE *pair){
             nbits += POPCOUNT(*((LONG *) &(pair->weights0[w].ds[jj])) & *((LONG *) &(pair->weights1[w].ds[jj])));
         }
         DOUBLE weight = (nbits == 0) ? pair->default_value : 1./nbits;
-        for (int w=pair->num_integer_weights;w<pair->num_weights;w++) {
+        for (int w=pair->num_integer_weights; w<pair->num_weights; w++) {
             weight *= pair->weights0[w].ds[jj]*pair->weights1[w].ds[jj];
         }
         int num = pair->pair_weight.num;
         if (num) {
             DOUBLE costheta = pair->costheta.ds[jj];
             DOUBLE *pair_sep = pair->pair_weight.sep;
-            if (costheta >= pair_sep[num-1] || (costheta < pair_sep[0])) {
+            if (costheta > pair_sep[num-1] || (costheta <= pair_sep[0])) {
                 ;
             }
             else {
                 DOUBLE *pair_weight = pair->pair_weight.weight;
-                for (int kbin=num-2;kbin>=0;kbin--) {
-                    if(costheta >= pair_sep[kbin]) {
+                for (int kbin=0;kbin<num-1;kbin++) {
+                    if(costheta <= pair_sep[kbin+1]) { // ]min, max], as costheta instead of theta
                         DOUBLE frac = (costheta - pair_sep[kbin])/(pair_sep[kbin+1] - pair_sep[kbin]);
                         weight *= (1 - frac) * pair_weight[kbin] + frac * pair_weight[kbin+1];
                         break;

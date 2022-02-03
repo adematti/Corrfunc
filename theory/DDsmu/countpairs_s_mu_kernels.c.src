@@ -232,6 +232,8 @@ static inline int countpairs_s_mu_avx512_intrinsics_DOUBLE(const int64_t N0, DOU
             const AVX512_FLOATS m_sqr_smax = m_supp_sqr[nsbin-1];
             const AVX512_FLOATS m_sqr_smin = m_supp_sqr[0];
             const AVX512_FLOATS m_sqr_mumax = AVX512_SET_FLOAT(sqr_mumax);
+            const AVX512_FLOATS m_zero = AVX_SETZERO_FLOAT();
+            const AVX512_FLOATS m_one = AVX_SET_FLOAT((DOUBLE) 1);
 
             const AVX512_FLOATS m_xdiff = AVX512_SUBTRACT_FLOATS(m_x1, m_xpos);  //(x1[j:j+NVEC-1] - x0)
             const AVX512_FLOATS m_ydiff = AVX512_SUBTRACT_FLOATS(m_y1, m_ypos);  //(y1[j:j+NVEC-1] - y0)
@@ -239,7 +241,7 @@ static inline int countpairs_s_mu_avx512_intrinsics_DOUBLE(const int64_t N0, DOU
 
             const AVX512_FLOATS m_sqr_zdiff = AVX512_SQUARE_FLOAT(m_zdiff);  //(z[j] - z0)^2
             const AVX512_FLOATS m_sqr_z_p_sqr_y = AVX512_FMA_ADD_FLOATS(m_ydiff, m_ydiff, m_sqr_zdiff);  //dy*dy + dz^2
-            const AVX512_FLOATS s2  = AVX512_FMA_ADD_FLOATS(m_xdiff, m_xdiff, m_sqr_z_p_sqr_y);//s^2 = dx*dx + (dz^2 + dy^2)
+            const AVX512_FLOATS s2 = AVX512_FMA_ADD_FLOATS(m_xdiff, m_xdiff, m_sqr_z_p_sqr_y);//s^2 = dx*dx + (dz^2 + dy^2)
 
             const AVX512_FLOATS max_sqr_dz = AVX512_MULTIPLY_FLOATS(s2, m_sqr_mumax);
 
@@ -253,7 +255,7 @@ static inline int countpairs_s_mu_avx512_intrinsics_DOUBLE(const int64_t N0, DOU
                 j=N1;//but do not break yet, there might be valid pairs in this chunk
             }
 
-            const AVX512_MASK m_mu_mask = AVX512_MASK_COMPARE_FLOATS(m_mask_left, m_sqr_zdiff, max_sqr_dz, _CMP_LT_OQ);
+            const AVX512_MASK m_mu_mask = AVX512_MASK_COMPARE_FLOATS(m_sqr_zdiff, m_mask_left, max_sqr_dz, _CMP_GE_OQ);
             const AVX512_MASK m_smax_mask = AVX512_MASK_COMPARE_FLOATS(m_mask_left, s2, m_sqr_smax, _CMP_LT_OQ);//check for s2 < sqr_smax
             const AVX512_MASK m_smin_mask = AVX512_MASK_COMPARE_FLOATS(m_mask_left, s2, m_sqr_smin, _CMP_GE_OQ);//check for s2 >= sqr_smin
             const AVX512_MASK m_s2_mask = AVX512_MASK_BITWISE_AND(m_smax_mask, m_smin_mask);
@@ -270,7 +272,9 @@ static inline int countpairs_s_mu_avx512_intrinsics_DOUBLE(const int64_t N0, DOU
 
             /*m_mu := sqrt(dz^2/s2) (with masked elements set to mu_max */
             AVX512_FLOATS m_sqr_mu = AVX512_SETZERO_FLOAT();
-            CHECK_AND_FAST_DIVIDE_AVX512(m_sqr_mu, m_sqr_zdiff, s2, m_mask_left, fast_divide_and_NR_steps);
+            const AVX512_FLOATS m_mask_szero = AVX512_COMPARE_FLOATS(m_zero, s2, _CMP_LT_OQ);
+            const AVX512_FLOATS m_sqr_norm_s = AVX512_BLEND_FLOATS_WITH_MASK(m_one, s2, m_mask_szero); // to avoid division by 0
+            CHECK_AND_FAST_DIVIDE_AVX512(m_sqr_mu, m_sqr_zdiff, m_sqr_norm_s, m_mask_left, fast_divide_and_NR_steps);
 
             const AVX512_FLOATS m_mu = AVX512_MASKZ_SQRT_FLOAT(m_mask_left, m_sqr_mu);
             if(need_savg || bin_type == BIN_LIN) {
@@ -376,7 +380,6 @@ static inline int countpairs_s_mu_avx_intrinsics_DOUBLE(const int64_t N0, DOUBLE
     int32_t need_costheta = need_weightavg;
     const DOUBLE sqr_smin=smin*smin, sqr_smax=smax*smax;
     DOUBLE inv_sstep=0., smin_invstep=0.;
-    const AVX_FLOATS m_zero = AVX_SETZERO_FLOAT();
     AVX_FLOATS m_inv_sstep = AVX_SETZERO_FLOAT();
     AVX_FLOATS m_smin_invstep = AVX_SETZERO_FLOAT();
     if (bin_type == BIN_LIN) {
@@ -559,11 +562,12 @@ static inline int countpairs_s_mu_avx_intrinsics_DOUBLE(const int64_t N0, DOUBLE
             const AVX_FLOATS m_max_dz = AVX_SET_FLOAT(max_dz);
             const AVX_FLOATS m_sqr_smax = m_supp_sqr[nsbin-1];
             const AVX_FLOATS m_sqr_smin = m_supp_sqr[0];
-            const AVX_FLOATS m_inv_dmu    = AVX_SET_FLOAT(inv_dmu);
+            const AVX_FLOATS m_inv_dmu = AVX_SET_FLOAT(inv_dmu);
             const AVX_FLOATS m_sqr_mumax = AVX_SET_FLOAT(sqr_mumax);
 
-            const AVX_FLOATS m_nmu_bins     = AVX_SET_FLOAT((DOUBLE) nmu_bins);
-            const AVX_FLOATS m_one    = AVX_SET_FLOAT((DOUBLE) 1);
+            const AVX_FLOATS m_nmu_bins = AVX_SET_FLOAT((DOUBLE) nmu_bins);
+            const AVX_FLOATS m_zero = AVX_SETZERO_FLOAT();
+            const AVX_FLOATS m_one = AVX_SET_FLOAT((DOUBLE) 1);
 
             const AVX_FLOATS m_xdiff = AVX_SUBTRACT_FLOATS(m_x1, m_xpos);  //(x[j] - x0)
             const AVX_FLOATS m_ydiff = AVX_SUBTRACT_FLOATS(m_y1, m_ypos);  //(y[j] - y0)
@@ -573,7 +577,7 @@ static inline int countpairs_s_mu_avx_intrinsics_DOUBLE(const int64_t N0, DOUBLE
             const AVX_FLOATS m_sqr_ydiff = AVX_SQUARE_FLOAT(m_ydiff);  //(y0 - y[j])^2
             const AVX_FLOATS m_sqr_zdiff = AVX_SQUARE_FLOAT(m_zdiff);  //(z0 - z[j])^2
 
-            AVX_FLOATS s2  = AVX_ADD_FLOATS(m_sqr_zdiff, AVX_ADD_FLOATS(m_sqr_xdiff, m_sqr_ydiff));//s^2 = dz^2 + dx^2 + dy^2
+            AVX_FLOATS s2 = AVX_ADD_FLOATS(m_sqr_zdiff, AVX_ADD_FLOATS(m_sqr_xdiff, m_sqr_ydiff));//s^2 = dz^2 + dx^2 + dy^2
 
             AVX_FLOATS m_mask_left;
             AVX_FLOATS max_sqr_dz = AVX_MULTIPLY_FLOATS(s2, m_sqr_mumax);
@@ -590,7 +594,7 @@ static inline int countpairs_s_mu_avx_intrinsics_DOUBLE(const int64_t N0, DOUBLE
                     j=N1;//but do not break yet, this chunk might contain valid pairs
                 }
 
-                const AVX_FLOATS m_mu_mask = AVX_COMPARE_FLOATS(m_sqr_zdiff, max_sqr_dz, _CMP_LT_OQ);
+                const AVX_FLOATS m_mu_mask = AVX_COMPARE_FLOATS(max_sqr_dz, m_sqr_zdiff, _CMP_GE_OQ);
                 const AVX_FLOATS m_smax_mask = AVX_COMPARE_FLOATS(s2, m_sqr_smax, _CMP_LT_OQ);//check for s2 < sqr_smax
                 const AVX_FLOATS m_smin_mask = AVX_COMPARE_FLOATS(s2, m_sqr_smin, _CMP_GE_OQ);//check for s2 >= sqr_smin
                 const AVX_FLOATS m_s2_mask = AVX_BITWISE_AND(m_smax_mask,m_smin_mask);
@@ -610,6 +614,8 @@ static inline int countpairs_s_mu_avx_intrinsics_DOUBLE(const int64_t N0, DOUBLE
             //There is some s2 that satisfies sqr_smin <= s2 < sqr_smax && mu_min <= |dz| < mu_max
             s2 = AVX_BLEND_FLOATS_WITH_MASK(m_sqr_smax, s2, m_mask_left);
             /*m_sqr_mu := dz^2/s^2 (with masked elements set to mu_max */
+            const AVX_FLOATS m_mask_szero = AVX_COMPARE_FLOATS(m_zero, s2, _CMP_LT_OQ);
+            const AVX_FLOATS m_sqr_norm_s = AVX_BLEND_FLOATS_WITH_MASK(m_one, s2, m_mask_szero); // to avoid division by 0
             AVX_FLOATS m_sqr_mu = AVX_SETZERO_FLOAT();
 
             /* Check if fast_divide is enabled and either use the normal divide or
@@ -618,7 +624,7 @@ static inline int countpairs_s_mu_avx_intrinsics_DOUBLE(const int64_t N0, DOUBLE
 
                macro is defined in `avx_calls.h`
             */
-            CHECK_AND_FAST_DIVIDE_AVX(m_sqr_mu, m_sqr_zdiff, s2, fast_divide_and_NR_steps);
+            CHECK_AND_FAST_DIVIDE_AVX(m_sqr_mu, m_sqr_zdiff, m_sqr_norm_s, fast_divide_and_NR_steps);
 
             const AVX_FLOATS m_mu = AVX_SQRT_FLOAT(AVX_BLEND_FLOATS_WITH_MASK(m_sqr_mumax, m_sqr_mu, m_mask_left));
 
@@ -697,9 +703,8 @@ static inline int countpairs_s_mu_avx_intrinsics_DOUBLE(const int64_t N0, DOUBLE
             const DOUBLE s2 =  sqr_dx_dy + sqr_dz;
 
             if(s2 >= sqr_smax || s2 < sqr_smin) continue;
-            if(sqr_dz >= s2 * sqr_mumax) continue;
-
-            const DOUBLE mu = SQRT(sqr_dz/s2);
+            if(sqr_dz > s2 * sqr_mumax) continue; // gt in case s2 (hence sqr_dz) is 0.
+            const DOUBLE mu = s2 > 0. ? SQRT(sqr_dz/s2) : 0.;
 
             DOUBLE s = ZERO, pairweight = ZERO;
             if(need_savg || bin_type == BIN_LIN) {
@@ -972,9 +977,10 @@ static inline int countpairs_s_mu_sse_intrinsics_DOUBLE(const int64_t N0, DOUBLE
             const SSE_FLOATS m_sqr_smax = m_supp_sqr[nsbin-1];
             const SSE_FLOATS m_sqr_smin = m_supp_sqr[0];
             const SSE_FLOATS m_sqr_mumax = SSE_SET_FLOAT(sqr_mumax);
-            const SSE_FLOATS m_inv_dmu   = SSE_SET_FLOAT(inv_dmu);
-            const SSE_FLOATS m_nmu_bins  = SSE_SET_FLOAT((DOUBLE) nmu_bins);
-            const SSE_FLOATS m_one       = SSE_SET_FLOAT((DOUBLE) 1);
+            const SSE_FLOATS m_inv_dmu = SSE_SET_FLOAT(inv_dmu);
+            const SSE_FLOATS m_nmu_bins = SSE_SET_FLOAT((DOUBLE) nmu_bins);
+            const SSE_FLOATS m_zero = SSE_SETZERO_FLOAT();
+            const SSE_FLOATS m_one = SSE_SET_FLOAT((DOUBLE) 1);
 
             const SSE_FLOATS m_xdiff = SSE_SUBTRACT_FLOATS(m_x1, m_xpos);  //(x[j] - x0)
             const SSE_FLOATS m_ydiff = SSE_SUBTRACT_FLOATS(m_y1, m_ypos);  //(y[j] - y0)
@@ -984,7 +990,7 @@ static inline int countpairs_s_mu_sse_intrinsics_DOUBLE(const int64_t N0, DOUBLE
             const SSE_FLOATS m_sqr_ydiff = SSE_SQUARE_FLOAT(m_ydiff);
             const SSE_FLOATS m_sqr_zdiff = SSE_SQUARE_FLOAT(m_zdiff);
 
-            SSE_FLOATS s2  = SSE_ADD_FLOATS(m_sqr_zdiff, SSE_ADD_FLOATS(m_sqr_xdiff, m_sqr_ydiff));//s^2 = dx^2 + dy^2 + dz^2
+            SSE_FLOATS s2 = SSE_ADD_FLOATS(m_sqr_zdiff, SSE_ADD_FLOATS(m_sqr_xdiff, m_sqr_ydiff));//s^2 = dx^2 + dy^2 + dz^2
 
             SSE_FLOATS m_mask_left;
             SSE_FLOATS max_sqr_dz = SSE_MULTIPLY_FLOATS(s2, m_sqr_mumax);
@@ -996,15 +1002,15 @@ static inline int countpairs_s_mu_sse_intrinsics_DOUBLE(const int64_t N0, DOUBLE
                 //that implies the zdiff values are also monotonically increasing
                 //Therefore, if any of the zdiff values are >= max_dz, then
                 //no future iteration in j can produce a zdiff value less than pimax.
-                SSE_FLOATS m_mask_geq_pimax = SSE_COMPARE_FLOATS_GE(m_zdiff,m_max_dz);
+                SSE_FLOATS m_mask_geq_pimax = SSE_COMPARE_FLOATS_GE(m_zdiff, m_max_dz);
                 if(SSE_TEST_COMPARISON(m_mask_geq_pimax) > 0) {
                     j=N1;//but do not break yet, this chunk might contain valid pairs
                 }
 
-                const SSE_FLOATS m_mu_mask = SSE_COMPARE_FLOATS_LT(m_sqr_zdiff, max_sqr_dz);
+                const SSE_FLOATS m_mu_mask = SSE_COMPARE_FLOATS_GE(max_sqr_dz, m_sqr_zdiff);
                 const SSE_FLOATS m_smax_mask = SSE_COMPARE_FLOATS_LT(s2, m_sqr_smax);
                 const SSE_FLOATS m_smin_mask = SSE_COMPARE_FLOATS_GE(s2, m_sqr_smin);
-                const SSE_FLOATS m_s2_mask = SSE_BITWISE_AND(m_smax_mask,m_smin_mask);
+                const SSE_FLOATS m_s2_mask = SSE_BITWISE_AND(m_smax_mask, m_smin_mask);
 
                 //Create a combined mask by bitwise and of m1 and m_mask_left.
                 //This gives us the mask for all sqr_smin <= s2 < sqr_smax
@@ -1020,7 +1026,9 @@ static inline int countpairs_s_mu_sse_intrinsics_DOUBLE(const int64_t N0, DOUBLE
 
             //There is some s2 that satisfies sqr_smin <= s2 < sqr_smax && mu_min <= |dz| < mu_max
             s2 = SSE_BLEND_FLOATS_WITH_MASK(m_sqr_smax, s2, m_mask_left);
-            const SSE_FLOATS m_mu = SSE_SQRT_FLOAT(SSE_BLEND_FLOATS_WITH_MASK(m_sqr_mumax, SSE_DIVIDE_FLOATS(m_sqr_zdiff, s2), m_mask_left));
+            const SSE_FLOATS m_mask_szero = SSE_COMPARE_FLOATS_LT(m_zero, s2);
+            const SSE_FLOATS m_sqr_norm_s = SSE_BLEND_FLOATS_WITH_MASK(m_one, s2, m_mask_szero); // to avoid division by 0
+            const SSE_FLOATS m_mu = SSE_SQRT_FLOAT(SSE_BLEND_FLOATS_WITH_MASK(m_sqr_mumax, SSE_DIVIDE_FLOATS(m_sqr_zdiff, m_sqr_norm_s), m_mask_left));
 
             if(need_savg || bin_type == BIN_LIN) {
                 union_mDperp.m_Dperp = SSE_SQRT_FLOAT(s2);
@@ -1048,7 +1056,7 @@ static inline int countpairs_s_mu_sse_intrinsics_DOUBLE(const int64_t N0, DOUBLE
                     //XOR with 0xFFFF... gives the bins that are smaller than m_supp_sqr[kbin] (and is faster than cmp_p(s/d) in theory)
                     //m_mask_left = SSE_XOR_FLOATS(m_mask_low, m_all_ones);
                     const int test = SSE_TEST_COMPARISON(m_mask_left);
-                    if(test==0) {
+                    if(test == 0) {
                         break;
                     }
                 }
@@ -1094,9 +1102,10 @@ static inline int countpairs_s_mu_sse_intrinsics_DOUBLE(const int64_t N0, DOUBLE
             const DOUBLE sqr_dx_dy = dx*dx + dy*dy;
             const DOUBLE sqr_dz = dz*dz;
             const DOUBLE s2 =  sqr_dx_dy + sqr_dz;
+
             if(s2 >= sqr_smax || s2 < sqr_smin) continue;
-            if(sqr_dz >= s2 * sqr_mumax) continue;
-            const DOUBLE mu = SQRT(sqr_dz/s2);
+            if(sqr_dz > s2 * sqr_mumax) continue;
+            const DOUBLE mu = s2 > 0. ? SQRT(sqr_dz/s2) : 0.;
 
             DOUBLE s = ZERO, pairweight = ZERO;
             if(need_weightavg){
@@ -1336,12 +1345,12 @@ static inline int countpairs_s_mu_fallback_DOUBLE(const int64_t N0, DOUBLE *x0, 
 
             const DOUBLE sqr_dx_dy = dx*dx + dy*dy;
             const DOUBLE sqr_dz = dz*dz;
-            const DOUBLE s2 =  sqr_dx_dy + sqr_dz;
+            const DOUBLE s2 = sqr_dx_dy + sqr_dz;
 
             if(s2 >= sqr_smax || s2 < sqr_smin) continue;
-            if(sqr_dz >= s2 * sqr_mu_max) continue;
+            if(sqr_dz > s2 * sqr_mu_max) continue; // gt in case s2 (hence sqr_dz) is 0.
+            const DOUBLE mu = s2 > 0. ? SQRT(sqr_dz/s2) : 0.;
 
-            const DOUBLE mu = SQRT(sqr_dz/s2);
             DOUBLE s = ZERO, pairweight = ZERO;
             if(need_savg || bin_type == BIN_LIN) {
                 s = SQRT(s2);
@@ -1355,7 +1364,7 @@ static inline int countpairs_s_mu_fallback_DOUBLE(const int64_t N0, DOUBLE *x0, 
             }
 
             int mu_bin = (int) (mu*inv_dmu);
-            mu_bin = mu_bin > nmu_bins ? nmu_bins:mu_bin;
+            mu_bin = mu_bin > nmu_bins ? nmu_bins : mu_bin;
 
             int kbin = 0;
             if (bin_type == BIN_LIN) {

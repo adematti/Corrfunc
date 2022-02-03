@@ -513,7 +513,7 @@ int countpairs_theta_mocks_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1,
         }
     }
 
-    if(autocorr==0) {
+    if(autocorr == 0) {
         int status = check_ra_dec_DOUBLE(ND2, ra2, dec2);
         if(status != EXIT_SUCCESS) {
             return status;
@@ -534,7 +534,7 @@ int countpairs_theta_mocks_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1,
     int nthetabin = bins->nedges;
     double thetamin=bins->edges[0], thetamax=bins->edges[bins->nedges-1];
     if( ! (thetamin >= 0.0 && thetamax > 0.0 && thetamin < thetamax && thetamax <= 180.0 && nthetabin >= 1) ) {
-        fprintf(stderr,"Error: Could not setup with theta bins correctly. (thetamin = %lf, thetamax = %lf, with nbins = %d). Expected non-zero rmin/rmax with thetamax > "
+        fprintf(stderr,"Error: Could not setup with theta bins correctly. (thetamin = %lf, thetamax = %lf, with nbins = %d). Expected positive rmin/rmax with thetamax > "
                 "thetamin and nbins >=1 \n",thetamin, thetamax, nthetabin);
         return EXIT_FAILURE;
     }
@@ -545,7 +545,7 @@ int countpairs_theta_mocks_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1,
     if((options->link_in_ra == 0) &&
        (options->bin_refine_factors[1] < numthreads) &&
        (get_bin_refine_scheme(options) == BINNING_DFL)) {
-        options->bin_refine_factors[1]=numthreads;
+        options->bin_refine_factors[1] = numthreads;
     }
 #endif
 
@@ -1148,11 +1148,9 @@ int countpairs_theta_mocks_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1,
             // The self-pairs have non-zero weight, though.  So, fix that here.
             if(need_weightavg){
                 // Keep in mind this is an autocorrelation (i.e. only one particle set to consider)
+                pair_struct_DOUBLE pair;
+                set_pair_struct_DOUBLE(&pair, (weight_struct_DOUBLE *) &(extra->weights0), (weight_struct_DOUBLE *) &(extra->weights0), &(extra->pair_weight));
                 weight_func_t_DOUBLE weight_func = get_weight_func_by_method_DOUBLE(extra->weight_method);
-                pair_struct_DOUBLE pair = {.num_weights = extra->weights0.num_weights,
-                                           .num_integer_weights = extra->weights0.num_integer_weights,
-                                           .dx.d=0., .dy.d=0., .dz.d=0.,  // always 0 separation
-                                           .parx.d=0., .pary.d=0., .parz.d=0.};
                 for(int64_t j = 0; j < ND1; j++){
                     for(int w = 0; w < pair.num_weights; w++){
                         pair.weights0[w].d = ((DOUBLE *) extra->weights0.weights[w])[j];
