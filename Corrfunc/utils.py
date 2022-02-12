@@ -13,6 +13,9 @@ from os.path import exists as file_exists
 import wurlitzer
 from contextlib import contextmanager
 
+import numpy as np
+
+
 __all__ = ['convert_3d_counts_to_cf', 'convert_rp_pi_counts_to_wp',
            'translate_isa_string_to_enum', 'translate_bin_type_string_to_enum',
             'return_file_with_rbins', 'fix_ra_dec', 'fix_cz', 'compute_nbins', 'gridlink_sphere', ]
@@ -321,63 +324,46 @@ def convert_rp_pi_counts_to_wp(ND1, ND2, NR1, NR2,
     return wp
 
 
-def return_file_with_rbins(rbins):
+def get_edges(binfile):
     """
-    Helper function to ensure that the ``binfile`` required by the Corrfunc
-    extensions is a actually a string.
-
-    Checks if the input is a string and file; return if True. If not, and
-    the input is an array, then a temporary file is created and the contents
-    of rbins is written out.
+    Helper function to return edges corresponding to ``binfile``.
 
     Parameters
     -----------
-    rbins: string or array-like
-       Expected to be a string or an array containing the bins
+    binfile : string or array-like
+       Expected to be a path to a bin file (two columns, lower and upper) or an array containing the bins.
 
     Returns
-    ---------
-    binfile: string, filename
-       If the input ``rbins`` was a valid filename, then returns the same
-       string. If ``rbins`` was an array, then this function creates a
-       temporary file with the contents of the ``rbins`` arrays. This
-       temporary filename is returned
-
+    -------
+    edges : array
     """
-
-    is_string = False
-    delete_after_use = False
-    try:
-        if isinstance(rbins, basestring):
-            is_string = True
-    except NameError:
-        if isinstance(rbins, str):
-            is_string = True
-
-    if is_string:
-        if file_exists(rbins):
-            delete_after_use = False
-            return rbins, delete_after_use
+    if isinstance(binfile, str):
+        if file_exists(binfile):
+            # The equivalent of read_binfile() in io.c
+            with open(binfile, 'r') as file:
+                binfile = []
+                for iline, line in enumerate(file):
+                    lowhi = line.split()
+                    if len(lowhi) == 2:
+                        low, hi = lowhi
+                        if iline == 0:
+                            binfile.append(low)
+                        binfile.append(hi)
+                    else:
+                        break
         else:
             msg = "Could not find file = `{0}` containing the bins"\
-                  .format(rbins)
+                    .format(binfile)
             raise IOError(msg)
 
     # For a valid bin specifier, there must be at least 1 bin.
-    if len(rbins) >= 1:
-        import tempfile
-        rbins = sorted(rbins)
-        with tempfile.NamedTemporaryFile(delete=False, mode='w') as f:
-            for i in range(len(rbins) - 1):
-                f.write("{0} {1}\n".format(rbins[i], rbins[i + 1]))
-
-            tmpfilename = f.name
-
-        delete_after_use = True
-        return tmpfilename, delete_after_use
+    if len(binfile) >= 1:
+        binfile = np.array(binfile, dtype='f8')
+        binfile.sort()
+        return binfile
 
     msg = "Input `binfile` was not a valid array (>= 1 element)."\
-          "Num elements = {0}".format(len(rbins))
+          "Num elements = {0}".format(len(binfile))
     raise TypeError(msg)
 
 
@@ -548,11 +534,11 @@ def translate_bin_type_string_to_enum(bin_type):
     except NameError:
         if not isinstance(bin_type, str):
             raise TypeError(msg)
-    valid_bin_types = ['AUTO', 'CUSTOM', 'LIN']
+    valid_bin_type = ['AUTO', 'CUSTOM', 'LIN']
     bin_type_upper = bin_type.upper()
-    if bin_type_upper not in valid_bin_types:
+    if bin_type_upper not in valid_bin_type:
         msg = "Desired bin type = {0} is not in the list of valid "\
-              "bin types = {1}".format(bin_type, valid_bin_types)
+              "bin types = {1}".format(bin_type, valid_bin_type)
         raise ValueError(msg)
 
     enums = {'AUTO': 0,
@@ -1034,26 +1020,25 @@ def process_weights(weights1, weights2, X1, X2, weight_type, autocorr):
 
     # Takes a scalar, 1d, or 2d weights array
     # and returns a 2d array of shape (nweights,npart)
-    def prep(w,x):
-        if w is None:
-            return w
+    def prep(weights, x):
+        if weights is None:
+            return weights
 
-        # not None, so probably float or numpy array
-        if isinstance(w, float):
-            # Use the particle dtype if a Python float was given
-            w = np.array(w, dtype=x.dtype)
+        if not isinstance(weights, (tuple,list)):
+            if isinstance(weights, np.ndarray) and weights.ndim == 2:
+                weights = list(weights)
+            else:
+                weights = [weights]
 
-        w = np.atleast_1d(w)  # could have been numpy scalar
+        toret = []
+        for w in weights:
+            w = np.asarray(w)
+            w.shape = (-1,)
+            if w.shape[-1] == 1:
+                w = np.tile(w, len(x))
+            toret.append(w)
 
-        # If only one particle's weight(s) were given,
-        # assume it applies to all particles
-        if w.shape[-1] == 1:
-            w = np.tile(w, len(x))
-
-        # now of shape (nweights,nparticles)
-        w = np.atleast_2d(w)
-
-        return w
+        return toret
 
     weights1 = prep(weights1, X1)
 
@@ -1067,10 +1052,10 @@ def process_weights(weights1, weights2, X1, X2, weight_type, autocorr):
                                  "both weight arrays.")
 
         if weights1 is None and weights2 is not None:
-            weights1 = np.ones((len(weights2),len(X1)), dtype=X1.dtype)
+            weights1 = [np.ones_like(X1) for w in weights2]
 
         if weights2 is None and weights1 is not None:
-            weights2 = np.ones((len(weights1),len(X2)), dtype=X2.dtype)
+            weights2 = [np.ones_like(X2) for w in weights1]
 
     return weights1, weights2
 
@@ -1078,12 +1063,13 @@ def process_weights(weights1, weights2, X1, X2, weight_type, autocorr):
 @contextmanager
 def sys_pipes():
     '''
-    We can use the Wurlitzer package to redirect stdout and stderr
-    from the command line into a Jupyter notebook.  But if we're not
-    in a notebook, this isn't safe because we can't redirect stdout
-    to itself.  This function is a thin wrapper that checks if the
-    stdout/err streams are TTYs and enables output redirection
-    based on that.
+    In a Jupyter notebook, Python's ``sys.stdout`` and ``sys.stderr`` are redirected
+    so output ends up in cells.  But C extensions don't know about that!  Wurlitzer
+    uses os.dup2 to redirect fds 1 & 2 to the new location and restore them on return,
+    but will cause the output to hang if they were not already redirected.  It seems
+    we can compare Python's ``sys.stdout`` to the saved ``sys.__stdout__`` to tell
+    if redirection occurred.  We will also check if the output is a TTY as a safety
+    net, even though it is probably a subset of the preceeding check.
 
     Basic usage is:
 
@@ -1091,11 +1077,19 @@ def sys_pipes():
     ...    call_some_c_function()
 
     See the Wurlitzer package for usage of `wurlitzer.pipes()`;
-    see also https://github.com/manodeep/Corrfunc/issues/157.
+    see also https://github.com/manodeep/Corrfunc/issues/157,
+    https://github.com/manodeep/Corrfunc/issues/269.
     '''
-
-    kwargs = {'stdout':None if sys.stdout.isatty() else sys.stdout,
-              'stderr':None if sys.stderr.isatty() else sys.stderr }
+    
+    kwargs = {}
+    if sys.stdout.isatty() or (sys.stdout is sys.__stdout__):
+        kwargs['stdout'] = None
+    else:
+        kwargs['stdout'] = sys.stdout
+    if sys.stderr.isatty() or (sys.stderr is sys.__stderr__):
+        kwargs['stderr'] = None
+    else:
+        kwargs['stderr'] = sys.stderr
 
     # Redirection might break for any number of reasons, like
     # stdout/err already being closed/redirected.  We probably

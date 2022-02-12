@@ -17,6 +17,7 @@
 #include "ftread.h"
 #include "utils.h"
 #include "macros.h"
+#include "defs.h"
 
 #ifndef MEMORY_INCREASE_FAC
 #define MEMORY_INCREASE_FAC 1.1
@@ -25,6 +26,82 @@
 #ifndef MAXLEN
 #define MAXLEN 500
 #endif
+
+
+int test_all_files_present(const int nfiles, ...)
+{
+    /* sets i'th bit for i'th missing file
+       return value is 0 *iff* all files are present
+       and readable.
+    */
+
+    int absent=0;
+    va_list filenames;
+    va_start(filenames, nfiles);
+    XASSERT(nfiles <= 31, "Can only test for 31 files simultaneously. nfiles = %d \n",nfiles);
+    for(int i=0;i<nfiles;i++) {
+        const char *f = va_arg(filenames, const char *);
+        FILE *fp = fopen(f,"r");
+        if(fp == NULL) {
+            absent |= 1;
+        } else {
+            fclose(fp);
+        }
+        absent <<= 1;
+    }
+    va_end(filenames);
+
+    return absent;
+}
+
+
+int read_binfile(const char *fname, binarray *bins)
+{
+    //set up the bins according to the binned data file
+    //the form of the data file should be <rlow  rhigh ....>
+    const int MAXBUFSIZE=1000;
+    char buf[MAXBUFSIZE];
+    FILE *fp=NULL;
+    double low,hi;
+    const char comment='#';
+    const int nitems=2;
+    int nread=0;
+    int nedges = ((int) getnumlines(fname, comment)) + 1;
+    double *edges = (double *) my_calloc(sizeof(double), nedges);
+
+    fp = my_fopen(fname,"r");
+    if(fp == NULL) {
+        free(edges);
+        return EXIT_FAILURE;
+    }
+    int index=1;
+    while(1) {
+        if(fgets(buf,MAXBUFSIZE,fp) != NULL) {
+            nread = sscanf(buf,"%lf %lf",&low,&hi);
+            if(nread == nitems) {
+
+                if(index == 1) {
+                    edges[0] = low;
+                }
+
+                edges[index] = hi;
+                index++;
+            }
+        } else {
+            break;
+        }
+    }
+    fclose(fp);
+    if (index != nedges) {
+        free(edges);
+        return EXIT_FAILURE;
+    }
+
+    set_binarray(bins, edges, nedges);
+    free(edges);
+    return EXIT_SUCCESS;
+}
+
 
 int64_t read_positions(const char *filename, const char *format, const size_t size, const int num_fields, ...)
 {

@@ -37,6 +37,9 @@ double *RA1=NULL,*DEC1=NULL,*CZ1=NULL,*weights1=NULL;
 int64_t ND2;
 double *RA2=NULL,*DEC2=NULL,*CZ2=NULL,*weights2=NULL;
 
+binarray bins;
+binarray angular_bins;
+
 const int cosmology_flag=1;
 char current_file1[MAXLEN+1],current_file2[MAXLEN+1];
 
@@ -62,8 +65,9 @@ int test_DDrppi_mocks(const char *correct_outputfile)
                                       ND2,RA2,DEC2,CZ2,
                                       nthreads,
                                       autocorr,
-                                      binfile,
+                                      &bins,
                                       pimax,
+                                      (int) pimax,
                                       cosmology_flag,
                                       &results,
                                       &options,
@@ -152,7 +156,7 @@ int test_DDsmu_mocks(const char *correct_outputfile)
                                            ND2,RA2,DEC2,CZ2,
                                            nthreads,
                                            autocorr,
-                                           binfile,
+                                           &bins,
                                            mocks_mu_max,
                                            nmu_bins,
                                            cosmology_flag,
@@ -241,7 +245,7 @@ int test_DDtheta_mocks(const char *correct_outputfile)
                                             ND2,RA2,DEC2,
                                             nthreads,
                                             autocorr,
-                                            angular_binfile,
+                                            &angular_bins,
                                             &results,
                                             &options,
                                             &extra);
@@ -481,6 +485,9 @@ int main(int argc, char **argv)
     CZ2 = CZ1;
     weights2 = weights1;
 
+    read_binfile(binfile, &bins);
+    read_binfile(angular_binfile, &angular_bins);
+
     strncpy(current_file1,file,MAXLEN);
     strncpy(current_file2,file,MAXLEN);
     reset_bin_refine_factors(&options);
@@ -625,5 +632,6 @@ int main(int argc, char **argv)
         free(RA2);free(DEC2);free(CZ2);
     }
     free(RA1);free(DEC1);free(CZ1);
+    free_binarray(&bins);
     return EXIT_SUCCESS;
 }

@@ -30,14 +30,15 @@ extern "C" {
                                       const DOUBLE min_xdiff, const DOUBLE min_ydiff, const DOUBLE min_zdiff,
                                       const DOUBLE closest_icell_xpos, const DOUBLE closest_icell_ypos, const DOUBLE closest_icell_zpos,
                                       DOUBLE *src_rpavg, uint64_t *src_npairs,
-                                      DOUBLE *src_weightavg, const weight_method_t weight_method, const bin_type_t bin_type);
+                                      DOUBLE *src_weightavg, const weight_method_t weight_method, const pair_weight_struct pair_weight,
+                                      const bin_type_t bin_type);
 
     extern wp_func_ptr_DOUBLE wp_driver_DOUBLE(const struct config_options *options) __attribute__((warn_unused_result));
 
     extern int countpairs_wp_DOUBLE(const int64_t ND1, DOUBLE * restrict X1, DOUBLE * restrict Y1, DOUBLE * restrict Z1,
                                     const double boxsize,
                                     const int numthreads,
-                                    const char *binfile,
+                                    binarray *bins,
                                     const double pimax,
                                     results_countpairs_wp *result,
                                     struct config_options *options,

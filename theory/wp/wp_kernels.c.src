@@ -29,7 +29,8 @@ static inline int wp_avx512_intrinsics_DOUBLE(DOUBLE *x0, DOUBLE *y0, DOUBLE *z0
                                               const DOUBLE min_xdiff, const DOUBLE min_ydiff, const DOUBLE min_zdiff,
                                               const DOUBLE closest_icell_xpos, const DOUBLE closest_icell_ypos, const DOUBLE closest_icell_zpos,
                                               DOUBLE *src_rpavg, uint64_t *src_npairs,
-                                              DOUBLE *src_weightavg, const weight_method_t weight_method, const bin_type_t bin_type)
+                                              DOUBLE *src_weightavg, const weight_method_t weight_method, const pair_weight_struct pair_weight,
+                                              const bin_type_t bin_type)
 {
 
 #ifdef COUNT_VECTORIZED
@@ -76,8 +77,8 @@ static inline int wp_avx512_intrinsics_DOUBLE(DOUBLE *x0, DOUBLE *y0, DOUBLE *z0
         local_w0 = *weights0;
         local_w1 = *weights1;
 
-        pair.num_weights = local_w0.num_weights;
-        avx512_weight_func   = get_avx512_weight_func_by_method_DOUBLE(weight_method);
+        set_pair_struct_DOUBLE(&pair, &local_w0, &local_w1, &pair_weight);
+        avx512_weight_func = get_avx512_weight_func_by_method_DOUBLE(weight_method);
     }
 
     const DOUBLE *zstart = z1, *zend = z1 + N1;
@@ -244,6 +245,7 @@ static inline int wp_avx512_intrinsics_DOUBLE(DOUBLE *x0, DOUBLE *y0, DOUBLE *z0
             if(need_rpavg || bin_type == BIN_LIN) {
                 union_mDperp.m_Dperp = AVX512_MASKZ_SQRT_FLOAT(m_mask_left, r2);
             }
+
             if(need_weightavg){
                 union_mweight.m_weights = avx512_weight_func(&pair);
             }
@@ -268,6 +270,7 @@ static inline int wp_avx512_intrinsics_DOUBLE(DOUBLE *x0, DOUBLE *y0, DOUBLE *z0
                     }
                 }//backwards loop over the bins
             }
+            if(need_rpavg && need_weightavg) union_mDperp.m_Dperp = AVX512_MASKZ_MULTIPLY_FLOATS(m_mask_left, union_mDperp.m_Dperp, union_mweight.m_weights);
             if(need_rpavg || need_weightavg || bin_type == BIN_LIN) {
                 //Do I need this step of going via the union? accessing int[] -> AVX* vector might
                 //cause alignment problems but accessing the ints from an AVX*
@@ -328,7 +331,8 @@ static inline int wp_avx2_intrinsics_DOUBLE(DOUBLE *x0, DOUBLE *y0, DOUBLE *z0, 
                                             const DOUBLE min_xdiff, const DOUBLE min_ydiff, const DOUBLE min_zdiff,
                                             const DOUBLE closest_icell_xpos, const DOUBLE closest_icell_ypos, const DOUBLE closest_icell_zpos,
                                             DOUBLE *src_rpavg, uint64_t *src_npairs,
-                                            DOUBLE *src_weightavg, const weight_method_t weight_method, const bin_type_t bin_type)
+                                            DOUBLE *src_weightavg, const weight_method_t weight_method, const pair_weight_struct pair_weight,
+                                            const bin_type_t bin_type)
 {
 #ifdef COUNT_VECTORIZED
     struct timespec tcell_start;
@@ -383,8 +387,7 @@ static inline int wp_avx2_intrinsics_DOUBLE(DOUBLE *x0, DOUBLE *y0, DOUBLE *z0, 
         local_w0 = *weights0;
         local_w1 = *weights1;
 
-        pair.num_weights = local_w0.num_weights;
-
+        set_pair_struct_DOUBLE(&pair, &local_w0, &local_w1, &pair_weight);
         avx_weight_func = get_avx_weight_func_by_method_DOUBLE(weight_method);
         fallback_weight_func = get_weight_func_by_method_DOUBLE(weight_method);
     }
@@ -507,7 +510,7 @@ static inline int wp_avx2_intrinsics_DOUBLE(DOUBLE *x0, DOUBLE *y0, DOUBLE *z0, 
                 pair.dy.a = m_ydiff;
                 pair.dz.a = m_zdiff;
             }
-            const AVX2_FLOATS m_neg_pimax_mask = AVX_COMPARE_FLOATS(m_zdiff,-m_pimax,_CMP_GT_OQ);
+            const AVX2_FLOATS m_neg_pimax_mask = AVX2_COMPARE_FLOATS(m_zdiff,-m_pimax,_CMP_GT_OQ);
             if(AVX2_TEST_COMPARISON(m_neg_pimax_mask)==0) {
                 continue;
             }
@@ -585,6 +588,7 @@ static inline int wp_avx2_intrinsics_DOUBLE(DOUBLE *x0, DOUBLE *y0, DOUBLE *z0, 
                     }
                 }
             }
+            if(need_rpavg && need_weightavg) union_mDperp.m_Dperp = AVX2_MULTIPLY_FLOATS(union_mDperp.m_Dperp, union_mweight.m_weights);
             if(need_rpavg || need_weightavg || bin_type == BIN_LIN) {
                 union_rpbin.m_ibin = AVX2_TRUNCATE_FLOAT_TO_INT(m_rpbin);
                 //protect the unroll pragma in case compiler is not icc.
@@ -614,6 +618,7 @@ static inline int wp_avx2_intrinsics_DOUBLE(DOUBLE *x0, DOUBLE *y0, DOUBLE *z0, 
 #ifdef COUNT_VECTORIZED
             serial_npairs++;
 #endif
+
             const DOUBLE dz = *localz1++ - zpos;
             const DOUBLE dx = *localx1++ - xpos;
             const DOUBLE dy = *localy1++ - ypos;
@@ -635,7 +640,7 @@ static inline int wp_avx2_intrinsics_DOUBLE(DOUBLE *x0, DOUBLE *y0, DOUBLE *z0, 
                 pair.dz.d = dz;
             }
 
-            DOUBLE r = (need_rpavg || bin_type == BIN_LIN) ? SQRT(r2):ZERO;
+            DOUBLE r = (need_rpavg || bin_type == BIN_LIN) ? SQRT(r2) : ZERO;
             const DOUBLE pairweight = need_weightavg ? fallback_weight_func(&pair) : ZERO;
 
             int kbin = 0;
@@ -651,6 +656,7 @@ static inline int wp_avx2_intrinsics_DOUBLE(DOUBLE *x0, DOUBLE *y0, DOUBLE *z0, 
             }
             npairs[kbin]++;
             if(need_rpavg) {
+                if(need_weightavg) r *= pairweight;
                 rpavg[kbin] += r;
             }
             if(need_weightavg){
@@ -694,7 +700,8 @@ static inline int wp_avx_intrinsics_DOUBLE(DOUBLE *x0, DOUBLE *y0, DOUBLE *z0, c
                                            const DOUBLE min_xdiff, const DOUBLE min_ydiff, const DOUBLE min_zdiff,
                                            const DOUBLE closest_icell_xpos, const DOUBLE closest_icell_ypos, const DOUBLE closest_icell_zpos,
                                            DOUBLE *src_rpavg, uint64_t *src_npairs,
-                                           DOUBLE *src_weightavg, const weight_method_t weight_method, const bin_type_t bin_type)
+                                           DOUBLE *src_weightavg, const weight_method_t weight_method, const pair_weight_struct pair_weight,
+                                           const bin_type_t bin_type)
 {
 #ifdef COUNT_VECTORIZED
     struct timespec tcell_start;
@@ -748,8 +755,7 @@ static inline int wp_avx_intrinsics_DOUBLE(DOUBLE *x0, DOUBLE *y0, DOUBLE *z0, c
         local_w0 = *weights0;
         local_w1 = *weights1;
 
-        pair.num_weights = local_w0.num_weights;
-
+        set_pair_struct_DOUBLE(&pair, &local_w0, &local_w1, &pair_weight);
         avx_weight_func = get_avx_weight_func_by_method_DOUBLE(weight_method);
         fallback_weight_func = get_weight_func_by_method_DOUBLE(weight_method);
     }
@@ -962,6 +968,7 @@ static inline int wp_avx_intrinsics_DOUBLE(DOUBLE *x0, DOUBLE *y0, DOUBLE *z0, c
                     }
                 }
             }
+            if(need_rpavg && need_weightavg) union_mDperp.m_Dperp = AVX_MULTIPLY_FLOATS(union_mDperp.m_Dperp, union_mweight.m_weights);
             if(need_rpavg || need_weightavg || bin_type == BIN_LIN) {
                 union_rpbin.m_ibin = AVX_TRUNCATE_FLOAT_TO_INT(m_rpbin);
                 //protect the unroll pragma in case compiler is not icc.
@@ -991,6 +998,7 @@ static inline int wp_avx_intrinsics_DOUBLE(DOUBLE *x0, DOUBLE *y0, DOUBLE *z0, c
 #ifdef COUNT_VECTORIZED
             serial_npairs++;
 #endif
+
             const DOUBLE dz = *localz1++ - zpos;
             const DOUBLE dx = *localx1++ - xpos;
             const DOUBLE dy = *localy1++ - ypos;
@@ -1012,7 +1020,7 @@ static inline int wp_avx_intrinsics_DOUBLE(DOUBLE *x0, DOUBLE *y0, DOUBLE *z0, c
                 pair.dz.d = dz;
             }
 
-            DOUBLE r = (need_rpavg || bin_type == BIN_LIN) ? SQRT(r2):ZERO;
+            DOUBLE r = (need_rpavg || bin_type == BIN_LIN) ? SQRT(r2) : ZERO;
             const DOUBLE pairweight = need_weightavg ? fallback_weight_func(&pair) : ZERO;
 
             int kbin = 0;
@@ -1028,6 +1036,7 @@ static inline int wp_avx_intrinsics_DOUBLE(DOUBLE *x0, DOUBLE *y0, DOUBLE *z0, c
             }
             npairs[kbin]++;
             if(need_rpavg) {
+                if(need_weightavg) r *= pairweight;
                 rpavg[kbin] += r;
             }
             if(need_weightavg){
@@ -1071,7 +1080,8 @@ static inline int wp_sse_intrinsics_DOUBLE(DOUBLE *x0, DOUBLE *y0, DOUBLE *z0, c
                                            const DOUBLE min_xdiff, const DOUBLE min_ydiff, const DOUBLE min_zdiff,
                                            const DOUBLE closest_icell_xpos, const DOUBLE closest_icell_ypos, const DOUBLE closest_icell_zpos,
                                            DOUBLE *src_rpavg, uint64_t *src_npairs,
-                                           DOUBLE *src_weightavg, const weight_method_t weight_method, const bin_type_t bin_type)
+                                           DOUBLE *src_weightavg, const weight_method_t weight_method, const pair_weight_struct pair_weight,
+                                           const bin_type_t bin_type)
 {
 #ifdef COUNT_VECTORIZED
     struct timespec tcell_start;
@@ -1126,8 +1136,7 @@ static inline int wp_sse_intrinsics_DOUBLE(DOUBLE *x0, DOUBLE *y0, DOUBLE *z0, c
         local_w0 = *weights0;
         local_w1 = *weights1;
 
-        pair.num_weights = local_w0.num_weights;
-
+        set_pair_struct_DOUBLE(&pair, &local_w0, &local_w1, &pair_weight);
         sse_weight_func = get_sse_weight_func_by_method_DOUBLE(weight_method);
         fallback_weight_func = get_weight_func_by_method_DOUBLE(weight_method);
     }
@@ -1226,6 +1235,7 @@ static inline int wp_sse_intrinsics_DOUBLE(DOUBLE *x0, DOUBLE *y0, DOUBLE *z0, c
 #ifdef COUNT_VECTORIZED
             vectorized_npairs += SSE_NVEC;
 #endif
+
             localx1 += SSE_NVEC;
             localy1 += SSE_NVEC;
             localz1 += SSE_NVEC;
@@ -1324,6 +1334,7 @@ static inline int wp_sse_intrinsics_DOUBLE(DOUBLE *x0, DOUBLE *y0, DOUBLE *z0, c
                     if(SSE_TEST_COMPARISON(m_mask_left) == 0) break;
                 }
             }
+            if(need_rpavg && need_weightavg) union_mDperp.m_Dperp = SSE_MULTIPLY_FLOATS(union_mDperp.m_Dperp, union_mweight.m_weights);
             if(need_rpavg || need_weightavg || bin_type == BIN_LIN) {
                 union_rpbin.m_ibin = SSE_TRUNCATE_FLOAT_TO_INT(m_rpbin);
                 //protect the unroll pragma in case compiler is not icc.
@@ -1371,7 +1382,7 @@ static inline int wp_sse_intrinsics_DOUBLE(DOUBLE *x0, DOUBLE *y0, DOUBLE *z0, c
                 pair.dz.d = dz;
             }
 
-            DOUBLE r = (need_rpavg || bin_type == BIN_LIN) ? SQRT(r2):ZERO;
+            DOUBLE r = (need_rpavg || bin_type == BIN_LIN) ? SQRT(r2) : ZERO;
             const DOUBLE pairweight = need_weightavg ? fallback_weight_func(&pair) : ZERO;
 
             int kbin = 0;
@@ -1387,6 +1398,7 @@ static inline int wp_sse_intrinsics_DOUBLE(DOUBLE *x0, DOUBLE *y0, DOUBLE *z0, c
             }
             npairs[kbin]++;
             if(need_rpavg) {
+                if(need_weightavg) r *= pairweight;
                 rpavg[kbin] += r;
             }
             if(need_weightavg){
@@ -1428,7 +1440,8 @@ static inline int wp_fallback_DOUBLE(DOUBLE *x0, DOUBLE *y0, DOUBLE *z0, const w
                                      const DOUBLE min_xdiff, const DOUBLE min_ydiff, const DOUBLE min_zdiff,
                                      const DOUBLE closest_icell_xpos, const DOUBLE closest_icell_ypos, const DOUBLE closest_icell_zpos,
                                      DOUBLE *src_rpavg, uint64_t *src_npairs,
-                                     DOUBLE *src_weightavg, const weight_method_t weight_method, const bin_type_t bin_type)
+                                     DOUBLE *src_weightavg, const weight_method_t weight_method, const pair_weight_struct pair_weight,
+                                     const bin_type_t bin_type)
 {
 #ifdef COUNT_VECTORIZED
     struct timespec tcell_start;
@@ -1468,8 +1481,7 @@ static inline int wp_fallback_DOUBLE(DOUBLE *x0, DOUBLE *y0, DOUBLE *z0, const w
         local_w0 = *weights0;
         local_w1 = *weights1;
 
-        pair.num_weights = local_w0.num_weights;
-
+        set_pair_struct_DOUBLE(&pair, &local_w0, &local_w1, &pair_weight);
         weight_func = get_weight_func_by_method_DOUBLE(weight_method);
     }
 
@@ -1482,7 +1494,6 @@ static inline int wp_fallback_DOUBLE(DOUBLE *x0, DOUBLE *y0, DOUBLE *z0, const w
         for(int w = 0; w < pair.num_weights; w++){
             pair.weights0[w].d = *local_w0.weights[w]++;
         }
-
 
 #if 0
         /* are there any pairs possible with this particle and ANY
@@ -1558,6 +1569,7 @@ static inline int wp_fallback_DOUBLE(DOUBLE *x0, DOUBLE *y0, DOUBLE *z0, const w
 #ifdef COUNT_VECTORIZED
             serial_npairs++;
 #endif
+
             const DOUBLE dx = *localx1++ - xpos;
             const DOUBLE dy = *localy1++ - ypos;
             const DOUBLE dz = *localz1++ - zpos;
@@ -1577,7 +1589,7 @@ static inline int wp_fallback_DOUBLE(DOUBLE *x0, DOUBLE *y0, DOUBLE *z0, const w
                 pair.dz.d = dz;
             }
 
-            DOUBLE r = (need_rpavg || bin_type == BIN_LIN) ? SQRT(r2):ZERO;
+            DOUBLE r = (need_rpavg || bin_type == BIN_LIN) ? SQRT(r2) : ZERO;
             const DOUBLE pairweight = need_weightavg ? weight_func(&pair) : ZERO;
 
             int kbin = 0;
@@ -1593,6 +1605,7 @@ static inline int wp_fallback_DOUBLE(DOUBLE *x0, DOUBLE *y0, DOUBLE *z0, const w
             }
             npairs[kbin]++;
             if(need_rpavg) {
+                if(need_weightavg) r *= pairweight;
                 rpavg[kbin] += r;
             }
             if(need_weightavg){

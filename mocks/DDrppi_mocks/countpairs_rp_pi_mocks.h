@@ -16,7 +16,7 @@ extern "C" {
 #include <stdint.h> //for uint64_t
 
     //define the results structure
-    typedef struct{
+    typedef struct {
         uint64_t *npairs;
         double *rupp;
         double *rpavg;
@@ -25,13 +25,14 @@ extern "C" {
         int nbin;
         int npibin;
     } results_countpairs_mocks;
-    
+
     int countpairs_mocks(const int64_t ND1, void *theta1, void *phi1, void *czD1,
                          const int64_t ND2, void *theta2, void *phi2, void *czD2,
                          const int numthreads,
                          const int autocorr,
-                         const char *binfile,
+                         binarray* bins,
                          const double pimax,
+                         const int npibins,
                          const int cosmology,
                          results_countpairs_mocks *results,
                          struct config_options *options, struct extra_options *extra);

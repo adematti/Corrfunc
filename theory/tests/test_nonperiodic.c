@@ -27,6 +27,8 @@ double *X1=NULL,*Y1=NULL,*Z1=NULL,*weights1=NULL;
 int64_t ND2;
 double *X2=NULL,*Y2=NULL,*Z2=NULL,*weights2=NULL;
 
+binarray bins;
+
 char current_file1[MAXLEN+1],current_file2[MAXLEN+1];
 struct config_options options;
 //end of global variables
@@ -50,7 +52,7 @@ int test_nonperiodic_DD(const char *correct_outputfile)
                                 ND2,X2,Y2,Z2,
                                 nthreads,
                                 autocorr,
-                                binfile,
+                                &bins,
                                 &results,
                                 &options,
                                 &extra);
@@ -120,8 +122,9 @@ int test_nonperiodic_DDrppi(const char *correct_outputfile)
                                       ND2,X2,Y2,Z2,
                                       nthreads,
                                       autocorr,
-                                      binfile,
+                                      &bins,
                                       pimax,
+                                      (int) pimax,
                                       &results,
                                       &options,
                                       &extra);
@@ -203,7 +206,7 @@ int test_nonperiodic_DDsmu(const char *correct_outputfile)
                                      ND2,X2,Y2,Z2,
                                      nthreads,
                                      autocorr,
-                                     binfile,
+                                     &bins,
                                      theory_mu_max,
                                      nmu_bins,
                                      &results,
@@ -351,6 +354,8 @@ int main(int argc, char **argv)
     Z2 = Z1;
     weights2 = weights1;
 
+    read_binfile(binfile, &bins);
+
     strncpy(current_file1,file,MAXLEN);
     strncpy(current_file2,file,MAXLEN);
     reset_bin_refine_factors(&options);
@@ -477,5 +482,6 @@ int main(int argc, char **argv)
         free(X2);free(Y2);free(Z2);free(weights2);
     }
     free(X1);free(Y1);free(Z1);free(weights1);
+    free_binarray(&bins);
     return failed;
 }

@@ -12,7 +12,7 @@
 extern "C" {
 #endif
 
-#include "defs.h" //for struct config_options 
+#include "defs.h" //for struct config_options
 #include <stdint.h> //for uint64_t
 
     //define the results structure
@@ -30,12 +30,13 @@ extern "C" {
                                 const int64_t ND2, void *X2, void *Y2, void *Z2,
                                 const int numthreads,
                                 const int autocorr,
-                                const char *binfile,
+                                binarray *bins,
                                 const double pimax,
+                                const int npibins,
                                 results_countpairs_rp_pi *results,
                                 struct config_options *options,
                                 struct extra_options *extra);
-    
+
     extern void free_results_rp_pi(results_countpairs_rp_pi *results);
 
 #ifdef __cplusplus

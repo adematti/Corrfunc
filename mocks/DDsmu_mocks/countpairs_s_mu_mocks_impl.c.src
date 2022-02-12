@@ -204,7 +204,7 @@ int countpairs_mocks_s_mu_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1, D
                                  const int64_t ND2, DOUBLE *ra2, DOUBLE *dec2, DOUBLE *czD2,
                                  const int numthreads,
                                  const int autocorr,
-                                 const char *sbinfile,
+                                 binarray *bins,
                                  const double max_mu,
                                  const int nmu_bins,
                                  const int cosmology,
@@ -294,16 +294,15 @@ int countpairs_mocks_s_mu_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1, D
     /***********************
      *initializing the  bins
      ************************/
-    double *supp;
-    int nsbin;
-    double smin,smax;
-    setup_bins(sbinfile,&smin,&smax,&nsbin,&supp);
-    if( ! (smin > 0.0 && smax > 0.0 && smin < smax && nsbin > 0)) {
-        fprintf(stderr,"Error: Could not setup with S bins correctly. (smin = %lf, smax = %lf, with nbins = %d). Expected non-zero smin/smax with smax > smin and nbins >=1 \n",
+    double *supp = bins->edges;
+    int nsbin = bins->nedges;
+    double smin=bins->edges[0], smax=bins->edges[bins->nedges-1];
+    if( ! (smin >= 0.0 && smax > 0.0 && smin < smax && nsbin > 0)) {
+        fprintf(stderr,"Error: Could not setup with s bins correctly. (smin = %lf, smax = %lf, with nbins = %d). Expected non-zero smin/smax with smax > smin and nbins >=1 \n",
                 smin, smax, nsbin);
         return EXIT_FAILURE;
     }
-    detect_bin_type(supp, nsbin, &(options->bin_type), options->verbose);
+    detect_bin_type(bins, &(options->bin_type), options->verbose);
 
     if(max_mu <= 0.0 || max_mu > 1.0) {
         fprintf(stderr,"Error: max_mu (max. value for the cosine of the angle with line of sight) must be greater than 0 and at most 1).\n"
@@ -540,7 +539,6 @@ int countpairs_mocks_s_mu_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1, D
         if(autocorr == 0) {
             free_cellarray_mocks_DOUBLE(lattice2, totncells);
         }
-        free(supp);
         return EXIT_FAILURE;
     }
 
@@ -642,7 +640,7 @@ int countpairs_mocks_s_mu_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1, D
                                                                          this_cell_pair->min_dx, this_cell_pair->min_dy, this_cell_pair->min_dz,
                                                                          this_cell_pair->closest_x1, this_cell_pair->closest_y1, this_cell_pair->closest_z1,
                                                                          this_savg, npairs,
-                                                                         this_weightavg, extra->weight_method, options->bin_type);
+                                                                         this_weightavg, extra->weight_method, extra->pair_weight, options->bin_type);
 
                 /* This actually causes a race condition under OpenMP - but mostly
                    I care that an error occurred - rather than the exact value of
@@ -690,7 +688,6 @@ int countpairs_mocks_s_mu_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1, D
 
     if(abort_status != EXIT_SUCCESS || interrupt_status_DDsmu_mocks_DOUBLE != EXIT_SUCCESS) {
         /* Cleanup memory here if aborting */
-        free(supp);
 #if defined(_OPENMP)
         matrix_free((void **) all_npairs, numthreads);
         if(options->need_avg_sep) {
@@ -764,23 +761,22 @@ int countpairs_mocks_s_mu_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1, D
             /* Then, add all the self-pairs. This ensures that
                a cross-correlation with two identical datasets
                produces the same result as the auto-correlation  */
-            npairs[1] += ND1; //npairs[1] contains the first valid bin.
+            npairs[nmu_bins+1] += ND1; //npairs[1] contains the first valid bin.
 
             // Increasing npairs affects rpavg and weightavg.
             // We don't need to add anything to rpavg; all the self-pairs have 0 separation!
             // The self-pairs have non-zero weight, though.  So, fix that here.
             if(need_weightavg){
                 // Keep in mind this is an autocorrelation (i.e. only one particle set to consider)
+                pair_struct_DOUBLE pair;
+                set_pair_struct_DOUBLE(&pair, (weight_struct_DOUBLE *) &(extra->weights0), (weight_struct_DOUBLE *) &(extra->weights0), &(extra->pair_weight));
                 weight_func_t_DOUBLE weight_func = get_weight_func_by_method_DOUBLE(extra->weight_method);
-                pair_struct_DOUBLE pair = {.num_weights = extra->weights0.num_weights,
-                                           .dx.d=0., .dy.d=0., .dz.d=0.,  // always 0 separation
-                                           .parx.d=0., .pary.d=0., .parz.d=0.};
                 for(int64_t j = 0; j < ND1; j++){
                     for(int w = 0; w < pair.num_weights; w++){
                         pair.weights0[w].d = ((DOUBLE *) extra->weights0.weights[w])[j];
                         pair.weights1[w].d = ((DOUBLE *) extra->weights0.weights[w])[j];
                     }
-                    weightavg[1] += weight_func(&pair);
+                    weightavg[nmu_bins+1] += weight_func(&pair);
                 }
             }
         }
@@ -789,7 +785,7 @@ int countpairs_mocks_s_mu_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1, D
     for(int i=0;i<totnbins;i++) {
         if(npairs[i] > 0) {
             if(options->need_avg_sep) {
-                savg[i] /= (DOUBLE) npairs[i] ;
+                savg[i] /= need_weightavg ? weightavg[i] : (DOUBLE) npairs[i];
             }
             if(need_weightavg) {
                 weightavg[i] /= (DOUBLE) npairs[i];
@@ -802,12 +798,11 @@ int countpairs_mocks_s_mu_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1, D
     results->mu_max = max_mu;//NOTE max_mu which is double and not mu_max (which might be float)
     results->mu_min = ZERO;
     results->npairs = my_malloc(sizeof(*(results->npairs)), totnbins);
-    results->supp   = my_malloc(sizeof(*(results->supp))  , nsbin);
-    results->savg  = my_malloc(sizeof(*(results->savg)) , totnbins);
-    results->weightavg  = my_calloc(sizeof(double)  , totnbins);
+    results->supp   = my_malloc(sizeof(*(results->supp)), nsbin);
+    results->savg  = my_malloc(sizeof(*(results->savg)), totnbins);
+    results->weightavg  = my_calloc(sizeof(double), totnbins);
     if(results->npairs == NULL || results->supp == NULL || results->savg == NULL || results->weightavg == NULL) {
         free_results_mocks_s_mu(results);
-        free(supp);
         return EXIT_FAILURE;
     }
 
@@ -818,7 +813,6 @@ int countpairs_mocks_s_mu_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1, D
             if( index >= totnbins ) {
                 fprintf(stderr, "ERROR: In %s> index = %d must be in range [0, %d)\n", __FUNCTION__, index, totnbins);
                 free_results_mocks_s_mu(results);
-                free(supp);
                 return EXIT_FAILURE;
             }
             results->npairs[index] = npairs[index];
@@ -832,7 +826,6 @@ int countpairs_mocks_s_mu_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1, D
             }
         }
     }
-    free(supp);
 
     /* reset interrupt handlers to default */
     RESET_INTERRUPT_HANDLERS();

@@ -28,10 +28,10 @@ extern "C" {
                                       const int64_t ND2, void *phi2, void *theta2,
                                       const int numthreads,
                                       const int autocorr,
-                                      const char *binfile,
+                                      binarray *bins,
                                       results_countpairs_theta *results,
                                       struct config_options *options, struct extra_options *extra);
-    
+
     extern void free_results_countpairs_theta(results_countpairs_theta *results);
 
 #ifdef __cplusplus

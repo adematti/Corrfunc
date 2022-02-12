@@ -47,20 +47,20 @@ int main(int argc, char **argv)
     char *binfile=NULL;
     char *weight_method_str=NULL;
     int nthreads=1;
-    
+
     weight_method_t weight_method = NONE;
     int num_weights = 0;
-    
+
 #if defined(_OPENMP)
     const char argnames[][30]={"file1","format1","file2","format2","binfile","Nthreads"};
 #else
     const char argnames[][30]={"file1","format1","file2","format2","binfile"};
 #endif
     const char optargnames[][30]={"weight_method", "weights_file1","weights_format1","weights_file2","weights_format2"};
-    
+
     int nargs=sizeof(argnames)/(sizeof(char)*30);
     int noptargs=sizeof(optargnames)/(sizeof(char)*30);
-    
+
     struct timeval tstart,t0,t1;
     double pair_time=0,read_time=0.0;
 
@@ -89,7 +89,7 @@ int main(int argc, char **argv)
             fprintf(stderr,"\t\t %s = `?'\n",argnames[i-1]);
         return EXIT_FAILURE;
     }
-    
+
     /* Validate optional arguments */
     int noptargs_given = argc - (nargs + 1);
     if(noptargs_given != 0 && noptargs_given != 3 && noptargs_given != 5){
@@ -104,7 +104,7 @@ int main(int argc, char **argv)
         }
         return EXIT_FAILURE;
     }
-    
+
     file1=argv[1];
     fileformat1=argv[2];
     file2=argv[3];
@@ -126,7 +126,7 @@ int main(int argc, char **argv)
          return EXIT_FAILURE;
        }
        num_weights = get_num_weights_by_method(weight_method);
-      
+
        weights_file1 = argv[nargs + 2];
        weights_fileformat1 = argv[nargs + 3];
     }
@@ -159,19 +159,21 @@ int main(int argc, char **argv)
     gettimeofday(&t1,NULL);
     read_time += ADD_DIFF_TIME(t0,t1);
     fprintf(stderr,"DDtheta_mocks> Read in %"PRId64" particles from file `%s'\n",ND1,file1);
-    
+
     /* Read weights file 1 */
     if(weights_file1 != NULL){
         gettimeofday(&t0,NULL);
         int64_t wND1 = read_columns_into_array(weights_file1,weights_fileformat1, sizeof(DOUBLE), num_weights, (void **) weights1);
         gettimeofday(&t1,NULL);
         read_time += ADD_DIFF_TIME(t0,t1);
-      
+
         if(wND1 != ND1){
           fprintf(stderr, "Error: read %"PRId64" lines from %s, but read %"PRId64" from %s\n", wND1, weights_file1, ND1, file1);
           return EXIT_FAILURE;
         }
     }
+    binarray bins;
+    read_binfile(binfile, &bins);
 
     /*---Read-data2-file----------------------------------*/
     if(autocorr==0) {
@@ -180,7 +182,7 @@ int main(int argc, char **argv)
         gettimeofday(&t1,NULL);
         read_time += ADD_DIFF_TIME(t0,t1);
         fprintf(stderr,"DDtheta_mocks> Read in %"PRId64" particles from file `%s'\n",ND2,file2);
-        
+
         if(weights_file2 != NULL){
             gettimeofday(&t0,NULL);
             int64_t wND2 = read_columns_into_array(weights_file2,weights_fileformat2, sizeof(DOUBLE), num_weights, (void **) weights2);
@@ -204,20 +206,20 @@ int main(int argc, char **argv)
     /*---Count-pairs--------------------------------------*/
     gettimeofday(&t0,NULL);
     results_countpairs_theta results;
-    
+
     /* Pack weights into extra options */
     struct extra_options extra = get_extra_options(weight_method);
     for(int w = 0; w < num_weights; w++){
         extra.weights0.weights[w] = (void *) weights1[w];
         extra.weights1.weights[w] = (void *) weights2[w];
     }
-    
+
     struct config_options options = get_config_options();
     int status = countpairs_theta_mocks(ND1,phiD1,thetaD1,
                                         ND2,phiD2,thetaD2,
                                         nthreads,
                                         autocorr,
-                                        binfile,
+                                        &bins,
                                         &results,
                                         &options,
                                         &extra);
@@ -234,10 +236,13 @@ int main(int argc, char **argv)
           free(weights2[w]);
         }
     }
+
+    free_binarray(&bins);
+
     if(status != EXIT_SUCCESS) {
         return status;
     }
-    
+
     /*---Output-Pairs-------------------------------------*/
     DOUBLE theta_low = results.theta_upp[0];
     for(int i=1;i<results.nbin;i++) {
@@ -263,7 +268,7 @@ void Printhelp(void)
     fprintf(stderr,"   --- DDtheta file1 format1 file2 format2 binfile numthreads [weight_method weights_file1 weights_format1 [weights_file2 weights_format2]] > Thetafile\n") ;
 #else
     fprintf(stderr,"   --- DDtheta file1 format1 file2 format2 binfile [weight_method weights_file1 weights_format1 [weights_file2 weights_format2]] > Thetafile\n") ;
-#endif    
+#endif
     fprintf(stderr,"   --- Measure the cross-correlation function w(theta) for two different\n") ;
     fprintf(stderr,"       data files (or autocorrelation if data1=data2).\n") ;
     fprintf(stderr,"     * file1       = name of first data file\n") ;
@@ -302,7 +307,7 @@ void Printhelp(void)
     fprintf(stderr,"Linking in declination = True\n");
 #else
     fprintf(stderr,"Linking in declination = False\n");
-#endif    
+#endif
 
 #ifdef LINK_IN_DEC
     //RA linking only works when dec linking is enabled
@@ -319,9 +324,9 @@ void Printhelp(void)
     fprintf(stderr,"Fast (approx) arc-cosine  = True\n");
 #else
     fprintf(stderr,"Fast (approx) arc-cosine  = False\n");
-#endif//fast acos    
-#endif//thetaavg    
-    
+#endif//fast acos
+#endif//thetaavg
+
 #ifdef DOUBLE_PREC
     fprintf(stderr,"Precision = double\n");
 #else

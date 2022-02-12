@@ -137,7 +137,7 @@ int countpairs_s_mu_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z1
                            const int64_t ND2, DOUBLE *X2, DOUBLE *Y2, DOUBLE *Z2,
                            const int numthreads,
                            const int autocorr,
-                           const char *sbinfile,
+                           binarray *bins,
                            const double max_mu,
                            const int nmu_bins,
                            results_countpairs_s_mu *results,
@@ -201,16 +201,15 @@ int countpairs_s_mu_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z1
     /***********************
      *initializing the  bins
      ************************/
-    double *supp;
-    int nsbin;
-    double smin,smax;
-    setup_bins(sbinfile,&smin,&smax,&nsbin,&supp);
+    double *supp = bins->edges;
+    int nsbin = bins->nedges;
+    double smin=bins->edges[0], smax=bins->edges[bins->nedges-1];
     if( ! (smin >= 0.0 && smax > 0.0 && smin < smax && nsbin > 0)) {
-        fprintf(stderr,"Error: Could not setup with R bins correctly. (rmin = %lf, rmax = %lf, with nbins = %d). Expected non-zero rmin/rmax with rmax > rmin and nbins >=1 \n",
+        fprintf(stderr,"Error: Could not setup with s bins correctly. (rmin = %lf, rmax = %lf, with nbins = %d). Expected non-zero rmin/rmax with rmax > rmin and nbins >=1 \n",
                 smin, smax, nsbin);
         return EXIT_FAILURE;
     }
-    detect_bin_type(supp, nsbin, &(options->bin_type), options->verbose);
+    detect_bin_type(bins, &(options->bin_type), options->verbose);
 
     if(max_mu <= 0.0 || max_mu > 1.0) {
         fprintf(stderr,"Error: max_mu (max. value for the cosine of the angle with line of sight) must be greater than 0 and at most 1).\n"
@@ -357,7 +356,6 @@ int countpairs_s_mu_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z1
         if(autocorr == 0) {
             free_cellarray_DOUBLE(lattice2, totncells);
         }
-        free(supp);
         return EXIT_FAILURE;
     }
 
@@ -369,7 +367,6 @@ int countpairs_s_mu_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z1
         if(autocorr == 0) {
             free_cellarray_DOUBLE(lattice2, totncells);
         }
-        free(supp);
         return EXIT_FAILURE;
     }
 
@@ -399,7 +396,6 @@ int countpairs_s_mu_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z1
         if(need_weightavg) {
             matrix_free((void**) all_weightavg, numthreads);
         }
-        free(supp);
         return EXIT_FAILURE;
     }
 #else
@@ -484,7 +480,7 @@ int countpairs_s_mu_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z1
                                                                    this_cell_pair->min_dx, this_cell_pair->min_dy, this_cell_pair->min_dz,
                                                                    this_cell_pair->closest_x1, this_cell_pair->closest_y1, this_cell_pair->closest_z1,
                                                                    this_rpavg, npairs,
-                                                                   this_weightavg, extra->weight_method, options->bin_type);
+                                                                   this_weightavg, extra->weight_method, extra->pair_weight, options->bin_type);
 
                 /* This actually causes a race condition under OpenMP - but mostly
                    I care that an error occurred - rather than the exact value of
@@ -530,7 +526,6 @@ int countpairs_s_mu_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z1
 
     if(abort_status != EXIT_SUCCESS || interrupt_status_DDsmu_DOUBLE != EXIT_SUCCESS) {
         /* Cleanup memory here if aborting */
-        free(supp);
 #if defined(_OPENMP)
         matrix_free((void **) all_npairs, numthreads);
         if(options->need_avg_sep) {
@@ -602,27 +597,25 @@ int countpairs_s_mu_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z1
         /* The comparison is '<=' rather than '==' only to silence
            the compiler  */
         if(supp[0] <= 0.0) {
-            int index = (nmu_bins + 1);//first valid s bin (with 0-dpi depth in pi)
             /* Then, add all the self-pairs. This ensures that
                a cross-correlation with two identical datasets
                produces the same result as the auto-correlation  */
-            npairs[index] += ND1;
+            npairs[nmu_bins+1] += ND1;
 
             // Increasing npairs affects savg and weightavg.
             // We don't need to add anything to savg; all the self-pairs have 0 separation!
             // The self-pairs have non-zero weight, though.  So, fix that here.
             if(need_weightavg){
                 // Keep in mind this is an autocorrelation (i.e. only one particle set to consider)
+                pair_struct_DOUBLE pair;
+                set_pair_struct_DOUBLE(&pair, (weight_struct_DOUBLE *) &(extra->weights0), (weight_struct_DOUBLE *) &(extra->weights0), &(extra->pair_weight));
                 weight_func_t_DOUBLE weight_func = get_weight_func_by_method_DOUBLE(extra->weight_method);
-                pair_struct_DOUBLE pair = {.num_weights = extra->weights0.num_weights,
-                                           .dx.d=0., .dy.d=0., .dz.d=0.,  // always 0 separation
-                                           .parx.d=0., .pary.d=0., .parz.d=0.};
                 for(int64_t j = 0; j < ND1; j++){
                     for(int w = 0; w < pair.num_weights; w++){
                         pair.weights0[w].d = ((DOUBLE *) extra->weights0.weights[w])[j];
                         pair.weights1[w].d = ((DOUBLE *) extra->weights0.weights[w])[j];
                     }
-                    weightavg[1] += weight_func(&pair);
+                    weightavg[nmu_bins+1] += weight_func(&pair);
                 }
             }
         }
@@ -632,7 +625,7 @@ int countpairs_s_mu_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z1
     for(int i=0;i<totnbins;i++) {
         if(npairs[i] > 0) {
             if(options->need_avg_sep) {
-                savg[i] /= (DOUBLE) npairs[i] ;
+                savg[i] /= need_weightavg ? weightavg[i] : (DOUBLE) npairs[i];
             }
             if(need_weightavg) {
                 weightavg[i] /= (DOUBLE) npairs[i];
@@ -653,7 +646,6 @@ int countpairs_s_mu_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z1
     if(results->npairs == NULL || results->supp == NULL ||
        results->savg == NULL || results->weightavg == NULL) {
         free_results_s_mu(results);
-        free(supp);
         return EXIT_FAILURE;
     }
 
@@ -678,7 +670,6 @@ int countpairs_s_mu_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z1
             }
         }
     }
-    free(supp);
 
     /* reset interrupt handlers to default */
     RESET_INTERRUPT_HANDLERS();

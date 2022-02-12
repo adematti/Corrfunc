@@ -13,7 +13,7 @@ __author__ = ('Manodeep Sinha')
 __all__ = ('DDrppi', )
 
 
-def DDrppi(autocorr, nthreads, pimax, binfile, X1, Y1, Z1, weights1=None,
+def DDrppi(autocorr, nthreads, binfile, pimax, npibins, X1, Y1, Z1, weights1=None,
            periodic=True, boxsize=None,
            X2=None, Y2=None, Z2=None, weights2=None,
            verbose=False, output_rpavg=False,
@@ -21,10 +21,11 @@ def DDrppi(autocorr, nthreads, pimax, binfile, X1, Y1, Z1, weights1=None,
            zbin_refine_factor=1, max_cells_per_dim=100,
            copy_particles=True, enable_min_sep_opt=True,
            c_api_timer=False, isa='fastest',
-           weight_type=None, bin_type='custom'):
+           weight_type=None, bin_type='custom',
+           pair_weights=None, sep_pair_weights=None, attrs_pair_weights=None):
     """
     Calculate the 3-D pair-counts corresponding to the real-space correlation
-    function, :math:`\\xi(r_p, \pi)` or :math:`\\wp(r_p)`. Pairs which are
+    function, :math:`\\xi(r_p, \\pi)` or :math:`\\wp(r_p)`. Pairs which are
     separated by less than the ``rp`` bins (specified in ``binfile``) in the
     X-Y plane, and less than ``pimax`` in the Z-dimension are
     counted.
@@ -35,35 +36,24 @@ def DDrppi(autocorr, nthreads, pimax, binfile, X1, Y1, Z1, weights1=None,
     ``weight_type``.
 
     .. note:: that this module only returns pair counts and not the actual
-        correlation function :math:`\\xi(r_p, \pi)` or :math:`wp(r_p)`. See the
+        correlation function :math:`\\xi(r_p, \\pi)` or :math:`wp(r_p)`. See the
         utilities :py:mod:`Corrfunc.utils.convert_3d_counts_to_cf` and
         :py:mod:`Corrfunc.utils.convert_rp_pi_counts_to_wp` for computing
-        :math:`\\xi(r_p, \pi)` and :math:`wp(r_p)` respectively from the
+        :math:`\\xi(r_p, \\pi)` and :math:`wp(r_p)` respectively from the
         pair counts.
 
 
     Parameters
-    -----------
-
-    autocorr: boolean, required
+    ----------
+    autocorr : boolean, required
         Boolean flag for auto/cross-correlation. If autocorr is set to 1,
         then the second set of particle positions are not required.
 
-    nthreads: integer
+    nthreads : integer
         The number of OpenMP threads to use. Has no effect if OpenMP was not
         enabled during library compilation.
 
-    pimax: double
-        A double-precision value for the maximum separation along
-        the Z-dimension.
-
-        Distances along the :math:``\\pi`` direction are binned with unit
-        depth. For instance, if ``pimax=40``, then 40 bins will be created
-        along the ``pi`` direction.
-
-        Note: Only pairs with ``0 <= dz < pimax`` are counted (no equality).
-
-    binfile: string or an list/array of floats
+    binfile : string or an list/array of floats
         For string input: filename specifying the ``rp`` bins for
         ``DDrppi``. The file should contain white-space separated values
         of (rpmin, rpmax)  for each ``rp`` wanted. The bins need to be
@@ -75,21 +65,35 @@ def DDrppi(autocorr, nthreads, pimax, binfile, X1, Y1, Z1, weights1=None,
         input specifying **14** (logarithmic) bins between 0.1 and 10.0. This
         array does not need to be sorted.
 
-    X1/Y1/Z1: array-like, real (float/double)
+    pimax : double
+        A double-precision value for the maximum separation along
+        the Z-dimension.
+
+        Distances along the :math:``\\pi`` direction are binned with unit
+        depth. For instance, if ``pimax=40``, then 40 bins will be created
+        along the ``pi`` direction.
+
+        Note: Only pairs with ``0 <= dz < pimax`` are counted (no equality).
+
+    npibins : int
+        The number of linear ``pi`` bins, with the bins ranging from
+        from (0, :math:`\\pi_{max}`)
+
+    X1/Y1/Z1 : array-like, real (float/double)
         The array of X/Y/Z positions for the first set of points.
         Calculations are done in the precision of the supplied arrays.
 
-    weights1: array_like, real (float/double), optional
+    weights1 : array_like, real (float/double), optional
         A scalar, or an array of weights of shape (n_weights, n_positions) or
         (n_positions,). ``weight_type`` specifies how these weights are used;
         results are returned in the ``weightavg`` field.  If only one of
         weights1 and weights2 is specified, the other will be set to uniform
         weights.
 
-    periodic: boolean
+    periodic : boolean
         Boolean flag to indicate periodic boundary conditions.
 
-    boxsize: double, required if ``periodic=True``
+    boxsize : double, required if ``periodic=True``
         The side-length of the cube in the cosmological simulation.
         Present to facilitate exact calculations for periodic wrapping.
         If boxsize is 0., then the wrapping is done based on
@@ -102,13 +106,13 @@ def DDrppi(autocorr, nthreads, pimax, binfile, X1, Y1, Z1, weights1=None,
         Array of XYZ positions for the second set of points. *Must* be the same
         precision as the X1/Y1/Z1 arrays. Only required when ``autocorr==0``.
 
-    weights2: array-like, real (float/double), optional
+    weights2 : array-like, real (float/double), optional
         Same as weights1, but for the second set of positions
 
-    verbose: boolean (default false)
+    verbose : boolean (default false)
         Boolean flag to control output of informational messages
 
-    output_rpavg: boolean (default false)
+    output_rpavg : boolean (default false)
         Boolean flag to output the average ``rp`` for each bin. Code will
         run slower if you set this flag.
 
@@ -117,32 +121,32 @@ def DDrppi(autocorr, nthreads, pimax, binfile, X1, Y1, Z1, weights1=None,
         you need accurate ``rpavg`` values, then pass in double precision
         arrays for the particle positions.
 
-    (xyz)bin_refine_factor: integer, default is (2,2,1); typically within [1-3]
+    (xyz)bin_refine_factor : integer, default is (2,2,1); typically within [1-3]
         Controls the refinement on the cell sizes. Can have up to a 20% impact
         on runtime.
 
-    max_cells_per_dim: integer, default is 100, typical values in [50-300]
+    max_cells_per_dim : integer, default is 100, typical values in [50-300]
         Controls the maximum number of cells per dimension. Total number of
         cells can be up to (max_cells_per_dim)^3. Only increase if ``rpmax`` is
         too small relative to the boxsize (and increasing helps the runtime).
 
-    copy_particles: boolean (default True)
+    copy_particles : boolean (default True)
         Boolean flag to make a copy of the particle positions
         If set to False, the particles will be re-ordered in-place
 
         .. versionadded:: 2.3.0
 
-    enable_min_sep_opt: boolean (default true)
+    enable_min_sep_opt : boolean (default true)
         Boolean flag to allow optimizations based on min. separation between
         pairs of cells. Here to allow for comparison studies.
 
         .. versionadded:: 2.3.0
 
-    c_api_timer: boolean (default false)
+    c_api_timer : boolean (default false)
         Boolean flag to measure actual time spent in the C libraries. Here
         to allow for benchmarking and scaling studies.
 
-    isa: string (default ``fastest``)
+    isa : string (default ``fastest``)
         Controls the runtime dispatch for the instruction set to use. Options
         are: [``fastest``, ``avx512f``, ``avx``, ``sse42``, ``fallback``]
 
@@ -155,7 +159,7 @@ def DDrppi(autocorr, nthreads, pimax, binfile, X1, Y1, Z1, weights1=None,
         you *are* benchmarking, then the string supplied here gets translated
         into an ``enum`` for the instruction set defined in ``utils/defs.h``.
 
-    weight_type: string, optional. Default: None.
+    weight_type : string, optional. Default: None.
         The type of weighting to apply.  One of ["pair_product", None].
 
     bin_type : string, case-insensitive (default ``custom``)
@@ -174,24 +178,33 @@ def DDrppi(autocorr, nthreads, pimax, binfile, X1, Y1, Z1, weights1=None,
         ``rtol = 1e-05`` *and* ``atol = 1e-08`` (relative and absolute tolerance)
         of ``np.linspace(binfile[0], binfile[-1], len(binfile))``.
 
-    Returns
-    --------
+    pair_weights : array-like, optional. Default: None.
+        Array of pair weights.
 
-    results: Numpy structured array
+    sep_pair_weights : array-like, optional. Default: None.
+        Array of separations corresponding to ``pair_weights``.
+
+    attrs_pair_weights : tuple. Default: None.
+        Attributes for pair weights; in case ``weight_type`` is "inverse_bitwise",
+        the tuple of (offset to be added to the bitwise counts,
+        default weight value if denominator is zero).
+
+    Returns
+    -------
+    results : Numpy structured array
         A numpy structured array containing [rpmin, rpmax, rpavg, pimax,
         npairs, weightavg] for each radial bin specified in the ``binfile``.
         If ``output_rpavg`` is not set, then ``rpavg`` will be set to 0.0 for
         all bins; similarly for ``weightavg``. ``npairs`` contains the number
-        of pairs in that bin and can be used to compute :math:`\\xi(r_p, \pi)`
+        of pairs in that bin and can be used to compute :math:`\\xi(r_p, \\pi)`
         by combining with (DR, RR) counts.
 
-    api_time: float, optional
+    api_time : float, optional
         Only returned if ``c_api_timer`` is set.  ``api_time`` measures only
         the time spent within the C library and ignores all python overhead.
 
     Example
-    --------
-
+    -------
     >>> from __future__ import print_function
     >>> import numpy as np
     >>> from os.path import dirname, abspath, join as pjoin
@@ -269,7 +282,7 @@ def DDrppi(autocorr, nthreads, pimax, binfile, X1, Y1, Z1, weights1=None,
 
     import numpy as np
     from Corrfunc.utils import translate_isa_string_to_enum, translate_bin_type_string_to_enum,\
-        return_file_with_rbins, convert_to_native_endian,\
+        get_edges, convert_to_native_endian,\
         sys_pipes, process_weights
     from future.utils import bytes_to_native_str
 
@@ -290,25 +303,36 @@ def DDrppi(autocorr, nthreads, pimax, binfile, X1, Y1, Z1, weights1=None,
     weights1, weights2 = process_weights(weights1, weights2, X1, X2, weight_type, autocorr)
 
     # Ensure all input arrays are native endian
-    X1, Y1, Z1, weights1, X2, Y2, Z2, weights2 = [
+    X1, Y1, Z1, X2, Y2, Z2 = [
             convert_to_native_endian(arr, warn=True) for arr in
-            [X1, Y1, Z1, weights1, X2, Y2, Z2, weights2]]
+            [X1, Y1, Z1, X2, Y2, Z2]]
+
+    if weights1 is not None:
+        weights1 = [convert_to_native_endian(arr, warn=True) for arr in weights1]
+    if weights2 is not None:
+        weights2 = [convert_to_native_endian(arr, warn=True) for arr in weights2]
+
+    if pair_weights is not None:
+        if periodic: raise ValueError('Cannot use pair_weights if periodic=True')
+        pair_weights = convert_to_native_endian(pair_weights, warn=True)
+        sep_pair_weights = convert_to_native_endian(sep_pair_weights, warn=True)
 
     # Passing None parameters breaks the parsing code, so avoid this
     kwargs = {}
     for k in ['weights1', 'weights2', 'weight_type',
-              'X2', 'Y2', 'Z2', 'boxsize']:
+              'X2', 'Y2', 'Z2', 'boxsize',
+              'pair_weights', 'sep_pair_weights', 'attrs_pair_weights']:
         v = locals()[k]
         if v is not None:
             kwargs[k] = v
 
     integer_isa = translate_isa_string_to_enum(isa)
     integer_bin_type = translate_bin_type_string_to_enum(bin_type)
-    rbinfile, delete_after_use = return_file_with_rbins(binfile)
+    rbinfile = get_edges(binfile)
 
     with sys_pipes():
       extn_results = DDrppi_extn(autocorr, nthreads,
-                                 pimax, rbinfile,
+                                 rbinfile, pimax, npibins,
                                  X1, Y1, Z1,
                                  periodic=periodic,
                                  verbose=verbose,
@@ -327,10 +351,6 @@ def DDrppi(autocorr, nthreads, pimax, binfile, X1, Y1, Z1, weights1=None,
         raise RuntimeError(msg)
     else:
         extn_results, api_time = extn_results
-
-    if delete_after_use:
-        import os
-        os.remove(rbinfile)
 
     results_dtype = np.dtype([(bytes_to_native_str(b'rmin'), np.float64),
                               (bytes_to_native_str(b'rmax'), np.float64),

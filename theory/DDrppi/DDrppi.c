@@ -73,7 +73,7 @@ int main(int argc, char *argv[])
     const char argnames[][30]={"file1","format1","file2","format2","binfile","pimax","boxsize","Nthreads"};
 #endif
     const char optargnames[][30]={"weight_method", "weights_file1","weights_format1","weights_file2","weights_format2"};
-    
+
     int nargs=sizeof(argnames)/(sizeof(char)*30);
     int noptargs=sizeof(optargnames)/(sizeof(char)*30);
 
@@ -99,7 +99,7 @@ int main(int argc, char *argv[])
             fprintf(stderr,"\t\t %s = `?'\n",argnames[i-1]);
         return EXIT_FAILURE;
     }
-    
+
     /* Validate optional arguments */
     int noptargs_given = argc - (nargs + 1);
     if(noptargs_given != 0 && noptargs_given != 3 && noptargs_given != 5){
@@ -146,7 +146,7 @@ int main(int argc, char *argv[])
          return EXIT_FAILURE;
        }
        num_weights = get_num_weights_by_method(weight_method);
-      
+
        weights_file1 = argv[nargs + 2];
        weights_fileformat1 = argv[nargs + 3];
     }
@@ -173,6 +173,8 @@ int main(int argc, char *argv[])
     }
     fprintf(stderr,"\t\t -------------------------------------\n");
 
+    binarray bins;
+    read_binfile(binfile, &bins);
 
     gettimeofday(&t0,NULL);
     /*---Read-data1-file----------------------------------*/
@@ -180,14 +182,14 @@ int main(int argc, char *argv[])
     gettimeofday(&t1,NULL);
     read_time += ADD_DIFF_TIME(t0,t1);
     gettimeofday(&t0,NULL);
-    
+
     /* Read weights file 1 */
     if(weights_file1 != NULL){
         gettimeofday(&t0,NULL);
         int64_t wND1 = read_columns_into_array(weights_file1,weights_fileformat1, sizeof(DOUBLE), num_weights, (void **) weights1);
         gettimeofday(&t1,NULL);
         read_time += ADD_DIFF_TIME(t0,t1);
-      
+
         if(wND1 != ND1){
           fprintf(stderr, "Error: read %"PRId64" lines from %s, but read %"PRId64" from %s\n", wND1, weights_file1, ND1, file1);
           return EXIT_FAILURE;
@@ -227,7 +229,7 @@ int main(int argc, char *argv[])
     results_countpairs_rp_pi results;
     struct config_options options = get_config_options();
     options.boxsize = boxsize;
-    
+
     /* Pack weights into extra options */
     struct extra_options extra = get_extra_options(weight_method);
     for(int w = 0; w < num_weights; w++){
@@ -242,8 +244,9 @@ int main(int argc, char *argv[])
                                   ND2,x2,y2,z2,
                                   nthreads,
                                   autocorr,
-                                  binfile,
+                                  &bins,
                                   pimax,
+                                  (int) pimax,
                                   &results,
                                   &options,
                                   &extra);
@@ -258,6 +261,7 @@ int main(int argc, char *argv[])
           free(weights2[w]);
         }
     }
+    free_binarray(&bins);
 
     if(status != EXIT_SUCCESS) {
         return status;

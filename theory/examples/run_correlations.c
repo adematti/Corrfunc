@@ -131,6 +131,9 @@ int main(int argc, char **argv)
 #endif
     fprintf(stderr,"\t\t -------------------------------------" ANSI_COLOR_RESET "\n");
 
+    binarray bins;
+    read_binfile(binfile, &bins);
+
     //Read-in the data
     const int64_t ND1 = read_positions(file,fileformat,sizeof(*x1),3, &x1, &y1, &z1);
 
@@ -156,7 +159,7 @@ int main(int argc, char **argv)
                                 ND2,x2,y2,z2,
                                 nthreads,
                                 autocorr,
-                                binfile,
+                                &bins,
                                 &results,
                                 &options, NULL);
         if(status != EXIT_SUCCESS) {
@@ -196,8 +199,9 @@ int main(int argc, char **argv)
                                       ND2,x2,y2,z2,
                                       nthreads,
                                       autocorr,
-                                      binfile,
+                                      &bins,
                                       pimax,
+                                      (int) pimax,
                                       &results,
                                       &options, NULL);
         if(status != EXIT_SUCCESS) {
@@ -241,7 +245,7 @@ int main(int argc, char **argv)
                                      ND2,x2,y2,z2,
                                      nthreads,
                                      autocorr,
-                                     binfile,
+                                     &bins,
                                      mu_max,
                                      nmu_bins,
                                      &results,
@@ -289,7 +293,7 @@ int main(int argc, char **argv)
         int status = countpairs_wp(ND1,x1,y1,z1,
                                    boxsize,
                                    nthreads,
-                                   binfile,
+                                   &bins,
                                    pimax,
                                    &results,
                                    &options, NULL);
@@ -328,7 +332,7 @@ int main(int argc, char **argv)
         int status = countpairs_xi(ND1,x1,y1,z1,
                                    boxsize,
                                    nthreads,
-                                   binfile,
+                                   &bins,
                                    &results,
                                    &options, NULL);
         if(status != EXIT_SUCCESS) {
@@ -394,5 +398,6 @@ int main(int argc, char **argv)
     }
 
     free(x1);free(y1);free(z1);
+    free_binarray(&bins);
     return EXIT_SUCCESS;
 }

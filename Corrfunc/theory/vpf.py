@@ -27,8 +27,7 @@ def vpf(rmax, nbins, nspheres, numpN, seed,
     sphere of radius up to ``rmax`` containing [0, numpN-1] galaxies.
 
     Parameters
-    -----------
-
+    ----------
     rmax: double
         Maximum radius of the sphere to place on the particles
 
@@ -127,8 +126,7 @@ def vpf(rmax, nbins, nspheres, numpN, seed,
         into an ``enum`` for the instruction set defined in ``utils/defs.h``.
 
     Returns
-    --------
-
+    -------
     results: Numpy structured array
 
         A numpy structured array containing [rmax, pN[numpN]] with ``nbins``
@@ -144,8 +142,7 @@ def vpf(rmax, nbins, nspheres, numpN, seed,
         the C library and ignores all python overhead.
 
     Example
-    --------
-
+    -------
     >>> from __future__ import print_function
     >>> import numpy as np
     >>> from Corrfunc.theory.vpf import vpf

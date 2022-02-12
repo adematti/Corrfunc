@@ -31,7 +31,8 @@ static inline int xi_avx512_intrinsics_DOUBLE(DOUBLE *x1, DOUBLE *y1, DOUBLE *z1
                                               const DOUBLE closest_icell_xpos, const DOUBLE closest_icell_ypos, const DOUBLE closest_icell_zpos,
                                               DOUBLE *src_rpavg,
                                               uint64_t *src_npairs,
-                                              DOUBLE *src_weightavg, const weight_method_t weight_method, const bin_type_t bin_type)
+                                              DOUBLE *src_weightavg, const weight_method_t weight_method, const pair_weight_struct pair_weight,
+                                              const bin_type_t bin_type)
 {
 
 #ifdef COUNT_VECTORIZED
@@ -78,8 +79,8 @@ static inline int xi_avx512_intrinsics_DOUBLE(DOUBLE *x1, DOUBLE *y1, DOUBLE *z1
         local_w1 = *weights1;
         local_w2 = *weights2;
 
-        pair.num_weights = local_w1.num_weights;
-        avx512_weight_func   = get_avx512_weight_func_by_method_DOUBLE(weight_method);
+        set_pair_struct_DOUBLE(&pair, &local_w0, &local_w1, &pair_weight);
+        avx512_weight_func = get_avx512_weight_func_by_method_DOUBLE(weight_method);
     }
 
     const DOUBLE *zstart = z2, *zend = z2 + N2;
@@ -242,6 +243,7 @@ static inline int xi_avx512_intrinsics_DOUBLE(DOUBLE *x1, DOUBLE *y1, DOUBLE *z1
                     }
                 }//backwards loop over the bins
             }
+            if(need_rpavg && need_weightavg) union_mDperp.m_Dperp = AVX512_MASKZ_MULTIPLY_FLOATS(m_mask_left, union_mDperp.m_Dperp, union_mweight.m_weights);
             if(need_rpavg || need_weightavg || bin_type == BIN_LIN) {
                 //Do I need this step of going via the union? accessing int[] -> AVX* vector might
                 //cause alignment problems but accessing the ints from an AVX*
@@ -274,7 +276,7 @@ static inline int xi_avx512_intrinsics_DOUBLE(DOUBLE *x1, DOUBLE *y1, DOUBLE *z1
         npairs_found += npairs[i];
         src_npairs[i] += npairs[i];
         if(need_rpavg) {
-            src_rpavg[i]  += rpavg[i];
+            src_rpavg[i] += rpavg[i];
         }
         if(need_weightavg) {
             src_weightavg[i] += weightavg[i];
@@ -305,7 +307,8 @@ static inline int xi_avx_intrinsics_DOUBLE(DOUBLE *x1, DOUBLE *y1, DOUBLE *z1, c
                                            const DOUBLE min_xdiff, const DOUBLE min_ydiff, const DOUBLE min_zdiff,
                                            const DOUBLE closest_icell_xpos, const DOUBLE closest_icell_ypos, const DOUBLE closest_icell_zpos,
                                            DOUBLE *src_ravg, uint64_t *src_npairs,
-                                           DOUBLE *src_weightavg, const weight_method_t weight_method, const bin_type_t bin_type)
+                                           DOUBLE *src_weightavg, const weight_method_t weight_method, const pair_weight_struct pair_weight,
+                                           const bin_type_t bin_type)
 {
     uint64_t npair[nbin];
     AVX_FLOATS m_rupp_sqr[nbin];
@@ -349,13 +352,12 @@ static inline int xi_avx_intrinsics_DOUBLE(DOUBLE *x1, DOUBLE *y1, DOUBLE *z1, c
     weight_func_t_DOUBLE fallback_weight_func = NULL;
     if(need_weightavg){
       // Same particle list, new copy of num_weights pointers into that list
-      local_w1 = *weights1;
-      local_w2 = *weights2;
+        local_w1 = *weights1;
+        local_w2 = *weights2;
 
-      pair.num_weights = local_w1.num_weights;
-
-      avx_weight_func = get_avx_weight_func_by_method_DOUBLE(weight_method);
-      fallback_weight_func = get_weight_func_by_method_DOUBLE(weight_method);
+        set_pair_struct_DOUBLE(&pair, &local_w1, &local_w2, &pair_weight);
+        avx_weight_func = get_avx_weight_func_by_method_DOUBLE(weight_method);
+        fallback_weight_func = get_weight_func_by_method_DOUBLE(weight_method);
     }
 
     const DOUBLE *zstart = z2, *zend = z2 + N2;
@@ -525,6 +527,7 @@ static inline int xi_avx_intrinsics_DOUBLE(DOUBLE *x1, DOUBLE *y1, DOUBLE *z1, c
                     }
                 }
             }
+            if(need_ravg && need_weightavg) union_mDperp.m_Dperp = AVX_MULTIPLY_FLOATS(union_mDperp.m_Dperp, union_mweight.m_weights);
             if(need_ravg || need_weightavg || bin_type == BIN_LIN) {
                 union_rbin.m_ibin = AVX_TRUNCATE_FLOAT_TO_INT(m_rbin);
                 //protect the unroll pragma in case compiler is not icc.
@@ -550,6 +553,7 @@ static inline int xi_avx_intrinsics_DOUBLE(DOUBLE *x1, DOUBLE *y1, DOUBLE *z1, c
 
         //remainder loop
         for(;j<N2;j++){
+
             const DOUBLE dz = *localz2++ - zpos;
             const DOUBLE dx = *localx2++ - xpos;
             const DOUBLE dy = *localy2++ - ypos;
@@ -590,6 +594,7 @@ static inline int xi_avx_intrinsics_DOUBLE(DOUBLE *x1, DOUBLE *y1, DOUBLE *z1, c
             }
             npair[kbin]++;
             if(need_ravg) {
+                if(need_weightavg) r *= pairweight;
                 ravg[kbin] += r;
             }
             if(need_weightavg){
@@ -624,7 +629,8 @@ static inline int xi_sse_intrinsics_DOUBLE(DOUBLE *x0, DOUBLE *y0, DOUBLE *z0, c
                                            const DOUBLE min_xdiff, const DOUBLE min_ydiff, const DOUBLE min_zdiff,
                                            const DOUBLE closest_icell_xpos, const DOUBLE closest_icell_ypos, const DOUBLE closest_icell_zpos,
                                            DOUBLE *src_ravg, uint64_t *src_npairs,
-                                           DOUBLE *src_weightavg, const weight_method_t weight_method, const bin_type_t bin_type)
+                                           DOUBLE *src_weightavg, const weight_method_t weight_method, const pair_weight_struct pair_weight,
+                                           const bin_type_t bin_type)
 {
     uint64_t npairs[nbin];
     SSE_FLOATS m_rupp_sqr[nbin];
@@ -667,13 +673,12 @@ static inline int xi_sse_intrinsics_DOUBLE(DOUBLE *x0, DOUBLE *y0, DOUBLE *z0, c
     weight_func_t_DOUBLE fallback_weight_func = NULL;
     if(need_weightavg){
       // Same particle list, new copy of num_weights pointers into that list
-      local_w0 = *weights0;
-      local_w1 = *weights1;
+        local_w0 = *weights0;
+        local_w1 = *weights1;
 
-      pair.num_weights = local_w0.num_weights;
-
-      sse_weight_func = get_sse_weight_func_by_method_DOUBLE(weight_method);
-      fallback_weight_func = get_weight_func_by_method_DOUBLE(weight_method);
+        set_pair_struct_DOUBLE(&pair, &local_w0, &local_w1, &pair_weight);
+        sse_weight_func = get_sse_weight_func_by_method_DOUBLE(weight_method);
+        fallback_weight_func = get_weight_func_by_method_DOUBLE(weight_method);
     }
 
     const DOUBLE *zstart = z1, *zend = z1 + N1;
@@ -830,6 +835,7 @@ static inline int xi_sse_intrinsics_DOUBLE(DOUBLE *x0, DOUBLE *y0, DOUBLE *z0, c
             				}
           			}
             }
+            if(need_ravg && need_weightavg) union_mDperp.m_Dperp = SSE_MULTIPLY_FLOATS(union_mDperp.m_Dperp, union_mweight.m_weights);
             if(need_ravg || need_weightavg || bin_type == BIN_LIN) {
                 union_rbin.m_ibin = SSE_TRUNCATE_FLOAT_TO_INT(m_rbin);
                 //protect the unroll pragma in case compiler is not icc.
@@ -854,6 +860,7 @@ static inline int xi_sse_intrinsics_DOUBLE(DOUBLE *x0, DOUBLE *y0, DOUBLE *z0, c
         }//j-loop
 
     		for(;j<N1;j++) {
+
       			const DOUBLE dx = *localx1++ - xpos;
       			const DOUBLE dy = *localy1++ - ypos;
       			const DOUBLE dz = *localz1++ - zpos;
@@ -892,6 +899,7 @@ static inline int xi_sse_intrinsics_DOUBLE(DOUBLE *x0, DOUBLE *y0, DOUBLE *z0, c
             }
             npairs[kbin]++;
             if(need_ravg) {
+                if(need_weightavg) r *= pairweight;
                 ravg[kbin] += r;
             }
             if(need_weightavg){
@@ -922,7 +930,8 @@ static inline int xi_fallback_DOUBLE(DOUBLE *x0, DOUBLE *y0, DOUBLE *z0, const w
                                      const DOUBLE min_xdiff, const DOUBLE min_ydiff, const DOUBLE min_zdiff,
                                      const DOUBLE closest_icell_xpos, const DOUBLE closest_icell_ypos, const DOUBLE closest_icell_zpos,
                                      DOUBLE *src_ravg, uint64_t *src_npairs,
-                                     DOUBLE *src_weightavg, const weight_method_t weight_method, const bin_type_t bin_type)
+                                     DOUBLE *src_weightavg, const weight_method_t weight_method, const pair_weight_struct pair_weight,
+                                     const bin_type_t bin_type)
 {
     /*----------------- FALLBACK CODE --------------------*/
     uint64_t npairs[nbin];
@@ -958,7 +967,7 @@ static inline int xi_fallback_DOUBLE(DOUBLE *x0, DOUBLE *y0, DOUBLE *z0, const w
       local_w0 = *weights0;
       local_w1 = *weights1;
 
-      pair.num_weights = local_w0.num_weights;
+      set_pair_struct_DOUBLE(&pair, &local_w0, &local_w1, &pair_weight);
       weight_func = get_weight_func_by_method_DOUBLE(weight_method);
     }
 
@@ -1031,6 +1040,7 @@ static inline int xi_fallback_DOUBLE(DOUBLE *x0, DOUBLE *y0, DOUBLE *z0, const w
         }
 
         for(int64_t j=0;j<nleft;j++) {
+
             const DOUBLE dx = *localx1++ - xpos;
             const DOUBLE dy = *localy1++ - ypos;
             const DOUBLE dz = *localz1++ - zpos;
@@ -1069,6 +1079,7 @@ static inline int xi_fallback_DOUBLE(DOUBLE *x0, DOUBLE *y0, DOUBLE *z0, const w
             }
             npairs[kbin]++;
             if(need_ravg) {
+                if(need_weightavg) r *= pairweight;
                 ravg[kbin] += r;
             }
             if(need_weightavg){

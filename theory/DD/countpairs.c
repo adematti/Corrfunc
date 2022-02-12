@@ -35,7 +35,7 @@ int countpairs(const int64_t ND1, void * restrict X1, void * restrict Y1, void  
                const int64_t ND2, void * restrict X2, void * restrict Y2, void  * restrict Z2,
                const int numthreads,
                const int autocorr,
-               const char *binfile,
+               binarray *bins,
                results_countpairs *results,
                struct config_options *options,
                struct extra_options *extra)
@@ -59,7 +59,7 @@ int countpairs(const int64_t ND1, void * restrict X1, void * restrict Y1, void  
                                 ND2, (float *) X2, (float *) Y2, (float *) Z2,
                                 numthreads,
                                 autocorr,
-                                binfile,
+                                bins,
                                 results,
                                 options,
                                 extra);
@@ -68,7 +68,7 @@ int countpairs(const int64_t ND1, void * restrict X1, void * restrict Y1, void  
                                  ND2, (double *) X2, (double *) Y2, (double *) Z2,
                                  numthreads,
                                  autocorr,
-                                 binfile,
+                                 bins,
                                  results,
                                  options,
                                  extra);

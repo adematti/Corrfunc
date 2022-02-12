@@ -16,6 +16,7 @@
 
 #include "macros.h"
 #include "cpu_features.h"
+#include "utils.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -346,31 +347,130 @@ static inline struct config_options get_config_options(void)
 
 #define EXTRA_OPTIONS_HEADER_SIZE     (1024)
 
+
 #define MAX_NUM_WEIGHTS 10
+
+
+typedef enum {
+    FLOAT_TYPE,
+    INT_TYPE
+} weight_type_t;
+
 
 typedef struct
 {
     void *weights[MAX_NUM_WEIGHTS];  // This will be of shape weights[num_weights][num_particles]
-    int64_t num_weights;
+    uint8_t num_weights;
+    uint8_t num_integer_weights;
 } weight_struct;
+
+
+typedef struct
+{
+    void *weight;
+    void *sep;
+    uint8_t num;
+    int8_t noffset;
+    double default_value;
+} pair_weight_struct;
+
 
 typedef enum {
   NONE=-42, /* default */
   PAIR_PRODUCT=0,
+  INVERSE_BITWISE=1,
   NUM_WEIGHT_TYPE
 } weight_method_t; // type of weighting to apply
 
 /* Gives the number of weight arrays required by the given weighting method
- */
-static inline int get_num_weights_by_method(const weight_method_t method){
-    switch(method){
+*/
+
+static inline void copy_weight_struct(weight_struct *weight_st0, const weight_struct *weight_st1) {
+    weight_st0->num_weights = weight_st1->num_weights;
+    weight_st0->num_integer_weights = weight_st1->num_integer_weights;
+}
+
+
+static inline int get_num_weights_by_method(const weight_method_t method) {
+    switch (method) {
         case PAIR_PRODUCT:
             return 1;
+        case INVERSE_BITWISE:
+            return 0; // we can e.g. have only angular upweighting
         default:
-        case NONE:
             return 0;
     }
+    return 0;
 }
+
+
+static inline int set_weight_struct(weight_struct* weight_st, const weight_method_t method, const weight_type_t* type, const int8_t num_weights) {
+    // index is 0 (first weights) or 1 (second weights)
+    weight_st->num_weights = num_weights;
+    if (num_weights > MAX_NUM_WEIGHTS) {
+        fprintf(stderr,"Error: %d weight arrays are provided, but only %d are supported\n", num_weights, MAX_NUM_WEIGHTS);
+        return EXIT_FAILURE;
+    }
+    if (num_weights < 0) {
+        weight_st->num_weights = get_num_weights_by_method(method);
+    }
+    char itemtype[MAX_NUM_WEIGHTS];
+    for (int w=0; w<weight_st->num_weights; w++) {
+        if (type == NULL) {
+            switch (method) {
+                case INVERSE_BITWISE:
+                    itemtype[w] = INT_TYPE;
+                    break;
+                default:
+                    itemtype[w] = FLOAT_TYPE;
+            }
+        }
+        else {
+            itemtype[w] = type[w];
+        }
+        switch (method) {
+            case PAIR_PRODUCT:
+                if (itemtype[w] == INT_TYPE) {
+                    fprintf(stderr,"Error: pair_product weights only supports floating weights\n");
+                    return EXIT_FAILURE;
+                }
+                break;
+            default:
+              break;
+        }
+    }
+    // check weights are first ints, then (optionally) float
+    weight_st->num_integer_weights = 0;
+    if (method == INVERSE_BITWISE) {
+        int first_float = 0;
+        for (int w=0; w<weight_st->num_weights; w++) {
+            if (itemtype[w] == INT_TYPE) {
+                if (first_float) {
+                    fprintf(stderr,"Error: inverse_bitwise weights should first include integer weights, then float weights\n");
+                    return EXIT_FAILURE;
+                }
+                weight_st->num_integer_weights++;
+            } else {
+                first_float = w;
+            }
+        }
+    }
+    //printf("Found %d integer weights among %d weights.\n",weight_st->num_integer_weights,weight_st->num_weights);
+    return EXIT_SUCCESS;
+}
+
+
+static inline int set_pair_weight_struct(pair_weight_struct* pair_weight_st, void* sep, void* weight, const uint8_t num,
+                                         const int8_t noffset, const double default_value) {
+    pair_weight_st->weight = weight;
+    pair_weight_st->sep = sep;
+    pair_weight_st->num = num;
+    pair_weight_st->noffset = noffset;
+    pair_weight_st->default_value = default_value;
+    //printf("Found %d pair weights.\n",num);
+    return EXIT_SUCCESS;
+}
+
 
 /* Maps a name to weighting method
    `method` will be set on return.
@@ -386,17 +486,75 @@ static inline int get_weight_method_by_name(const char *name, weight_method_t *m
         *method = PAIR_PRODUCT;
         return EXIT_SUCCESS;
     }
+    if(strcmp(name, "inverse_bitwise") == 0){
+        *method = INVERSE_BITWISE;
+        return EXIT_SUCCESS;
+    }
 
     return EXIT_FAILURE;
 }
+
+
+typedef struct {
+    double *edges;
+    int nedges;
+} binarray;
+
+
+static inline int set_binarray(binarray *bins, double* edges, int nedges)
+{
+    bins->nedges = nedges;
+    bins->edges = (double *) malloc(sizeof(double) * bins->nedges);
+    if (bins->edges == NULL){
+        fprintf(stderr,"malloc for %d bins failed...\n",bins->nedges);
+        return EXIT_FAILURE;
+    }
+    //bins->edges = (double *) my_malloc(sizeof(double), (int64_t) bins->nedges);
+    for (int ii=0; ii<bins->nedges; ii++) bins->edges[ii] = edges[ii];
+    return EXIT_SUCCESS;
+}
+
+
+static inline int detect_bin_type(binarray *bins, bin_type_t *bin_type, uint8_t verbose)
+{
+    if (*bin_type == BIN_AUTO) {
+        // if linear spacing, return BIN_LIN, else BIN_CUSTOM
+        const double atol = 1e-8; // same tol as numpy.allclose
+        const double rtol = 1e-5;
+        double rmin = bins->edges[0];
+        double rstep = (bins->edges[bins->nedges-1] - bins->edges[0])/(bins->nedges - 1);
+        *bin_type = BIN_LIN;
+        for (int ii=1; ii<bins->nedges; ii++) {
+            double pred = rmin + rstep*ii;
+            if ((fabs(bins->edges[ii] - pred) > atol)||(fabs(bins->edges[ii] - pred) > rtol * fabs(pred))) {
+                *bin_type = BIN_CUSTOM;
+                break;
+            }
+        }
+    }
+    if (verbose) {
+        if (*bin_type == BIN_LIN) fprintf(stderr,"Linear binning\n");
+        else fprintf(stderr,"Custom binning\n");
+    }
+    return EXIT_SUCCESS;
+}
+
+
+static inline int free_binarray(binarray *bins)
+{
+    free(bins->edges);
+    return EXIT_SUCCESS;
+}
+
 
 struct extra_options
 {
     // Two possible weight_structs (at most we will have two loaded sets of particles)
     weight_struct weights0;
     weight_struct weights1;
+    pair_weight_struct pair_weight;
     weight_method_t weight_method; // the function that will get called to give the weight of a particle pair
-    uint8_t reserved[EXTRA_OPTIONS_HEADER_SIZE - 2*sizeof(weight_struct) - sizeof(weight_method_t)];
+    uint8_t reserved[EXTRA_OPTIONS_HEADER_SIZE - 2*sizeof(weight_struct) - sizeof(weight_method_t) - sizeof(pair_weight_struct)];
 };
 
 // weight_method determines the number of various weighting arrays that we allocate
@@ -408,10 +566,9 @@ static inline struct extra_options get_extra_options(const weight_method_t weigh
 
     extra.weight_method = weight_method;
 
-    weight_struct *w0 = &(extra.weights0);
-    weight_struct *w1 = &(extra.weights1);
-    w0->num_weights = get_num_weights_by_method(extra.weight_method);
-    w1->num_weights = w0->num_weights;
+    set_weight_struct(&(extra.weights0), weight_method, NULL, -1);
+    set_weight_struct(&(extra.weights1), weight_method, NULL, -1);
+    set_pair_weight_struct(&(extra.pair_weight), NULL, NULL, 0, 1, 0.);
 
     return extra;
 }

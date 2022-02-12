@@ -6,5 +6,14 @@
 typedef struct
 {
     DOUBLE *weights[MAX_NUM_WEIGHTS];  // This will be of shape weights[num_weights][num_particles]
-    int64_t num_weights;
+    uint8_t num_weights;
+    uint8_t num_integer_weights;
 } weight_struct_DOUBLE;
+
+
+typedef struct
+{
+    DOUBLE *weight;
+    DOUBLE *sep;
+    uint8_t num;
+} pair_weight_struct_DOUBLE;

@@ -8,11 +8,12 @@
 
 #pragma once
 #include <stdio.h>
+#include "defs.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-    
+    int read_binfile(const char *fname, binarray *bins);
     int64_t read_positions(const char *filename, const char *format, const size_t size, const int num_fields, ...) __attribute__((warn_unused_result));
     int64_t read_columns_into_array(const char *filename, const char *format, const size_t size, const int num_fields, void **data) __attribute__((warn_unused_result));
 

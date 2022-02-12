@@ -148,7 +148,7 @@ wp_func_ptr_DOUBLE wp_driver_DOUBLE(const struct config_options *options)
 int countpairs_wp_DOUBLE(const int64_t ND, DOUBLE * restrict X, DOUBLE * restrict Y, DOUBLE * restrict Z,
                          const double boxsize,
                          const int numthreads,
-                         const char *binfile,
+                         binarray *bins,
                          const double pimax,
                          results_countpairs_wp *results,
                          struct config_options *options,
@@ -215,16 +215,15 @@ int countpairs_wp_DOUBLE(const int64_t ND, DOUBLE * restrict X, DOUBLE * restric
     /***********************
      *initializing the  bins
      ************************/
-    double *rupp;
-    double rpmin,rpmax;
-    int nrpbins;
-    setup_bins(binfile,&rpmin,&rpmax,&nrpbins,&rupp);
+    double *rupp = bins->edges;
+    int nrpbins = bins->nedges;
+    double rpmin=bins->edges[0], rpmax=bins->edges[bins->nedges-1];
     if( ! (rpmin >=0 && rpmax > 0.0 && rpmin < rpmax && nrpbins > 0)) {
-        fprintf(stderr,"Error: Could not setup with R bins correctly. (rmin = %lf, rmax = %lf, with nbins = %d). Expected non-zero rmin/rmax with rmax > rmin and nbins >=1 \n",
+        fprintf(stderr,"Error: Could not setup with r bins correctly. (rmin = %lf, rmax = %lf, with nbins = %d). Expected non-zero rmin/rmax with rmax > rmin and nbins >=1 \n",
                 rpmin, rpmax, nrpbins);
         return EXIT_FAILURE;
     }
-    detect_bin_type(rupp, nrpbins, &(options->bin_type), options->verbose);
+    detect_bin_type(bins, &(options->bin_type), options->verbose);
 
     const DOUBLE xmin = 0.0, xmax=boxsize;
     const DOUBLE ymin = 0.0, ymax=boxsize;
@@ -308,7 +307,6 @@ int countpairs_wp_DOUBLE(const int64_t ND, DOUBLE * restrict X, DOUBLE * restric
 
     if(all_cell_pairs == NULL) {
         free_cellarray_DOUBLE(lattice, totncells);
-        free(rupp);
         return EXIT_FAILURE;
     }
 
@@ -316,7 +314,6 @@ int countpairs_wp_DOUBLE(const int64_t ND, DOUBLE * restrict X, DOUBLE * restric
     wp_func_ptr_DOUBLE wp_function_DOUBLE = wp_driver_DOUBLE(options);
     if(wp_function_DOUBLE == NULL) {
         free_cellarray_DOUBLE(lattice, totncells);
-        free(rupp);
         return EXIT_FAILURE;
     }
 
@@ -347,7 +344,6 @@ int countpairs_wp_DOUBLE(const int64_t ND, DOUBLE * restrict X, DOUBLE * restric
         if(need_weightavg) {
             matrix_free((void**) all_weightavg, numthreads);
         }
-        free(rupp);
         return EXIT_FAILURE;
     }
 
@@ -440,7 +436,7 @@ int countpairs_wp_DOUBLE(const int64_t ND, DOUBLE * restrict X, DOUBLE * restric
                                                       this_cell_pair->min_dx, this_cell_pair->min_dy, this_cell_pair->min_dz,
                                                       this_cell_pair->closest_x1, this_cell_pair->closest_y1, this_cell_pair->closest_z1,
                                                       this_rpavg, npairs,
-                                                      this_weightavg, extra->weight_method, options->bin_type);
+                                                      this_weightavg, extra->weight_method, extra->pair_weight, options->bin_type);
 
                 /* This actually causes a race condition under OpenMP - but mostly
                    I care that an error occurred - rather than the exact value of
@@ -482,7 +478,6 @@ int countpairs_wp_DOUBLE(const int64_t ND, DOUBLE * restrict X, DOUBLE * restric
     free_cellarray_DOUBLE(lattice, totncells);
     if(abort_status != EXIT_SUCCESS || interrupt_status_wp_DOUBLE != EXIT_SUCCESS) {
       /* Cleanup memory here if aborting */
-      free(rupp);
 #if defined(_OPENMP)
       matrix_free((void **) all_npairs,numthreads);
       if(options->need_avg_sep) {
@@ -567,10 +562,9 @@ int countpairs_wp_DOUBLE(const int64_t ND, DOUBLE * restrict X, DOUBLE * restric
       // The self-pairs have non-zero weight, though.  So, fix that here.
       if(need_weightavg){
         // Keep in mind this is an autocorrelation (i.e. only one particle set to consider)
+        pair_struct_DOUBLE pair;
+        set_pair_struct_DOUBLE(&pair, (weight_struct_DOUBLE *) &(extra->weights0), (weight_struct_DOUBLE *) &(extra->weights0), &(extra->pair_weight));
         weight_func_t_DOUBLE weight_func = get_weight_func_by_method_DOUBLE(extra->weight_method);
-        pair_struct_DOUBLE pair = {.num_weights = extra->weights0.num_weights,
-                                   .dx.d=0., .dy.d=0., .dz.d=0.,  // always 0 separation
-                                   .parx.d=0., .pary.d=0., .parz.d=0.};
         for(int64_t j = 0; j < ND; j++){
             for(int w = 0; w < pair.num_weights; w++){
                 pair.weights0[w].d = ((DOUBLE *) extra->weights0.weights[w])[j];
@@ -585,7 +579,7 @@ int countpairs_wp_DOUBLE(const int64_t ND, DOUBLE * restrict X, DOUBLE * restric
     for(int i=0;i<nrpbins;i++) {
       if(npairs[i] > 0) {
         if(options->need_avg_sep) {
-          rpavg[i] /= (DOUBLE) npairs[i] ;
+          rpavg[i] /= need_weightavg ? weightavg[i] : (DOUBLE) npairs[i];
         }
         if(need_weightavg) {
           weightavg[i] /= (DOUBLE) npairs[i];
@@ -605,7 +599,6 @@ int countpairs_wp_DOUBLE(const int64_t ND, DOUBLE * restrict X, DOUBLE * restric
     if(results->npairs == NULL || results->rupp == NULL ||
        results->rpavg == NULL || results->wp == NULL || results->weightavg == NULL){
         free_results_wp(results);
-        free(rupp);
         return EXIT_FAILURE;
     }
 
@@ -653,7 +646,6 @@ int countpairs_wp_DOUBLE(const int64_t ND, DOUBLE * restrict X, DOUBLE * restric
         }
         rlow=results->rupp[i];
     }
-    free(rupp);
 
     /* reset interrupt handlers to default */
     RESET_INTERRUPT_HANDLERS();

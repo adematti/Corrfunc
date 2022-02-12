@@ -136,8 +136,9 @@ int countpairs_rp_pi_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z
                             const int64_t ND2, DOUBLE *X2, DOUBLE *Y2, DOUBLE *Z2,
                             const int numthreads,
                             const int autocorr,
-                            const char *binfile,
+                            binarray *bins,
                             const DOUBLE pimax,
+                            const int npibin,
                             results_countpairs_rp_pi *results,
                             struct config_options *options,
                             struct extra_options *extra)
@@ -185,8 +186,6 @@ int countpairs_rp_pi_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z
         options->max_cells_per_dim = NLATMAX;
     }
 
-    const int npibin = (int) pimax;
-
     /* setup interrupt handler -> mostly useful during the python execution.
        Let's Ctrl-C abort the extension  */
     SETUP_INTERRUPT_HANDLERS(interrupt_handler_countpairs_rp_pi_DOUBLE);
@@ -194,16 +193,15 @@ int countpairs_rp_pi_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z
     /***********************
      *initializing the  bins
      ************************/
-    double *rupp;
-    int nrpbin ;
-    double rpmin,rpmax;
-    setup_bins(binfile,&rpmin,&rpmax,&nrpbin,&rupp);
+    double *rupp = bins->edges;
+    int nrpbin = bins->nedges;
+    double rpmin=bins->edges[0], rpmax=bins->edges[bins->nedges-1];
     if( ! (rpmin >= 0.0 && rpmax > 0.0 && rpmin < rpmax && nrpbin > 0)) {
-        fprintf(stderr,"Error: Could not setup with R bins correctly. (rmin = %lf, rmax = %lf, with nbins = %d). Expected non-zero rmin/rmax with rmax > rmin and nbins >=1 \n",
+        fprintf(stderr,"Error: Could not setup with r bins correctly. (rmin = %lf, rmax = %lf, with nbins = %d). Expected positive rmin/rmax with rmax > rmin and nbins >=1 \n",
                 rpmin, rpmax, nrpbin);
         return EXIT_FAILURE;
     }
-    detect_bin_type(rupp, nrpbin, &(options->bin_type), options->verbose);
+    detect_bin_type(bins, &(options->bin_type), options->verbose);
 
     DOUBLE rupp_sqr[nrpbin];
     const int64_t totnbins = (npibin+1)*(nrpbin+1);
@@ -339,7 +337,6 @@ int countpairs_rp_pi_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z
         if(autocorr == 0) {
             free_cellarray_DOUBLE(lattice2, totncells);
         }
-        free(rupp);
         return EXIT_FAILURE;
     }
 
@@ -350,7 +347,6 @@ int countpairs_rp_pi_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z
         if(autocorr == 0) {
             free_cellarray_DOUBLE(lattice2, totncells);
         }
-        free(rupp);
         return EXIT_FAILURE;
     }
 
@@ -380,7 +376,6 @@ int countpairs_rp_pi_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z
         if(need_weightavg) {
             matrix_free((void**) all_weightavg, numthreads);
         }
-        free(rupp);
         return EXIT_FAILURE;
     }
 #else
@@ -463,7 +458,7 @@ int countpairs_rp_pi_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z
                                                                     this_cell_pair->min_dx, this_cell_pair->min_dy, this_cell_pair->min_dz,
                                                                     this_cell_pair->closest_x1, this_cell_pair->closest_y1, this_cell_pair->closest_z1,
                                                                     this_rpavg, npairs,
-                                                                    this_weightavg, extra->weight_method, options->bin_type);
+                                                                    this_weightavg, extra->weight_method, extra->pair_weight, options->bin_type);
 
                 /* This actually causes a race condition under OpenMP - but mostly
                    I care that an error occurred - rather than the exact value of
@@ -510,7 +505,6 @@ int countpairs_rp_pi_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z
 
     if(abort_status != EXIT_SUCCESS || interrupt_status_DDrppi_DOUBLE != EXIT_SUCCESS) {
         /* Cleanup memory here if aborting */
-        free(rupp);
 #if defined(_OPENMP)
         matrix_free((void **) all_npairs, numthreads);
         if(options->need_avg_sep) {
@@ -582,27 +576,25 @@ int countpairs_rp_pi_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z
         /* The comparison is '<=' rather than '==' only to silence
            the compiler  */
         if(rupp[0] <= 0.0) {
-            int index = (npibin+1);//first valid rp bin (with 0-dpi depth in pi)
             /* Then, add all the self-pairs. This ensures that
                a cross-correlation with two identical datasets
                produces the same result as the auto-correlation  */
-            npairs[index] += ND1;
+            npairs[npibin+1] += ND1;
 
             // Increasing npairs affects rpavg and weightavg.
             // We don't need to add anything to rpavg; all the self-pairs have 0 separation!
             // The self-pairs have non-zero weight, though.  So, fix that here.
             if(need_weightavg){
                 // Keep in mind this is an autocorrelation (i.e. only one particle set to consider)
+                pair_struct_DOUBLE pair;
+                set_pair_struct_DOUBLE(&pair, (weight_struct_DOUBLE *) &(extra->weights0), (weight_struct_DOUBLE *) &(extra->weights0), &(extra->pair_weight));
                 weight_func_t_DOUBLE weight_func = get_weight_func_by_method_DOUBLE(extra->weight_method);
-                pair_struct_DOUBLE pair = {.num_weights = extra->weights0.num_weights,
-                                           .dx.d=0., .dy.d=0., .dz.d=0.,  // always 0 separation
-                                           .parx.d=0., .pary.d=0., .parz.d=0.};
                 for(int64_t j = 0; j < ND1; j++){
                     for(int w = 0; w < pair.num_weights; w++){
                         pair.weights0[w].d = ((DOUBLE *) extra->weights0.weights[w])[j];
                         pair.weights1[w].d = ((DOUBLE *) extra->weights0.weights[w])[j];
                     }
-                    weightavg[1] += weight_func(&pair);
+                    weightavg[npibin+1] += weight_func(&pair);
                 }
             }
         }
@@ -612,7 +604,7 @@ int countpairs_rp_pi_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z
     for(int i=0;i<totnbins;i++) {
         if(npairs[i] > 0) {
             if(options->need_avg_sep) {
-                rpavg[i] /= (DOUBLE) npairs[i] ;
+                rpavg[i] /= need_weightavg ? weightavg[i] : (DOUBLE) npairs[i];
             }
             if(need_weightavg) {
                 weightavg[i] /= (DOUBLE) npairs[i];
@@ -632,7 +624,6 @@ int countpairs_rp_pi_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z
     if(results->npairs == NULL || results->rupp == NULL ||
        results->rpavg == NULL || results->weightavg == NULL) {
         free_results_rp_pi(results);
-        free(rupp);
         return EXIT_FAILURE;
     }
 
@@ -657,7 +648,6 @@ int countpairs_rp_pi_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z
             }
         }
     }
-    free(rupp);
 
     /* reset interrupt handlers to default */
     RESET_INTERRUPT_HANDLERS();

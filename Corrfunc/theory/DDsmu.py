@@ -13,7 +13,7 @@ __author__ = ('Manodeep Sinha', 'Nick Hand')
 __all__ = ('DDsmu', )
 
 
-def DDsmu(autocorr, nthreads, binfile, mu_max, nmu_bins,
+def DDsmu(autocorr, nthreads, binfile, mumax, nmubins,
           X1, Y1, Z1, weights1=None, periodic=True, boxsize=None,
           X2=None, Y2=None, Z2=None, weights2=None,
           verbose=False, output_savg=False,
@@ -22,12 +22,13 @@ def DDsmu(autocorr, nthreads, binfile, mu_max, nmu_bins,
           zbin_refine_factor=1, max_cells_per_dim=100,
           copy_particles=True, enable_min_sep_opt=True,
           c_api_timer=False, isa='fastest',
-          weight_type=None, bin_type='custom'):
+          weight_type=None, bin_type='custom',
+          pair_weights=None, sep_pair_weights=None, attrs_pair_weights=None):
     """
     Calculate the 2-D pair-counts corresponding to the redshift-space
-    correlation function, :math:`\\xi(s, \mu)` Pairs which are separated
+    correlation function, :math:`\\xi(s, \\mu)` Pairs which are separated
     by less than the ``s`` bins (specified in ``binfile``) in 3-D, and
-    less than ``s*mu_max`` in the Z-dimension are counted.
+    less than ``s*mumax`` in the Z-dimension are counted.
 
     If ``weights`` are provided, the mean pair weight is stored in the
     ``"weightavg"`` field of the results array.  The raw pair counts in the
@@ -35,24 +36,23 @@ def DDsmu(autocorr, nthreads, binfile, mu_max, nmu_bins,
     ``weight_type``.
 
     .. note:: This module only returns pair counts and not the actual
-        correlation function :math:`\\xi(s, \mu)`. See the
+        correlation function :math:`\\xi(s, \\mu)`. See the
         utilities :py:mod:`Corrfunc.utils.convert_3d_counts_to_cf`
-        for computing :math:`\\xi(s, \mu)` from the pair counts.
+        for computing :math:`\\xi(s, \\mu)` from the pair counts.
 
     .. versionadded:: 2.1.0
 
     Parameters
     ----------
-
-    autocorr: boolean, required
+    autocorr : boolean, required
         Boolean flag for auto/cross-correlation. If autocorr is set to 1,
         then the second set of particle positions are not required.
 
-    nthreads: integer
+    nthreads : integer
         The number of OpenMP threads to use. Has no effect if OpenMP was not
         enabled during library compilation.
 
-    binfile: string or an list/array of floats
+    binfile : string or an list/array of floats
         For string input: filename specifying the ``s`` bins for
         ``DDsmu_mocks``. The file should contain white-space separated values
         of (smin, smax) specifying each ``s`` bin wanted. The bins
@@ -65,15 +65,15 @@ def DDsmu(autocorr, nthreads, binfile, mu_max, nmu_bins,
         input specifying **14** (logarithmic) bins between 0.1 and 10.0. This
         array does not need to be sorted.
 
-    mu_max: double. Must be in range (0.0, 1.0]
+    mumax : double. Must be in range (0.0, 1.0]
         A double-precision value for the maximum cosine of the angular
         separation from the line of sight (LOS). Here, LOS is taken to be
         along the Z direction.
 
-        Note: Only pairs with :math:`0 <= \cos(\\theta_{LOS}) < \mu_{max}`
+        Note: Only pairs with :math:`0 <= \\cos(\\theta_{LOS}) < \\mu_{max}`
         are counted (no equality).
 
-    nmu_bins: int
+    nmubins : int
         The number of linear ``mu`` bins, with the bins ranging from
         from (0, :math:`\mu_{max}`)
 
@@ -81,7 +81,7 @@ def DDsmu(autocorr, nthreads, binfile, mu_max, nmu_bins,
         The array of X/Y/Z positions for the first set of points.
         Calculations are done in the precision of the supplied arrays.
 
-    weights1: array_like, real (float/double), optional
+    weights1 : array_like, real (float/double), optional
         A scalar, or an array of weights of shape (n_weights, n_positions) or
         (n_positions,). ``weight_type`` specifies how these weights are used;
         results are returned in the ``weightavg`` field.  If only one of
@@ -104,7 +104,7 @@ def DDsmu(autocorr, nthreads, binfile, mu_max, nmu_bins,
         Array of XYZ positions for the second set of points. *Must* be the same
         precision as the X1/Y1/Z1 arrays. Only required when ``autocorr==0``.
 
-    weights2: array-like, real (float/double), optional
+    weights2 : array-like, real (float/double), optional
         Same as weights1, but for the second set of positions
 
     verbose : boolean (default false)
@@ -118,28 +118,28 @@ def DDsmu(autocorr, nthreads, binfile, mu_max, nmu_bins,
         values, then pass in double precision arrays for the particle
         positions.
 
-    fast_divide_and_NR_steps: integer (default 0)
+    fast_divide_and_NR_steps : integer (default 0)
         Replaces the division in ``AVX`` implementation with an approximate
         reciprocal, followed by ``fast_divide_and_NR_steps`` of Newton-Raphson.
         Can improve runtime by ~15-20% on older computers. Value of 0 uses
         the standard division operation.
 
-    (xyz)bin_refine_factor: integer (default (2,2,1) typical values in [1-3])
+    (xyz)bin_refine_factor : integer (default (2,2,1) typical values in [1-3])
         Controls the refinement on the cell sizes. Can have up to a 20% impact
         on runtime.
 
-    max_cells_per_dim: integer (default 100, typical values in [50-300])
+    max_cells_per_dim : integer (default 100, typical values in [50-300])
         Controls the maximum number of cells per dimension. Total number of
         cells can be up to (max_cells_per_dim)^3. Only increase if ``rmax`` is
         too small relative to the boxsize (and increasing helps the runtime).
 
-    copy_particles: boolean (default True)
+    copy_particles : boolean (default True)
         Boolean flag to make a copy of the particle positions
         If set to False, the particles will be re-ordered in-place
 
         .. versionadded:: 2.3.0
 
-    enable_min_sep_opt: boolean (default true)
+    enable_min_sep_opt : boolean (default true)
         Boolean flag to allow optimizations based on min. separation between
         pairs of cells. Here to allow for comparison studies.
 
@@ -182,17 +182,28 @@ def DDsmu(autocorr, nthreads, binfile, mu_max, nmu_bins,
         ``rtol = 1e-05`` *and* ``atol = 1e-08`` (relative and absolute tolerance)
         of ``np.linspace(binfile[0], binfile[-1], len(binfile))``.
 
+    pair_weights : array-like, optional. Default: None.
+        Array of pair weights.
+
+    sep_pair_weights : array-like, optional. Default: None.
+        Array of separations corresponding to ``pair_weights``.
+
+    attrs_pair_weights : tuple. Default: None.
+        Attributes for pair weights; in case ``weight_type`` is "inverse_bitwise",
+        the tuple of (offset to be added to the bitwise counts,
+        default weight value if denominator is zero).
+
     Returns
-    --------
+    -------
     results : A python list
-        A python list containing ``nmu_bins`` of [smin, smax, savg, mu_max,
+        A python list containing ``nmubins`` of [smin, smax, savg, mumax,
         npairs, weightavg] for each spatial bin specified in the ``binfile``.
-        There will be a total of ``nmu_bins`` ranging from [0, ``mu_max``)
+        There will be a total of ``nmubins`` ranging from [0, ``mumax``)
         *per* spatial bin. If ``output_savg`` is not set, then ``savg`` will
         be set to 0.0 for all bins; similarly for ``weight_avg``. ``npairs``
         contains the number of pairs in that bin.
 
-    api_time: float, optional
+    api_time : float, optional
         Only returned if ``c_api_timer`` is set.  ``api_time`` measures only
         the time spent within the C library and ignores all python overhead.
 
@@ -209,20 +220,20 @@ def DDsmu(autocorr, nthreads, binfile, mu_max, nmu_bins,
     >>> boxsize = 420.0
     >>> nthreads = 4
     >>> autocorr = 1
-    >>> mu_max = 1.0
+    >>> mumax = 1.0
     >>> seed = 42
-    >>> nmu_bins = 10
+    >>> nmubins = 10
     >>> np.random.seed(seed)
     >>> X = np.random.uniform(0, boxsize, N)
     >>> Y = np.random.uniform(0, boxsize, N)
     >>> Z = np.random.uniform(0, boxsize, N)
     >>> weights = np.ones_like(X)
-    >>> results = DDsmu(autocorr, nthreads, binfile, mu_max, nmu_bins,
+    >>> results = DDsmu(autocorr, nthreads, binfile, mumax, nmubins,
     ...                  X, Y, Z, weights1=weights, weight_type='pair_product',
     ...                  output_savg=True, boxsize=boxsize, periodic=True)
     >>> for r in results[100:]: print("{0:10.6f} {1:10.6f} {2:10.6f} {3:10.1f}"
     ...                               " {4:10d} {5:10.6f}".format(r['smin'], r['smax'],
-    ...                               r['savg'], r['mu_max'], r['npairs'], r['weightavg']))
+    ...                               r['savg'], r['mumax'], r['npairs'], r['weightavg']))
     ...                         # doctest: +NORMALIZE_WHITESPACE
       5.788530   8.249250   7.149762        0.1        230   1.000000
       5.788530   8.249250   7.158884        0.2        236   1.000000
@@ -275,22 +286,22 @@ def DDsmu(autocorr, nthreads, binfile, mu_max, nmu_bins,
 
     import numpy as np
     from Corrfunc.utils import translate_isa_string_to_enum, translate_bin_type_string_to_enum,\
-        return_file_with_rbins, convert_to_native_endian,\
+        get_edges, convert_to_native_endian,\
         sys_pipes, process_weights
 
     from future.utils import bytes_to_native_str
 
-    # Check if mu_max is scalar
-    if not np.isscalar(mu_max):
-        msg = "The parameter `mu_max` = {0}, has size = {1}. "\
+    # Check if mumax is scalar
+    if not np.isscalar(mumax):
+        msg = "The parameter `mumax` = {0}, has size = {1}. "\
               "The code is expecting a scalar quantity (and not "\
-              "not a list, array)".format(mu_max, np.size(mu_max))
+              "not a list, array)".format(mumax, np.size(mumax))
         raise TypeError(msg)
 
-    # Check that mu_max is within (0.0, 1.0]
-    if mu_max <= 0.0 or mu_max > 1.0:
-        msg = "The parameter `mu_max` = {0}, is the max. of cosine of an "\
-        "angle and should be within (0.0, 1.0]".format(mu_max)
+    # Check that mumax is within (0.0, 1.0]
+    if mumax <= 0.0 or mumax > 1.0:
+        msg = "The parameter `mumax` = {0}, is the max. of cosine of an "\
+        "angle and should be within (0.0, 1.0]".format(mumax)
         raise ValueError(msg)
 
     if not autocorr:
@@ -305,25 +316,36 @@ def DDsmu(autocorr, nthreads, binfile, mu_max, nmu_bins,
     weights1, weights2 = process_weights(weights1, weights2, X1, X2, weight_type, autocorr)
 
     # Ensure all input arrays are native endian
-    X1, Y1, Z1, weights1, X2, Y2, Z2, weights2 = [
+    X1, Y1, Z1, X2, Y2, Z2 = [
             convert_to_native_endian(arr, warn=True) for arr in
-            [X1, Y1, Z1, weights1, X2, Y2, Z2, weights2]]
+            [X1, Y1, Z1, X2, Y2, Z2]]
+
+    if weights1 is not None:
+        weights1 = [convert_to_native_endian(arr, warn=True) for arr in weights1]
+    if weights2 is not None:
+        weights2 = [convert_to_native_endian(arr, warn=True) for arr in weights2]
+
+    if pair_weights is not None:
+        if periodic: raise ValueError('Cannot use pair_weights if periodic=True')
+        pair_weights = convert_to_native_endian(pair_weights, warn=True)
+        sep_pair_weights = convert_to_native_endian(sep_pair_weights, warn=True)
 
     # Passing None parameters breaks the parsing code, so avoid this
     kwargs = {}
     for k in ['weights1', 'weights2', 'weight_type',
-              'X2', 'Y2', 'Z2', 'boxsize']:
+              'X2', 'Y2', 'Z2', 'boxsize',
+              'pair_weights', 'sep_pair_weights', 'attrs_pair_weights']:
         v = locals()[k]
         if v is not None:
             kwargs[k] = v
 
     integer_isa = translate_isa_string_to_enum(isa)
     integer_bin_type = translate_bin_type_string_to_enum(bin_type)
-    sbinfile, delete_after_use = return_file_with_rbins(binfile)
+    sbinfile = get_edges(binfile)
     with sys_pipes():
         extn_results = DDsmu_extn(autocorr, nthreads,
                                   sbinfile,
-                                  mu_max, nmu_bins,
+                                  mumax, nmubins,
                                   X1, Y1, Z1,
                                   periodic=periodic,
                                   verbose=verbose,
@@ -344,14 +366,10 @@ def DDsmu(autocorr, nthreads, binfile, mu_max, nmu_bins,
     else:
         extn_results, api_time = extn_results
 
-    if delete_after_use:
-        import os
-        os.remove(sbinfile)
-
     results_dtype = np.dtype([(bytes_to_native_str(b'smin'), np.float64),
                               (bytes_to_native_str(b'smax'), np.float64),
                               (bytes_to_native_str(b'savg'), np.float64),
-                              (bytes_to_native_str(b'mu_max'), np.float64),
+                              (bytes_to_native_str(b'mumax'), np.float64),
                               (bytes_to_native_str(b'npairs'), np.uint64),
                               (bytes_to_native_str(b'weightavg'), np.float64),
                               ])
