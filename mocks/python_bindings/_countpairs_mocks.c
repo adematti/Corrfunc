@@ -1857,14 +1857,14 @@ static PyObject *countpairs_countpairs_s_mu_mocks(PyObject *self, PyObject *args
     /* Build the output list */
     PyObject *ret = PyList_New(0);//create an empty list
     double rlow=results.supp[0];
-    const double dmu = mu_max/(double)results.nmu_bins ;
+    const double dmu = 2.*mu_max/(double)results.nmu_bins ;
 
     for(int i=1;i<results.nsbin;i++) {
         for(int j=0;j<results.nmu_bins;j++) {
             const int bin_index = i*(results.nmu_bins + 1) + j;
             const double savg = results.savg[bin_index];
             const double weight_avg = results.weightavg[bin_index];
-            PyObject *item = Py_BuildValue("(ddddkd)", rlow,results.supp[i],savg,(j+1)*dmu,results.npairs[bin_index], weight_avg);
+            PyObject *item = Py_BuildValue("(ddddkd)", rlow, results.supp[i], savg, (j+1)*dmu-mu_max, results.npairs[bin_index], weight_avg);
             PyList_Append(ret, item);
             Py_XDECREF(item);
         }

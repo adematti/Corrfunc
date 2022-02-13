@@ -374,6 +374,18 @@ ifeq ($(DO_CHECKS), 1)
     endif
   endif
 
+	# AVX512 has not been tested, let us disable it for the moment
+	CC_SUPPORTS_AVX512 := $(shell $(CC) $(CFLAGS) -dM -E - < /dev/null | \grep -Ecm1 __AVX512F__)
+	ifeq ($(CC_SUPPORTS_AVX512),1)
+		ifeq ($(shell test 0$(ICC_MAJOR_VER) -ge 019 -o -z "$(ICC_MAJOR_VER)"; echo $$?),0)
+			# If gcc, clang, or new icc, we can use this
+			CFLAGS += -mno-avx512f
+		else
+			CFLAGS += -xCORE-AVX2
+		endif
+		CFLAGS += -DGAS_BUG_DISABLE_AVX512
+	endif
+
   # All of the python/numpy checks follow
   export PYTHON_CHECKED ?= 0
   export NUMPY_CHECKED ?= 0
