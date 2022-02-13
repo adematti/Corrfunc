@@ -91,12 +91,12 @@ def DDsmu_mocks(autocorr, cosmology, nthreads, binfile, mumax, nmubins,
         represent the vectors to each point constituting the pair, then
         :math:`s := v_1 - v_2` and :math:`l := 1/2 (v_1 + v_2)`.
 
-        Note: Only pairs with :math:`0 <= \\cos(\\theta_{LOS}) < \\mu_{max}`
-        are counted (no equality).
+        Note: Pairs with :math:`-\\mu_{max} <= \\mu <= \\mu_{max}`
+        are counted (last :math:'\\mu'-bin inclusive).
 
     nmubins : int
         The number of linear ``mu`` bins, with the bins ranging from
-        from (0, :math:`\\mu_{max}`)
+        from (:math:`-\\mu_{max}`, :math:`\\mu_{max}`).
 
     RA1 : array-like, real (float/double)
         The array of Right Ascensions for the first set of points. RA's

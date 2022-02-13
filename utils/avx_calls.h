@@ -94,14 +94,15 @@ extern "C" {
 #define AVX_MAX_FLOATS(X,Y)               _mm256_max_ps(X,Y)
 
 
-  //Absolute value
+//Absolute value
+#define AVX_OPPOSITE_FLOAT(X)             _mm256_sub_ps(_mm256_setzero_ps(), X)
 #define AVX_ABS_FLOAT(X)                  _mm256_max_ps(_mm256_sub_ps(_mm256_setzero_ps(), X), X)
 
-    //Casting (does not actual convert between types)
+//Casting (does not actual convert between types)
 #define AVX_CAST_FLOAT_TO_INT(X)          _mm256_castps_si256(X)
 #define AVX_CAST_INT_TO_FLOAT(X)          _mm256_castsi256_ps(X)
 
-    //Streaming store
+//Streaming store
 #define AVX_STREAMING_STORE_FLOATS(X,Y)   _mm256_stream_ps(X,Y)
 #define AVX_STREAMING_STORE_INTS(X,Y)     _mm256_stream_si256(X,Y)
 
@@ -163,18 +164,22 @@ extern "C" {
 //Max
 #define AVX_MAX_FLOATS(X,Y)               _mm256_max_pd(X,Y)
 
-  //Absolute value
+//Absolute value
+#define AVX_OPPOSITE_FLOAT(X)             _mm256_sub_pd(_mm256_setzero_pd(), X)
 #define AVX_ABS_FLOAT(X)                  _mm256_max_pd(_mm256_sub_pd(_mm256_setzero_pd(), X), X)
 
 //Casting (does not actual convert between types)
 #define AVX_CAST_FLOAT_TO_INT(X)          _mm256_castpd_si256(X)
 #define AVX_CAST_INT_TO_FLOAT(X)          _mm256_castsi256_pd(X)
 
-    //Streaming store
+//Streaming store
 #define AVX_STREAMING_STORE_FLOATS(X,Y)   _mm256_stream_pd(X,Y)
 #define AVX_STREAMING_STORE_INTS(X,Y)     _mm_stream_si128(X,Y)
 
 #endif //DOUBLE_PREC
+
+//Take the opposite of X if S is negative
+#define AVX_SIGNED_FLOATS(X, S)           AVX_BLEND_FLOATS_WITH_MASK(X, AVX_OPPOSITE_FLOAT(X), AVX_COMPARE_FLOATS(S, AVX_SETZERO_FLOAT(), _CMP_LT_OQ))
 
 #ifndef  __INTEL_COMPILER
 #include "fast_acos.h"

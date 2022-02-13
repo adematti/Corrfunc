@@ -57,7 +57,7 @@ extern "C" {
 
 //Max
 #define SSE_MAX_FLOATS(X,Y)               _mm_max_ps(X,Y)
-
+#define SSE_OPPOSITE_FLOAT(X)                  _mm_sub_ps(_mm_setzero_ps(), X)
 #define SSE_ABS_FLOAT(X)                  _mm_max_ps(_mm_sub_ps(_mm_setzero_ps(), X), X)
 
 /* returns Z + XY*/
@@ -121,6 +121,7 @@ extern "C" {
 
 #define SSE_MIN_FLOATS(X,Y)               _mm_min_pd(X,Y)
 #define SSE_MAX_FLOATS(X,Y)               _mm_max_pd(X,Y)
+#define SSE_OPPOSITE_FLOAT(X)                  _mm_sub_pd(_mm_setzero_pd(), X)
 #define SSE_ABS_FLOAT(X)                  _mm_max_pd(_mm_sub_pd(_mm_setzero_pd(), X), X)
 
 /* returns Z + XY*/
@@ -132,6 +133,10 @@ extern "C" {
 #define SSE_FMA_ADD_TRUNCATE_FLOATS(X,Y,Z) _mm_round_pd(SSE_FMA_ADD_FLOATS(X,Y,Z),_MM_FROUND_TO_ZERO|_MM_FROUND_NO_EXC)
 
 #endif
+
+//Take the opposite of X if S is negative
+#define SSE_SIGNED_FLOATS(X, S)           SSE_BLEND_FLOATS_WITH_MASK(X, SSE_OPPOSITE_FLOAT(X), SSE_COMPARE_FLOATS_LT(S, SSE_SETZERO_FLOAT()))
+
 
 #ifndef  __INTEL_COMPILER
 #include "fast_acos.h"

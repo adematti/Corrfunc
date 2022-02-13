@@ -19,9 +19,9 @@
 #define STR(x) STRINGIFY(x)
 
 
-#define MIN(X, Y)                        (( (X) < (Y)) ? (X):(Y))
-#define MAX(X, Y)                        (( (X) > (Y)) ? (X):(Y))
-
+#define MIN(X, Y)                        (((X) < (Y)) ? (X):(Y))
+#define MAX(X, Y)                        (((X) > (Y)) ? (X):(Y))
+#define SIGNED(X, S)                     ((S >= 0) ? X : -X)
 
 #define ASSIGN_CELL_TIMINGS(thread_timings, nx1, nx2, timediff, tid, first_cellid, second_cellid) \
     {                                                                   \

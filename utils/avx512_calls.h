@@ -174,12 +174,13 @@ extern "C" {
 
 
 //Absolute value
+#define AVX512_OPPOSITE_FLOAT(X)             _mm512_sub_ps(_mm512_setzero_ps(), X)
 #define AVX512_ABS_FLOAT(X)                  _mm512_abs_ps(X)
 
  //Casting (does not actual convert between types)
 #define AVX512_CAST_FLOAT_TO_INT(X)          _mm512_castps_si512(X)
 #define AVX512_CAST_INT_TO_FLOAT(X)          _mm512_castsi512_ps(X)
-    
+
 // Slow rounding
 #define AVX512_TRUNCATE_FLOAT_TO_FLOAT(X) _mm512_roundscale_ps(X, _MM_FROUND_TO_ZERO)
 
@@ -313,9 +314,9 @@ extern "C" {
 #define AVX512_ARC_COSINE(X, order)                  inv_cosine_avx512(X, order)
 #endif
 
-    //Max
+//Max
 #define AVX512_MAX_FLOATS(X,Y)               _mm512_max_pd(X,Y)
-
+#define AVX512_OPPOSITE_FLOAT(X)             _mm512_sub_pd(_mm512_setzero_pd(), X)
 //Absolute value
 #if __GNUC__  <=  8
     //there was a bug for the function proto-type
@@ -329,11 +330,14 @@ extern "C" {
  //Casting (does not actual convert between types)
 #define AVX512_CAST_FLOAT_TO_INT(X)          _mm512_castpd_si512(X)
 #define AVX512_CAST_INT_TO_FLOAT(X)          _mm512_castsi512_pd(_mm512_castsi256_si512(X))
-    
+
 // Slow rounding
 #define AVX512_TRUNCATE_FLOAT_TO_FLOAT(X) _mm512_roundscale_pd(X, _MM_FROUND_TO_ZERO)
 
 #endif //DOUBLE_PREC
+
+//Take the opposite of X if S is negative
+#define AVX512_SIGNED_FLOATS(X, S)           AVX512_BLEND_FLOATS_WITH_MASK(X, AVX512_OPPOSITE_FLOAT(X), AVX512_COMPARE_FLOATS(S, AVX512_SETZERO_FLOAT(), _CMP_LT_OQ))
 
 #ifndef  __INTEL_COMPILER
 #include "fast_acos.h"

@@ -160,9 +160,9 @@ static inline AVX512_FLOATS avx512_inverse_bitwise_DOUBLE(pair_struct_DOUBLE *pa
 
     weight_union_DOUBLE m_weight;
 
-    #if  __INTEL_COMPILER
-    #pragma unroll(AVX512_NVEC)
-    #endif
+#if  __INTEL_COMPILER
+#pragma unroll(AVX512_NVEC)
+#endif
     for(int jj=0;jj<AVX512_NVEC;jj++) {
         int nbits = pair->noffset;
         //printf("%d ", nbits);
@@ -203,9 +203,9 @@ static inline AVX_FLOATS avx_inverse_bitwise_DOUBLE(pair_struct_DOUBLE *pair){
 
     weight_union_DOUBLE m_weight;
 
-    #if  __INTEL_COMPILER
-    #pragma unroll(AVX_NVEC)
-    #endif
+#if  __INTEL_COMPILER
+#pragma unroll(AVX_NVEC)
+#endif
     for(int jj=0;jj<AVX_NVEC;jj++) {
         int nbits = pair->noffset;
         for (int w=0;w<pair->num_integer_weights;w++) {
@@ -245,9 +245,9 @@ static inline SSE_FLOATS sse_inverse_bitwise_DOUBLE(pair_struct_DOUBLE *pair){
 
     weight_union_DOUBLE m_weight;
 
-    #if  __INTEL_COMPILER
-    #pragma unroll(SSE_NVEC)
-    #endif
+#if  __INTEL_COMPILER
+#pragma unroll(SSE_NVEC)
+#endif
     for(int jj=0;jj<SSE_NVEC;jj++) {
         int nbits = pair->noffset;
         //printf("%d ", nbits);
