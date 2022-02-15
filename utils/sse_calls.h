@@ -49,6 +49,7 @@ extern "C" {
 // X OP Y
 //#define SSE_COMPARE_FLOATS(X,Y,OP)        _mm_cmp_ps(X,Y,OP)
 #define SSE_BITWISE_AND(X,Y)              _mm_and_ps(X,Y)
+#define SSE_BITWISE_OR(X,Y)              _mm_or_ps(X,Y)
 
 //MoveMask
 #define SSE_TEST_COMPARISON(X)            _mm_movemask_ps(X)
@@ -107,6 +108,7 @@ extern "C" {
 
 //Bitwise and
 #define SSE_BITWISE_AND(X,Y)              _mm_and_pd(X,Y)
+#define SSE_BITWISE_OR(X,Y)               _mm_or_pd(X,Y)
 
 //MoveMask
 #define SSE_TEST_COMPARISON(X)            _mm_movemask_pd(X)

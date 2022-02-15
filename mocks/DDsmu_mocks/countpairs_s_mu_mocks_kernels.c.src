@@ -278,8 +278,8 @@ static inline int countpairs_s_mu_mocks_avx512_intrinsics_DOUBLE(const int64_t N
 
             // \mu^2 := cos^2(\theta_between_s_and_l) = |s.l|^2 / (|s|^2 * |l|^2)
             const AVX512_FLOATS m_sqr_norm_l_norm_s = AVX512_MULTIPLY_FLOATS(m_sqr_norm_l, m_sqr_s);
-            const AVX512_FLOATS m_mask_szero = AVX512_COMPARE_FLOATS(m_zero, m_sqr_s, _CMP_LT_OQ);
-            m_sqr_norm_l_norm_s = AVX512_BLEND_FLOATS_WITH_MASK(m_one, m_sqr_norm_l_norm_s, m_mask_szero); // to avoid division by 0
+            const AVX512_FLOATS m_mask_szero = AVX512_COMPARE_FLOATS(m_sqr_s, m_zero, _CMP_LE_OQ);
+            m_sqr_norm_l_norm_s = AVX512_BLEND_FLOATS_WITH_MASK(m_sqr_norm_l_norm_s, m_one, m_mask_szero); // to avoid division by 0
             AVX512_FLOATS m_sqr_mu = AVX512_SETZERO_FLOAT();
             CHECK_AND_FAST_DIVIDE_AVX512(m_sqr_mu, m_sqr_s_dot_l, m_sqr_norm_l_norm_s, m_mask_left, fast_divide_and_NR_steps);
 
@@ -642,8 +642,8 @@ static inline int countpairs_s_mu_mocks_avx_intrinsics_DOUBLE(const int64_t N0, 
 
             // \mu^2 := cos^2(\theta_between_s_and_l) = |s.l|^2 / (|s|^2 * |l|^2)
             AVX_FLOATS m_sqr_norm_l_norm_s = AVX_MULTIPLY_FLOATS(m_sqr_norm_l, m_sqr_s);
-            const AVX_FLOATS m_mask_szero = AVX_COMPARE_FLOATS(m_zero, m_sqr_s, _CMP_LT_OQ);
-            m_sqr_norm_l_norm_s = AVX_BLEND_FLOATS_WITH_MASK(m_one, m_sqr_norm_l_norm_s, m_mask_szero); // to avoid division by 0
+            const AVX_FLOATS m_mask_szero = AVX_COMPARE_FLOATS(m_sqr_s, m_zero, _CMP_LE_OQ);
+            m_sqr_norm_l_norm_s = AVX_BLEND_FLOATS_WITH_MASK(m_sqr_norm_l_norm_s, m_one, m_mask_szero); // to avoid division by 0
             AVX_FLOATS m_sqr_mu = AVX_SETZERO_FLOAT();
             CHECK_AND_FAST_DIVIDE_AVX(m_sqr_mu, m_sqr_s_dot_l, m_sqr_norm_l_norm_s, fast_divide_and_NR_steps);
 
@@ -783,7 +783,7 @@ static inline int countpairs_s_mu_mocks_avx_intrinsics_DOUBLE(const int64_t N0, 
             const DOUBLE sqr_s_dot_l = s_dot_l * s_dot_l;
             //const DOUBLE sqr_mu = sqr_s_dot_l/(sqr_l * sqr_s);
             const DOUBLE sqr_mu = sqr_s > 0. ? sqr_s_dot_l/(sqr_l * sqr_s) : 0.;
-            if (sqr_mu > sqr_mumax) continue;
+            if (sqr_mu >= sqr_mumax) continue;
             DOUBLE s = ZERO, pairweight = ZERO;
             if(need_savg || bin_type == BIN_LIN) {
                 s = SQRT(sqr_s);
@@ -1091,8 +1091,8 @@ static inline int countpairs_s_mu_mocks_sse_intrinsics_DOUBLE(const int64_t N0, 
 
                 // \mu^2 = \pi^2 / s^2
                 SSE_FLOATS m_sqr_norm_l_norm_s = SSE_MULTIPLY_FLOATS(m_sqr_norm_l, m_sqr_s);
-                const SSE_FLOATS m_mask_szero = SSE_COMPARE_FLOATS_LT(m_zero, m_sqr_s);
-                m_sqr_norm_l_norm_s = SSE_BLEND_FLOATS_WITH_MASK(m_one, m_sqr_norm_l_norm_s, m_mask_szero); // to avoid division by 0
+                const SSE_FLOATS m_mask_szero = SSE_COMPARE_FLOATS_LE(m_sqr_s, m_zero);
+                m_sqr_norm_l_norm_s = SSE_BLEND_FLOATS_WITH_MASK(m_sqr_norm_l_norm_s, m_one, m_mask_szero); // to avoid division by 0
                 m_sqr_mu = SSE_DIVIDE_FLOATS(m_sqr_s_dot_l, m_sqr_norm_l_norm_s);
             }
 
@@ -1227,7 +1227,7 @@ static inline int countpairs_s_mu_mocks_sse_intrinsics_DOUBLE(const int64_t N0, 
             const DOUBLE sqr_s_dot_l = s_dot_l * s_dot_l;
             //const DOUBLE sqr_mu = sqr_s_dot_l/(sqr_l * sqr_s);
             const DOUBLE sqr_mu = sqr_s > 0. ? sqr_s_dot_l/(sqr_l * sqr_s) : 0.;
-            if (sqr_mu > sqr_mumax) continue;
+            if (sqr_mu >= sqr_mumax) continue;
             DOUBLE s = ZERO, pairweight = ZERO;
             if(need_savg || bin_type == BIN_LIN) {
                 s = SQRT(sqr_s);
@@ -1471,7 +1471,7 @@ static inline int countpairs_s_mu_mocks_fallback_DOUBLE(const int64_t N0, DOUBLE
             const DOUBLE sqr_s_dot_l = s_dot_l * s_dot_l;
             //const DOUBLE sqr_mu = sqr_s_dot_l/(sqr_l * sqr_s);
             const DOUBLE sqr_mu = sqr_s > 0. ? sqr_s_dot_l/(sqr_l * sqr_s) : 0.;
-            if (sqr_mu > sqr_mumax) continue;
+            if (sqr_mu >= sqr_mumax) continue;
             DOUBLE s = ZERO, pairweight = ZERO;
             if(need_savg || bin_type == BIN_LIN) {
                 s = SQRT(sqr_s);
@@ -1512,7 +1512,7 @@ static inline int countpairs_s_mu_mocks_fallback_DOUBLE(const int64_t N0, DOUBLE
                 weightavg[ibin] += pairweight;
             }
             if(autocorr == 1){
-                ibin = kbin + MIN((int) (-mubin + mumin_invstep), nmu_bins - 1);
+                ibin = kbin + (int) (-mubin + mumin_invstep);
                 npairs[ibin]++;
                 if(need_savg) savg[ibin] += s;
                 if(need_weightavg) weightavg[ibin] += pairweight;
