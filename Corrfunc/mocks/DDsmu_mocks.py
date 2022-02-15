@@ -91,8 +91,7 @@ def DDsmu_mocks(autocorr, cosmology, nthreads, binfile, mumax, nmubins,
         represent the vectors to each point constituting the pair, then
         :math:`s := v_1 - v_2` and :math:`l := 1/2 (v_1 + v_2)`.
 
-        Note: Pairs with :math:`-\\mu_{max} <= \\mu <= \\mu_{max}`
-        are counted (last :math:'\\mu'-bin inclusive).
+        Note: Pairs with :math:`-\\mu_{max} <= \\mu < \\mu_{max}` are counted.
 
     nmubins : int
         The number of linear ``mu`` bins, with the bins ranging from
@@ -287,7 +286,7 @@ def DDsmu_mocks(autocorr, cosmology, nthreads, binfile, mumax, nmubins,
         raise TypeError(msg)
 
     # Check that mumax is within (0.0, 1.0]
-    if mumax <= 0.0 or mumax > 1.0:
+    if mumax <= 0.: #or mumax > 1.0:
         msg = "The parameter `mumax` = {0}, is the max. of cosine of an "\
         "angle and should be within (0.0, 1.0]".format(mumax)
         raise ValueError(msg)

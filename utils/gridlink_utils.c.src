@@ -28,10 +28,10 @@
 #endif
 
 
-int get_binsize_DOUBLE(const DOUBLE xmin,const DOUBLE xmax, const DOUBLE rmax, const int refine_factor, const int max_ncells,
+int get_binsize_DOUBLE(const DOUBLE xmin, const DOUBLE xmax, const DOUBLE rmax, const int refine_factor, const int max_ncells,
                        DOUBLE *xbinsize, int *nlattice, const struct config_options *options)
 {
-    const DOUBLE xdiff = (options->periodic && options->boxsize > 0) ? options->boxsize:(xmax-xmin);
+    const DOUBLE xdiff = (options->periodic && options->boxsize > 0) ? options->boxsize : MAX(xmax-xmin, rmax/1000.); // just to avoid 0
     int nmesh=(int)(refine_factor*xdiff/rmax) ;
     nmesh = nmesh < 1 ? 1:nmesh;
     if(options->periodic == 1) {

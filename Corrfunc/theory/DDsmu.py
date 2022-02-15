@@ -70,8 +70,7 @@ def DDsmu(autocorr, nthreads, binfile, mumax, nmubins,
         separation from the line of sight (LOS). Here, LOS is taken to be
         along the Z direction.
 
-        Note: Pairs with :math:`-\\mu_{max} <= \\mu <= \\mu_{max}`
-        are counted (last :math:'\\mu'-bin inclusive).
+        Note: Pairs with :math:`-\\mu_{max} <= \\mu < \\mu_{max}` are counted.
 
     nmubins : int
         The number of linear ``mu`` bins, with the bins ranging from
@@ -299,7 +298,7 @@ def DDsmu(autocorr, nthreads, binfile, mumax, nmubins,
         raise TypeError(msg)
 
     # Check that mumax is within (0.0, 1.0]
-    if mumax <= 0.0 or mumax > 1.0:
+    if mumax <= 0.:# or mumax > 1.0:
         msg = "The parameter `mumax` = {0}, is the max. of cosine of an "\
         "angle and should be within (0.0, 1.0]".format(mumax)
         raise ValueError(msg)

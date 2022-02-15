@@ -55,7 +55,8 @@ int check_ra_dec_cz_DOUBLE(const int64_t N, DOUBLE *phi, DOUBLE *theta, DOUBLE *
     int fix_ra  = 0;
     int fix_dec = 0;
 
-    const DOUBLE max_cz_threshold = 10.0;//if I find that max cz is smaller than this threshold, then I will assume z has been supplied rather than cz
+    //const DOUBLE max_cz_threshold = 10.0;//if I find that max cz is smaller than this threshold, then I will assume z has been supplied rather than cz
+    const DOUBLE max_cz_threshold = -1.;
     DOUBLE max_cz = 0.0;
     //Check input cz -> ensure that cz contains cz and not z
     for(int64_t i=0;i<N;i++) {

@@ -56,7 +56,8 @@ int check_ra_dec_cz_s_mu_DOUBLE(const int64_t N, DOUBLE *phi, DOUBLE *theta, DOU
     int fix_ra  = 0;
     int fix_dec = 0;
 
-    const DOUBLE max_cz_threshold = 10.0;//if I find that max cz is smaller than this threshold, then I will assume z has been supplied rather than cz
+    //const DOUBLE max_cz_threshold = 10.0;//if I find that max cz is smaller than this threshold, then I will assume z has been supplied rather than cz
+    const DOUBLE max_cz_threshold = -1.;
     DOUBLE max_cz = 0.0;
     //Check input cz -> ensure that cz contains cz and not z
     for(int64_t i=0;i<N;i++) {
@@ -304,9 +305,9 @@ int countpairs_mocks_s_mu_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1, D
     }
     detect_bin_type(bins, &(options->bin_type), options->verbose);
 
-    if(max_mu <= 0.0 || max_mu > 1.0) {
+    if(max_mu <= 0.) {
         fprintf(stderr,"Error: max_mu (max. value for the cosine of the angle with line of sight) must be greater than 0 and at most 1).\n"
-                "The passed value is max_mu = %lf. Please change it to be > 0 and <= 1.0\n", max_mu);
+                "The passed value is max_mu = %lf. Please change it to be > 0 and <= 1\n", max_mu);
         return EXIT_FAILURE;
     }
 

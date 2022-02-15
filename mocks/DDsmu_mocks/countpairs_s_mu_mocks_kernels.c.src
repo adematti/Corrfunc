@@ -789,7 +789,7 @@ static inline int countpairs_s_mu_mocks_avx_intrinsics_DOUBLE(const int64_t N0, 
             const DOUBLE sqr_s_dot_l = s_dot_l * s_dot_l;
             //const DOUBLE sqr_mu = sqr_s_dot_l/(sqr_l * sqr_s);
             const DOUBLE sqr_mu = sqr_s > 0. ? sqr_s_dot_l/(sqr_l * sqr_s) : 0.;
-
+            if (sqr_mu > sqr_mumax) continue;
             DOUBLE s = ZERO, pairweight = ZERO;
             if(need_savg || bin_type == BIN_LIN) {
                 s = SQRT(sqr_s);
@@ -1117,8 +1117,9 @@ static inline int countpairs_s_mu_mocks_sse_intrinsics_DOUBLE(const int64_t N0, 
                 }
 
                 m_sqr_s = SSE_BLEND_FLOATS_WITH_MASK(m_zero, m_sqr_s, m_mask_left);
-                m_sqr_mu = SSE_BLEND_FLOATS_WITH_MASK(m_sqr_mumax, m_sqr_mu, m_mask_left);
+                //m_sqr_mu = SSE_BLEND_FLOATS_WITH_MASK(m_sqr_mumax, m_sqr_mu, m_mask_left);
             }
+
             if(need_savg || bin_type == BIN_LIN) {
                 union_msep.m_Dperp = SSE_SQRT_FLOAT(m_sqr_s);
             }
