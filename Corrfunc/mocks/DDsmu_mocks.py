@@ -91,7 +91,8 @@ def DDsmu_mocks(autocorr, cosmology, nthreads, binfile, mumax, nmubins,
         represent the vectors to each point constituting the pair, then
         :math:`s := v_1 - v_2` and :math:`l := 1/2 (v_1 + v_2)`.
 
-        Note: Pairs with :math:`-\\mu_{max} <= \\mu < \\mu_{max}` are counted.
+        Note: Pairs with :math:`-\\mu_{max} < \\mu < \\mu_{max}`
+        (exclusive on both ends) are counted.
 
     nmubins : int
         The number of linear ``mu`` bins, with the bins ranging from

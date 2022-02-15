@@ -70,7 +70,8 @@ def DDsmu(autocorr, nthreads, binfile, mumax, nmubins,
         separation from the line of sight (LOS). Here, LOS is taken to be
         along the Z direction.
 
-        Note: Pairs with :math:`-\\mu_{max} <= \\mu < \\mu_{max}` are counted.
+        Note: Pairs with :math:`-\\mu_{max} < \\mu < \\mu_{max}`
+        (exclusive on both ends) are counted.
 
     nmubins : int
         The number of linear ``mu`` bins, with the bins ranging from
