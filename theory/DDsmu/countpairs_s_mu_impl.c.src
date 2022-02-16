@@ -626,7 +626,7 @@ int countpairs_s_mu_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z1
     results->nsbin  = nsbin;
     results->nmu_bins = nmu_bins;
     results->mu_max = max_mu;//NOTE max_mu which is double and not mu_max (which might be float)
-    results->mu_min = ZERO;
+    results->mu_min = -max_mu;
     results->npairs = my_malloc(sizeof(uint64_t), totnbins);
     results->supp   = my_malloc(sizeof(double)  , nsbin);
     results->savg  = my_malloc(sizeof(double)  , totnbins);

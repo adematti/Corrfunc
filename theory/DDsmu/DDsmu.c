@@ -268,12 +268,12 @@ int main(int argc, char *argv[])
     gettimeofday(&t1,NULL);
     double pair_time = ADD_DIFF_TIME(t0,t1);
     double smin = results.supp[0];
-    const double dmu = mu_max/(double) nmu_bins;
+    const double dmu = 2.*mu_max/(double) nmu_bins;
     for(int i=1;i<results.nsbin;i++) {
         const double smax = results.supp[i];
         for(int j=0;j<nmu_bins;j++) {
             int index = i*(nmu_bins+1) + j;
-            fprintf(stdout,"%e\t%e\t%e\t%12"PRIu64"\t%e\n", smin, smax, (j+1)*dmu, results.npairs[index], results.weightavg[index]);
+            fprintf(stdout,"%e\t%e\t%e\t%12"PRIu64"\t%e\n", smin, smax, (j+1)*dmu-mu_max, results.npairs[index], results.weightavg[index]);
         }
         smin = smax;
     }

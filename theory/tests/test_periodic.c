@@ -272,12 +272,12 @@ int test_periodic_DDsmu(const char *correct_outputfile)
             return EXIT_FAILURE;
         }
         const int nmubin = results.nmu_bins;
-        const double dmu = theory_mu_max/(double)results.nmu_bins;
+        const double dmu = 2*theory_mu_max/(double) results.nmu_bins;
         for(int i=1;i<results.nsbin;i++) {
             const double logs = log10(results.supp[i]);
             for(int j=0;j<nmubin;j++) {
                 int index = i*(nmubin+1) + j;
-                fprintf(fp,"%10"PRIu64" %20.8lf %20.8lf %20.8lf %20.8lf\n",results.npairs[index],results.savg[index],logs,(j+1)*dmu, results.weightavg[index]);
+                fprintf(fp,"%10"PRIu64" %20.8lf %20.8lf %20.8lf %20.8lf\n",results.npairs[index],results.savg[index],logs,(j+1)*dmu-theory_mu_max, results.weightavg[index]);
             }
         }
         fclose(fp);
