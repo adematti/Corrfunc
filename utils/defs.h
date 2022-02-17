@@ -352,6 +352,13 @@ static inline struct config_options get_config_options(void)
 
 
 typedef enum {
+    Z_LOS,
+    MIDPOINT_LOS,
+    FIRSTPOINT_LOS
+} los_type_t;
+
+
+typedef enum {
     FLOAT_TYPE,
     INT_TYPE
 } weight_type_t;
