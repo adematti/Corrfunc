@@ -309,6 +309,8 @@ static inline int countpairs_rp_pi_avx512_intrinsics_DOUBLE(const int64_t N0, DO
         }//AVX512 j loop
     }//i-loop
 
+    if (need_costheta) free(norm1);
+
     for(int i=0;i<totnbins;i++) {
         src_npairs[i] += npairs[i];
         if(need_rpavg) {
@@ -692,7 +694,9 @@ static inline int countpairs_rp_pi_avx_intrinsics_DOUBLE(const int64_t N0, DOUBL
                 weightavg[ibin] += pairweight;
             }
         }//remainder loop over second set of particles
-    }//loop over first set of particles
+  }//loop over first set of particles
+
+  if (need_costheta) free(norm1);
 
 	for(int i=0;i<totnbins;i++) {
 		src_npairs[i] += npairs[i];
@@ -1084,6 +1088,8 @@ static inline int countpairs_rp_pi_sse_intrinsics_DOUBLE(const int64_t N0, DOUBL
         }
     }
 
+    if (need_costheta) free(norm1);
+
     for(int i=0;i<totnbins;i++) {
         src_npairs[i] += npairs[i];
         if(need_rpavg) {
@@ -1312,6 +1318,9 @@ static inline int countpairs_rp_pi_fallback_DOUBLE(const int64_t N0, DOUBLE *x0,
             }
         }
     }
+
+    if (need_costheta) free(norm1);
+
     for(int i=0;i<totnbins;i++) {
         src_npairs[i] += npairs[i];
         if(need_rpavg) {

@@ -353,7 +353,9 @@ static inline int countpairs_s_mu_avx512_intrinsics_DOUBLE(const int64_t N0, DOU
             }
 
         }//loop over second set of particles
-    }//loop over first set of particles
+  }//loop over first set of particles
+
+  if (need_costheta) free(norm1);
 
 	for(int i=0;i<totnbins;i++) {
 		src_npairs[i] += npairs[i];
@@ -790,7 +792,9 @@ static inline int countpairs_s_mu_avx_intrinsics_DOUBLE(const int64_t N0, DOUBLE
                 if(need_weightavg) weightavg[ibin] += pairweight;
             }
         }//remainder loop over second set of particles
-    }//loop over first set of particles
+  }//loop over first set of particles
+
+  if (need_costheta) free(norm1);
 
 	for(int i=0;i<totnbins;i++) {
 		src_npairs[i] += npairs[i];
@@ -1227,6 +1231,8 @@ static inline int countpairs_s_mu_sse_intrinsics_DOUBLE(const int64_t N0, DOUBLE
         }
     }
 
+    if (need_costheta) free(norm1);
+
     for(int i=0;i<totnbins;i++) {
         src_npairs[i] += npairs[i];
         if(need_savg) {
@@ -1480,6 +1486,9 @@ static inline int countpairs_s_mu_fallback_DOUBLE(const int64_t N0, DOUBLE *x0, 
             }
         }
     }
+
+    if (need_costheta) free(norm1);
+
     for(int i=0;i<totnbins;i++) {
         src_npairs[i] += npairs[i];
         if(need_savg) {
