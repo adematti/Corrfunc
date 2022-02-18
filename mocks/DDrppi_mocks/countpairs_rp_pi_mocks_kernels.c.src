@@ -371,6 +371,8 @@ static inline int countpairs_rp_pi_mocks_avx512_intrinsics_DOUBLE(const int64_t 
         }//AVX512 j loop
     }//i-loop
 
+    if (need_costheta) free(norm1);
+
     for(int i=0;i<totnbins;i++) {
         src_npairs[i] += npairs[i];
         if(need_rpavg) {
@@ -811,6 +813,8 @@ static inline int countpairs_rp_pi_mocks_avx_intrinsics_DOUBLE(const int64_t N0,
         }//remainder jloop
     }//i-loop
 
+    if (need_costheta) free(norm1);
+
     for(int i=0;i<totnbins;i++) {
         src_npairs[i] += npairs[i];
         if(need_rpavg) {
@@ -1233,6 +1237,8 @@ static inline int countpairs_rp_pi_mocks_sse_intrinsics_DOUBLE(const int64_t N0,
         }//remainder jloop
     }//i-loop
 
+    if (need_costheta) free(norm1);
+
     for(int i=0;i<totnbins;i++) {
         src_npairs[i] += npairs[i];
         if(need_rpavg) {
@@ -1476,6 +1482,8 @@ static inline int countpairs_rp_pi_mocks_fallback_DOUBLE(const int64_t N0, DOUBL
             }
         }//j loop over second set of particles
     }//i loop over first set of particles
+
+    if (need_costheta) free(norm1);
 
     for(int i=0;i<totnbins;i++) {
         src_npairs[i] += npairs[i];

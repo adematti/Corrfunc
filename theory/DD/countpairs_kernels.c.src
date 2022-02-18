@@ -291,6 +291,8 @@ static inline int countpairs_avx512_intrinsics_DOUBLE(const int64_t N0, DOUBLE *
         }//end of j-loop
     }//loop over first set of particles
 
+    if (need_costheta) free(norm1);
+
     uint64_t npairs_found = 0;
     for(int i=0;i<nbin;i++) {
         npairs_found += npairs[i];
@@ -658,8 +660,10 @@ static inline int countpairs_avx_intrinsics_DOUBLE(const int64_t N0, DOUBLE *x0,
             if(need_weightavg){
                 weightavg[kbin] += pairweight;
             }
-        }//remainder loop over second set of particles
-    }//loop over first set of particles
+      }//remainder loop over second set of particles
+  }//loop over first set of particles
+
+  if (need_costheta) free(norm1);
 
 	for(int i=0;i<nbin;i++) {
 		src_npairs[i] += npairs[i];
@@ -995,6 +999,8 @@ static inline int countpairs_sse_intrinsics_DOUBLE(const int64_t N0, DOUBLE *x0,
       }//loop over remnant second set of particles
   }//loop over first set of particles
 
+  if (need_costheta) free(norm1);
+
   for(int i=0;i<nbin;i++) {
       src_npairs[i] += npairs[i];
       if(need_rpavg) {
@@ -1194,6 +1200,8 @@ static inline int countpairs_fallback_DOUBLE(const int64_t N0, DOUBLE *x0, DOUBL
         }
     }
 
+    if (need_costheta) free(norm1);
+
     for(int i=0;i<nbin;i++) {
         src_npairs[i] += npairs[i];
         if(need_rpavg) {
@@ -1202,9 +1210,6 @@ static inline int countpairs_fallback_DOUBLE(const int64_t N0, DOUBLE *x0, DOUBL
         if(need_weightavg){
             src_weightavg[i] += weightavg[i];
         }
-    }
-    if (need_costheta) {
-        free(norm1);
     }
     /*----------------- FALLBACK CODE --------------------*/
 
