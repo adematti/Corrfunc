@@ -35,7 +35,7 @@ static inline int countpairs_s_mu_mocks_avx512_intrinsics_DOUBLE(const int64_t N
                                                                  const DOUBLE closest_icell_xpos, const DOUBLE closest_icell_ypos, const DOUBLE closest_icell_zpos,
                                                                  DOUBLE *src_savg,
                                                                  uint64_t *src_npairs, DOUBLE *src_weightavg, const weight_method_t weight_method, const pair_weight_struct pair_weight,
-                                                                 const bin_type_t bin_type, const int autocorr)
+                                                                 const bin_type_t bin_type, const los_type_t los_type, const int autocorr)
 {
 
     if(N0 == 0 || N1 == 0) {
@@ -405,7 +405,7 @@ static inline int countpairs_s_mu_mocks_avx_intrinsics_DOUBLE(const int64_t N0, 
                                                               const DOUBLE closest_icell_zpos,
                                                               DOUBLE *src_savg,
                                                               uint64_t *src_npairs, DOUBLE *src_weightavg, const weight_method_t weight_method, const pair_weight_struct pair_weight,
-                                                              const bin_type_t bin_type, const int autocorr)
+                                                              const bin_type_t bin_type, const los_type_t los_type, const int autocorr)
 {
     if(N0 == 0 || N1 == 0) {
         return EXIT_SUCCESS;
@@ -862,7 +862,7 @@ static inline int countpairs_s_mu_mocks_sse_intrinsics_DOUBLE(const int64_t N0, 
                                                               const DOUBLE closest_icell_zpos,
                                                               DOUBLE *src_savg, uint64_t *src_npairs,
                                                               DOUBLE *src_weightavg, const weight_method_t weight_method, const pair_weight_struct pair_weight,
-                                                              const bin_type_t bin_type, const int autocorr)
+                                                              const bin_type_t bin_type, const los_type_t los_type, const int autocorr)
 {
     if(N0 == 0 || N1 == 0) {
         return EXIT_SUCCESS;
@@ -1303,7 +1303,7 @@ static inline int countpairs_s_mu_mocks_fallback_DOUBLE(const int64_t N0, DOUBLE
                                                         const DOUBLE closest_icell_zpos,
                                                         DOUBLE *src_savg, uint64_t *src_npairs,
                                                         DOUBLE *src_weightavg, const weight_method_t weight_method, const pair_weight_struct pair_weight,
-                                                        const bin_type_t bin_type, const int autocorr)
+                                                        const bin_type_t bin_type, const los_type_t los_type, const int autocorr)
 {
     if(N0 == 0 || N1 == 0) {
         return EXIT_SUCCESS;
@@ -1357,11 +1357,16 @@ static inline int countpairs_s_mu_mocks_fallback_DOUBLE(const int64_t N0, DOUBLE
         need_costheta = pair_weight.num;
         weight_func = get_weight_func_by_method_DOUBLE(weight_method);
     }
-    DOUBLE *norm1 = NULL;
+    DOUBLE *xhat1 = NULL, *yhat1 = NULL, *zhat1 = NULL;
     if (need_costheta) {
-        norm1 = (DOUBLE *) my_malloc(N1,sizeof(DOUBLE));
+        xhat1 = (DOUBLE *) my_malloc(N1, sizeof(DOUBLE));
+        yhat1 = (DOUBLE *) my_malloc(N1, sizeof(DOUBLE));
+        zhat1 = (DOUBLE *) my_malloc(N1, sizeof(DOUBLE));
         for(int64_t i=0;i<N1;i++) {
-            norm1[i] = SQRT(x1[i]*x1[i] + y1[i]*y1[i] + z1[i]*z1[i]);
+            norm1 = SQRT(x1[i]*x1[i] + y1[i]*y1[i] + z1[i]*z1[i]);
+            xhat1[i] = x1[i]/norm1;
+            yhat1[i] = y1[i]/norm1;
+            zhat1[i] = z1[i]/norm1;
         }
     }
 
@@ -1374,8 +1379,14 @@ static inline int countpairs_s_mu_mocks_fallback_DOUBLE(const int64_t N0, DOUBLE
         for(int w = 0; w < pair.num_weights; w++){
             pair.weights0[w].d = *local_w0.weights[w]++;
         }
-        DOUBLE norm0 = ZERO;
-        if (need_costheta) norm0 = SQRT(xpos*xpos + ypos*ypos + zpos*zpos);
+        DOUBLE xhat0 = ZERO, yhat0 = ZERO, zhat0 = ZERO;
+        if (need_costheta || los_type == FIRSTPOINT_LOS) {
+            const DOUBLE norm0 = SQRT(xpos0*xpos0 + ypos0*ypos0 + zpos0*zpos0);
+            xhat0 = xpos/norm0;
+            yhat0 = ypos/norm0;
+            zhat0 = zpos/norm0;
+        }
+
         DOUBLE max_dz = max_all_dz;
 
         /* Now consider if this i'th particle can be a valid pair with ANY of the remaining
@@ -1440,13 +1451,14 @@ static inline int countpairs_s_mu_mocks_fallback_DOUBLE(const int64_t N0, DOUBLE
         for(int w = 0; w < pair.num_weights; w++){
             local_w1.weights[w] = weights1->weights[w] + n_off;
         }
+        int localj = n_off - 1;
 
         for(int64_t j=0;j<nleft;j++){
 
+            localj++;
+
             if(need_costheta) {
-                DOUBLE localnorm1 = norm1[n_off + j];
-                pair.costheta.d = (*localx1)*xpos + (*localy1)*ypos + (*localz1)*zpos;
-                pair.costheta.d /= localnorm1*norm0;
+                pair.costheta.d = xhat1[localj]*xhat0 + yhat1[localj]*yhat0 + zhat1[localj]*zhat0;
             }
 
             const DOUBLE parx = xpos + *localx1;
@@ -1466,16 +1478,22 @@ static inline int countpairs_s_mu_mocks_fallback_DOUBLE(const int64_t N0, DOUBLE
             const DOUBLE sqr_s = perpx*perpx + perpy*perpy + perpz*perpz;
             if(sqr_s >= sqr_smax || sqr_s < sqr_smin) continue;
 
-            const DOUBLE s_dot_l = parx*perpx + pary*perpy + parz*perpz;
-            const DOUBLE sqr_l = parx*parx + pary*pary + parz*parz;
-            const DOUBLE sqr_s_dot_l = s_dot_l * s_dot_l;
-            //const DOUBLE sqr_mu = sqr_s_dot_l/(sqr_l * sqr_s);
-            const DOUBLE sqr_mu = sqr_s > 0. ? sqr_s_dot_l/(sqr_l * sqr_s) : 0.;
+            DOUBLE s_dot_l;
+            if (los_type == MIDPOINT_LOS) {
+                s_dot_l = parx*perpx + pary*perpy + parz*perpz;
+                sqr_l = parx*parx + pary*pary + parz*parz;
+            }
+            else {
+                s_dot_l = xhat*perpx + yhat*perpy + zhat*perpz;
+                sqr_l = 1.;
+            }
+            const DOUBLE sqr_mu = sqr_s > 0. ? (s_dot_l * s_dot_l)/(sqr_l * sqr_s) : 0.;
             if (sqr_mu >= sqr_mumax) continue;
             DOUBLE s = ZERO, pairweight = ZERO;
-            if(need_savg || bin_type == BIN_LIN) {
+            if(need_savg || bin_type == BIN_LIN || los_type == FIRSTPOINT_LOS) {
                 s = SQRT(sqr_s);
             }
+
             if(need_weightavg){
                 pair.dx.d = perpx;
                 pair.dy.d = perpy;
@@ -1499,9 +1517,15 @@ static inline int countpairs_s_mu_mocks_fallback_DOUBLE(const int64_t N0, DOUBLE
                     }
                 }//finding kbin
             }
+            if (los_type == MIDPOINT_LOS) {
+                mu = SIGNED(SQRT(sqr_mu), s_dot_l);
+            }
+            else {
+                mu = s_dot_l/s;
+            }
 
             kbin *= nmu_bins+1;
-            const DOUBLE mubin = SIGNED(SQRT(sqr_mu), s_dot_l) * inv_dmu;
+            const DOUBLE mubin = mu * inv_dmu;
             int ibin = kbin + (int) (mubin + mumin_invstep);
             npairs[ibin]++;
             if(need_savg) {
@@ -1512,7 +1536,12 @@ static inline int countpairs_s_mu_mocks_fallback_DOUBLE(const int64_t N0, DOUBLE
                 weightavg[ibin] += pairweight;
             }
             if(autocorr == 1){
-                ibin = kbin + (int) (-mubin + mumin_invstep);
+                if (los_type == MIDPOINT_LOS) {
+                    ibin = kbin + (int) (-mubin + mumin_invstep);
+                else {
+                    s_dot_l = xhat1[localj]*perpx + yhat1[localj]*perpy + zhat1[localj]*perpz;
+                    ibin = kbin + (int) (-s_dot_l / s * inv_dmu + mumin_invstep);
+                }
                 npairs[ibin]++;
                 if(need_savg) savg[ibin] += s;
                 if(need_weightavg) weightavg[ibin] += pairweight;

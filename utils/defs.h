@@ -255,6 +255,7 @@ static inline struct config_options get_config_options(void)
     options.boxsize = -1.;
     // Default: custom binning
     options.bin_type = BIN_CUSTOM;
+    options.los_type = MIDPOINT_LOS;
 
 #ifdef DOUBLE_PREC
     options.float_type = sizeof(double);
@@ -352,7 +353,6 @@ static inline struct config_options get_config_options(void)
 
 
 typedef enum {
-    Z_LOS,
     MIDPOINT_LOS,
     FIRSTPOINT_LOS
 } los_type_t;
