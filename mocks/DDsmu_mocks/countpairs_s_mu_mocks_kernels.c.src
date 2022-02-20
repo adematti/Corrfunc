@@ -96,11 +96,16 @@ static inline int countpairs_s_mu_mocks_avx512_intrinsics_DOUBLE(const int64_t N
         need_costheta = pair_weight.num;
         avx512_weight_func = get_avx512_weight_func_by_method_DOUBLE(weight_method);
     }
-    DOUBLE *norm1 = NULL;
-    if (need_costheta) {
-        norm1 = (DOUBLE *) my_malloc(N1,sizeof(DOUBLE));
+    DOUBLE *xhat1 = NULL, *yhat1 = NULL, *zhat1 = NULL;
+    if (need_costheta || ((autocorr == 1) && (los_type == FIRSTPOINT_LOS))) {
+        xhat1 = (DOUBLE *) my_malloc(N1, sizeof(DOUBLE));
+        yhat1 = (DOUBLE *) my_malloc(N1, sizeof(DOUBLE));
+        zhat1 = (DOUBLE *) my_malloc(N1, sizeof(DOUBLE));
         for(int64_t i=0;i<N1;i++) {
-            norm1[i] = SQRT(x1[i]*x1[i] + y1[i]*y1[i] + z1[i]*z1[i]);
+            const DOUBLE norm1 = SQRT(x1[i]*x1[i] + y1[i]*y1[i] + z1[i]*z1[i]);
+            xhat1[i] = x1[i]/norm1;
+            yhat1[i] = y1[i]/norm1;
+            zhat1[i] = z1[i]/norm1;
         }
     }
 
@@ -116,8 +121,14 @@ static inline int countpairs_s_mu_mocks_avx512_intrinsics_DOUBLE(const int64_t N
             // The advancement of the local_w0.weights[w] pointer should always mirror x0.
             pair.weights0[w].a512 = AVX512_SET_FLOAT(*(local_w0.weights[w])++);
         }
-        DOUBLE norm0 = ZERO;
-        if (need_costheta) norm0 = SQRT(xpos*xpos + ypos*ypos + zpos*zpos);
+        DOUBLE xhat0 = ZERO, yhat0 = ZERO, zhat0 = ZERO;
+        if (need_costheta || los_type == FIRSTPOINT_LOS) {
+            const DOUBLE norm0 = SQRT(xpos*xpos + ypos*ypos + zpos*zpos);
+            xhat0 = xpos/norm0;
+            yhat0 = ypos/norm0;
+            zhat0 = zpos/norm0;
+        }
+
         DOUBLE max_dz = max_all_dz;
 
         /* Now consider if this i'th particle can be a valid pair with ANY of the remaining
@@ -187,7 +198,9 @@ static inline int countpairs_s_mu_mocks_avx512_intrinsics_DOUBLE(const int64_t N
         AVX512_FLOATS m_xpos = AVX512_SET_FLOAT(xpos);
         AVX512_FLOATS m_ypos = AVX512_SET_FLOAT(ypos);
         AVX512_FLOATS m_zpos = AVX512_SET_FLOAT(zpos);
-        const AVX512_FLOATS m_norm0 = AVX512_SET_FLOAT(norm0);
+        const AVX512_FLOATS m_xhat0 = AVX512_SET_FLOAT(xhat0);
+        const AVX512_FLOATS m_yhat0 = AVX512_SET_FLOAT(yhat0);
+        const AVX512_FLOATS m_zhat0 = AVX512_SET_FLOAT(zhat0);
 
         const AVX512_FLOATS m_max_dz = AVX512_SET_FLOAT(max_dz);
         const AVX512_FLOATS m_sqr_smax = AVX512_SET_FLOAT(sqr_smax);
@@ -203,13 +216,15 @@ static inline int countpairs_s_mu_mocks_avx512_intrinsics_DOUBLE(const int64_t N
 
         for(int64_t j=n_off;j<N1;j+=AVX512_NVEC){
             AVX512_MASK m_mask_left = (N1 - j) >= AVX512_NVEC ? ~0:masks_per_misalignment_value_DOUBLE[N1-j];
-            const AVX512_FLOATS m_x1 = AVX512_MASKZ_LOAD_FLOATS_UNALIGNED(m_mask_left, localx1);
-            const AVX512_FLOATS m_y1 = AVX512_MASKZ_LOAD_FLOATS_UNALIGNED(m_mask_left, localy1);
-            const AVX512_FLOATS m_z1 = AVX512_MASKZ_LOAD_FLOATS_UNALIGNED(m_mask_left, localz1);
-            if(need_costheta) {
-                const AVX512_FLOATS m_norm1 = AVX512_MASKZ_LOAD_FLOATS_UNALIGNED(m_mask_left, norm1 + j);
-                pair.costheta.a512 = AVX512_MASKZ_ADD_FLOATS(m_mask_left, AVX512_MASKZ_ADD_FLOATS(AVX512_MASKZ_MULTIPLY_FLOATS(m_mask_left, m_xpos, m_x2), AVX512_MASKZ_MULTIPLY_FLOATS(m_mask_left, m_ypos, m_y2)), AVX512_MASKZ_MULTIPLY_FLOATS(m_mask_left, m_zpos, m_z2));
-                pair.costheta.a512 = AVX512_MASKZ_DIVIDE_FLOATS(m_mask_left, pair.costheta.a512, AVX512_MASKZ_MULTIPLY_FLOATS(m_mask_left, m_norm0, m_norm1));
+
+            const AVX512_FLOATS m_x2 = AVX512_MASKZ_LOAD_FLOATS_UNALIGNED(m_mask_left, localx1);
+            const AVX512_FLOATS m_y2 = AVX512_MASKZ_LOAD_FLOATS_UNALIGNED(m_mask_left, localy1);
+            const AVX512_FLOATS m_z2 = AVX512_MASKZ_LOAD_FLOATS_UNALIGNED(m_mask_left, localz1);
+            AVX512_FLOATS m_xhat1, m_yhat1, m_zhat1;
+            if (need_costheta || ((autocorr == 1) && (los_type == FIRSTPOINT_LOS))) {
+                m_xhat1 = AVX512_MASKZ_LOAD_FLOATS_UNALIGNED(m_mask_left, xhat1 + j);
+                m_yhat1 = AVX512_MASKZ_LOAD_FLOATS_UNALIGNED(m_mask_left, yhat1 + j);
+                m_zhat1 = AVX512_MASKZ_LOAD_FLOATS_UNALIGNED(m_mask_left, zhat1 + j);
             }
 
             localx1 += AVX512_NVEC;
@@ -222,83 +237,86 @@ static inline int countpairs_s_mu_mocks_avx512_intrinsics_DOUBLE(const int64_t N
             }
 
             union int16 union_finalbin;
-            union float16 union_mDperp;
+            union float16 union_msep;
             union float16_weights union_mweight;
-            union_finalbin.m_ibin = AVX512_SETZERO_INT();
-            union_mDperp.m_Dperp = AVX512_SETZERO_FLOAT();
 
-            const AVX512_FLOATS m_perpx = AVX512_MASKZ_SUBTRACT_FLOATS(m_mask_left, m_x1, m_xpos);
-            const AVX512_FLOATS m_perpy = AVX512_MASKZ_SUBTRACT_FLOATS(m_mask_left, m_y1, m_ypos);
-            const AVX512_FLOATS m_perpz = AVX512_MASKZ_SUBTRACT_FLOATS(m_mask_left, m_z1, m_zpos);
+            const AVX512_FLOATS m_perpx = AVX512_MASKZ_SUBTRACT_FLOATS(m_mask_left, m_x2, m_xpos);
+            const AVX512_FLOATS m_perpy = AVX512_MASKZ_SUBTRACT_FLOATS(m_mask_left, m_y2, m_ypos);
+            const AVX512_FLOATS m_perpz = AVX512_MASKZ_SUBTRACT_FLOATS(m_mask_left, m_z2, m_zpos);
 
-            const AVX512_MASK m_neg_pimax_mask = AVX512_MASK_COMPARE_FLOATS(m_mask_left, m_perpz, -m_max_dz,_CMP_GT_OQ);
-            if(m_neg_pimax_mask == 0) continue;
+            const AVX512_FLOATS m_parx = AVX512_MASKZ_SUBTRACT_FLOATS(m_mask_left, m_x2, m_xpos);
+            const AVX512_FLOATS m_pary = AVX512_MASKZ_SUBTRACT_FLOATS(m_mask_left, m_y2, m_ypos);
+            const AVX512_FLOATS m_parz = AVX512_MASKZ_SUBTRACT_FLOATS(m_mask_left, m_z2, m_zpos);
 
-            const AVX512_FLOATS m_parx = AVX512_MASKZ_ADD_FLOATS(m_mask_left, m_x1, m_xpos);
-            const AVX512_FLOATS m_pary = AVX512_MASKZ_ADD_FLOATS(m_mask_left, m_y1, m_ypos);
-            const AVX512_FLOATS m_parz = AVX512_MASKZ_ADD_FLOATS(m_mask_left, m_z1, m_zpos);
-
-            /*
-            //Technically l := 1/2 (v1 + v2) but the factor of 1/2 occurs both in numerator and denominator
-            and cancels out.
-
-            s \dot l := (parx*perpx + pary*perpy + parz*perp)
-                     := (x1 + x2)*(x1 - x2) + (y1 + y2)*(y1 - y2) + (z1 + z2)*(z1 - z2)
-                     := (x1^2 + y1^2 + z1^2) - (x2^2 + y2^2 + z2^2)
-                     := d1^2 - d2^2
-            */
-
-
-            /* Since the particles are sorted on 'z', we can check if any of the dz values >= max_dz */
-            const AVX512_MASK m_mask_dz = AVX512_MASK_COMPARE_FLOATS(m_mask_left, m_perpz, m_max_dz,_CMP_GE_OQ);
+            const AVX512_FLOATS m_mask_dz = AVX512_MASK_COMPARE_FLOATS(m_mask_left, m_perpz, m_max_dz, _CMP_GE_OQ);
             if(m_mask_dz > 0) {
                 /* this means the next chunk of particles can not be within 's' */
                 j = N1;/* but do not break out of the loop because this chunk might contain valid pairs */
             }
 
-            const AVX512_FLOATS m_term1 = AVX512_MULTIPLY_FLOATS(m_parx, m_perpx);
-            const AVX512_FLOATS m_term2 = AVX512_MULTIPLY_FLOATS(m_pary, m_perpy);
-            const AVX512_FLOATS m_s_dot_l = AVX512_FMA_ADD_FLOATS(m_parz, m_perpz, AVX512_ADD_FLOATS(m_term1, m_term2));
-            const AVX512_FLOATS m_sqr_s_dot_l = AVX512_SQUARE_FLOAT(m_s_dot_l);
-
-            /*s^2 = dx^2 + dy^2 + dz^2*/
-            const AVX512_FLOATS m_sqr_s = AVX512_FMA_ADD_FLOATS(m_perpx, m_perpx,
-                                                                AVX512_FMA_ADD_FLOATS(m_perpy, m_perpy,
-                                                                                      AVX512_SQUARE_FLOAT(m_perpz)));//3-d separation
-
-
-            //Create a mask where s^2 < smax^2
-            m_mask_left = AVX512_MASK_COMPARE_FLOATS(m_mask_left, m_sqr_s, m_sqr_smax, _CMP_LT_OQ);
-            if(m_mask_left == 0) {
-                continue;
-            }
-            const AVX512_FLOATS m_sqr_norm_l = AVX512_FMA_ADD_FLOATS(m_parx, m_parx,
-                                                                     AVX512_FMA_ADD_FLOATS(m_pary, m_pary,
-                                                                                           AVX512_SQUARE_FLOAT(m_parz)));
-
-            // \mu^2 := cos^2(\theta_between_s_and_l) = |s.l|^2 / (|s|^2 * |l|^2)
-            const AVX512_FLOATS m_sqr_norm_l_norm_s = AVX512_MULTIPLY_FLOATS(m_sqr_norm_l, m_sqr_s);
-            const AVX512_FLOATS m_mask_szero = AVX512_COMPARE_FLOATS(m_sqr_s, m_zero, _CMP_LE_OQ);
-            m_sqr_norm_l_norm_s = AVX512_BLEND_FLOATS_WITH_MASK(m_sqr_norm_l_norm_s, m_one, m_mask_szero); // to avoid division by 0
-            AVX512_FLOATS m_sqr_mu = AVX512_SETZERO_FLOAT();
-            CHECK_AND_FAST_DIVIDE_AVX512(m_sqr_mu, m_sqr_s_dot_l, m_sqr_norm_l_norm_s, m_mask_left, fast_divide_and_NR_steps);
-
-            //Do the mask filters in a separate scope
+            AVX512_FLOATS m_sqr_s;
             {
-                const AVX512_MASK m_mask_mumax = AVX512_MASK_COMPARE_FLOATS(m_mask_left, m_sqr_mu, m_sqr_mumax, _CMP_LT_OQ);
-                const AVX512_MASK m_smax_mask = AVX512_MASK_COMPARE_FLOATS(m_mask_left, m_sqr_s, m_sqr_smax, _CMP_LT_OQ);
-                const AVX512_MASK m_smin_mask = AVX512_MASK_COMPARE_FLOATS(m_mask_left, m_sqr_s, m_sqr_smin, _CMP_GE_OQ);
-                const AVX512_MASK m_s_mask = AVX512_MASK_BITWISE_AND(m_smax_mask, m_smin_mask);
+                const AVX512_FLOATS m_sqr_perpx = AVX512_SQUARE_FLOAT(m_perpx);
+                const AVX512_FLOATS m_sqr_perpy = AVX512_SQUARE_FLOAT(m_perpy);
+                const AVX512_FLOATS m_sqr_perpz = AVX512_SQUARE_FLOAT(m_perpz);
+                m_sqr_s = AVX512_ADD_FLOATS(m_sqr_perpx, AVX512_ADD_FLOATS(m_sqr_perpy, m_sqr_perpz));//3-d separation
+            }
 
-                m_mask_left = AVX512_MASK_BITWISE_AND(m_mask_mumax, m_s_mask);
-                if(m_mask_left==0) {
-                    continue;
+            const AVX512_FLOATS m_smax_mask = AVX512_COMPARE_FLOATS(m_sqr_s, m_sqr_smax, _CMP_LT_OQ);
+            const AVX512_FLOATS m_smin_mask = AVX512_COMPARE_FLOATS(m_sqr_s, m_sqr_smin, _CMP_GE_OQ);
+            const AVX512_FLOATS m_s_mask = AVX512_BITWISE_AND(m_smax_mask, m_smin_mask);
+
+            if(m_s_mask == 0) continue;
+
+            const AVX512_FLOATS m_mask_szero = AVX512_COMPARE_FLOATS(m_sqr_s, m_zero, _CMP_LE_OQ);
+            AVX512_FLOATS m_s, m_mubin, m_mubin2, m_mask_left;
+            if (los_type == MIDPOINT_LOS) {
+                const AVX512_FLOATS m_s_dot_l = AVX512_ADD_FLOATS(AVX512_MULTIPLY_FLOATS(m_parx, m_perpx), AVX512_ADD_FLOATS(AVX512_MULTIPLY_FLOATS(m_pary, m_perpy), AVX512_MULTIPLY_FLOATS(m_parz, m_perpz)));
+                const AVX512_FLOATS m_sqr_l = AVX512_ADD_FLOATS(AVX512_SQUARE_FLOAT(m_parx), AVX512_ADD_FLOATS(AVX512_SQUARE_FLOAT(m_pary), AVX512_SQUARE_FLOAT(m_parz)));
+                AVX512_FLOATS m_sqr_mu = AVX512_SETZERO_FLOAT();
+                CHECK_AND_FAST_DIVIDE_AVX(m_sqr_mu, AVX512_SQUARE_FLOAT(m_s_dot_l), AVX512_BLEND_FLOATS_WITH_MASK(AVX512_MULTIPLY_FLOATS(m_sqr_s, m_sqr_l), m_one, m_mask_szero), fast_divide_and_NR_steps);
+                const AVX512_FLOATS m_mask_mumax = AVX512_COMPARE_FLOATS(m_sqr_mu, m_sqr_mumax, _CMP_LT_OQ);
+                m_mask_left = AVX512_BITWISE_AND(m_mask_mumax, m_s_mask);
+                if (m_mask_left == 0) continue;
+                const AVX512_FLOATS m_mu = AVX512_SIGNED_FLOATS(AVX512_SQRT_FLOAT(m_sqr_mu), m_s_dot_l);
+                m_mubin = AVX512_BLEND_FLOATS_WITH_MASK(m_nmu_bins, AVX512_FMA_ADD_TRUNCATE_FLOATS(m_mu, m_inv_dmu, m_mumin_invstep), m_mask_left);
+                if (autocorr == 1) m_mubin2 = AVX512_BLEND_FLOATS_WITH_MASK(m_nmu_bins, AVX512_FMA_ADD_TRUNCATE_FLOATS(m_mu, m_inv_dmu_opp, m_mumin_invstep), m_mask_mumax);
+                if (need_savg || bin_type == BIN_LIN) {
+                    m_s = AVX512_SQRT_FLOAT(m_sqr_s);
+                    union_msep.m_Dperp = m_s;
                 }
             }
-
-            if(need_savg || bin_type == BIN_LIN) {
-                union_mDperp.m_Dperp = AVX512_MASKZ_SQRT_FLOAT(m_mask_left, m_sqr_s);
+            else {
+                const AVX512_FLOATS m_s_dot_l = AVX512_ADD_FLOATS(AVX512_MULTIPLY_FLOATS(m_xhat0, m_perpx), AVX512_ADD_FLOATS(AVX512_MULTIPLY_FLOATS(m_yhat0, m_perpy), AVX512_MULTIPLY_FLOATS(m_zhat0, m_perpz)));
+                AVX512_FLOATS m_sqr_mu = AVX512_SETZERO_FLOAT();
+                CHECK_AND_FAST_DIVIDE_AVX(m_sqr_mu, AVX512_SQUARE_FLOAT(m_s_dot_l), AVX512_BLEND_FLOATS_WITH_MASK(m_sqr_s, m_one, m_mask_szero), fast_divide_and_NR_steps);
+                const AVX512_FLOATS m_mask_mumax = AVX512_COMPARE_FLOATS(m_sqr_mu, m_sqr_mumax, _CMP_LT_OQ);
+                m_mask_left = AVX512_BITWISE_AND(m_mask_mumax, m_s_mask);
+                if (autocorr == 1) {
+                    const AVX512_FLOATS m_s_dot_l2 = AVX512_ADD_FLOATS(AVX512_MULTIPLY_FLOATS(m_xhat1, m_perpx), AVX512_ADD_FLOATS(AVX512_MULTIPLY_FLOATS(m_yhat1, m_perpy), AVX512_MULTIPLY_FLOATS(m_zhat1, m_perpz)));
+                    AVX512_FLOATS m_sqr_mu2 = AVX512_SETZERO_FLOAT();
+                    CHECK_AND_FAST_DIVIDE_AVX(m_sqr_mu2, AVX512_SQUARE_FLOAT(m_s_dot_l2), AVX512_BLEND_FLOATS_WITH_MASK(m_sqr_s, m_one, m_mask_szero), fast_divide_and_NR_steps);
+                    const AVX512_FLOATS m_mask_mumax2 = AVX512_COMPARE_FLOATS(m_sqr_mu2, m_sqr_mumax, _CMP_LT_OQ);
+                    const AVX512_FLOATS m_mask_left1 = m_mask_left;
+                    const AVX512_FLOATS m_mask_left2 = AVX512_BITWISE_AND(m_mask_mumax2, m_s_mask);
+                    m_mask_left = AVX512_BITWISE_OR(m_mask_left1, m_mask_left2);
+                    if (m_mask_left == 0) continue;
+                    m_s = AVX512_SQRT_FLOAT(m_sqr_s);
+                    const AVX512_FLOATS m_s_nonzero = AVX512_BLEND_FLOATS_WITH_MASK(m_s, m_one, m_mask_szero);
+                    m_mubin = AVX512_BLEND_FLOATS_WITH_MASK(m_nmu_bins, AVX512_FMA_ADD_TRUNCATE_FLOATS(AVX512_DIVIDE_FLOATS(m_s_dot_l, m_s_nonzero), m_inv_dmu, m_mumin_invstep), m_mask_left1);
+                    m_mubin2 = AVX512_BLEND_FLOATS_WITH_MASK(m_nmu_bins, AVX512_FMA_ADD_TRUNCATE_FLOATS(AVX512_DIVIDE_FLOATS(m_s_dot_l2, m_s_nonzero), m_inv_dmu_opp, m_mumin_invstep), m_mask_left2);
+                }
+                else {
+                    if (m_mask_left == 0) continue;
+                    m_s = AVX512_SQRT_FLOAT(m_sqr_s);
+                    const AVX512_FLOATS m_s_nonzero = AVX512_BLEND_FLOATS_WITH_MASK(m_s, m_one, m_mask_szero);
+                    m_mubin = AVX512_BLEND_FLOATS_WITH_MASK(m_nmu_bins, AVX512_FMA_ADD_TRUNCATE_FLOATS(AVX512_DIVIDE_FLOATS(m_s_dot_l, m_s_nonzero), m_inv_dmu, m_mumin_invstep), m_mask_left);
+                }
+                union_msep.m_Dperp = m_s;
             }
+
+            if(need_costheta) pair.costheta.a512 = AVX512_ADD_FLOATS(AVX512_ADD_FLOATS(AVX512_MULTIPLY_FLOATS(m_xhat0, m_xhat1), AVX512_MULTIPLY_FLOATS(m_yhat0, m_yhat1)), AVX512_MULTIPLY_FLOATS(m_zhat0, m_zhat1));
+
             if(need_weightavg){
                 pair.dx.a512 = m_perpx;
                 pair.dy.a512 = m_perpy;
@@ -309,72 +327,59 @@ static inline int countpairs_s_mu_mocks_avx512_intrinsics_DOUBLE(const int64_t N
                 pair.parz.a512 = m_parz;
 
                 union_mweight.m_weights = avx512_weight_func(&pair);
+                if(need_savg) union_msep.m_Dperp = AVX512_MULTIPLY_FLOATS(m_s, union_mweight.m_weights);
             }
 
-            const AVX512_MASK m_mask = m_mask_left;
             AVX512_FLOATS m_sbin = AVX512_SETZERO_FLOAT();
 
             if (bin_type == BIN_LIN) {
-                m_sbin = AVX512_MASKZ_FMA_ADD_TRUNCATE_FLOATS(m_mask, union_mDperp.m_Dperp, m_inv_sstep, m_smin_invstep);
-                // This rounding is only necessary because the rounding is supposed to happen during the FMA, but doesn't for some reason
-                // https://github.com/manodeep/Corrfunc/pull/258#issuecomment-942479146
-                // This may be obviated if we switch the bin index calculations to use ints instead of floats
-                m_sbin = AVX512_TRUNCATE_FLOAT_TO_FLOAT(m_sbin);
+                m_sbin = AVX512_BLEND_FLOATS_WITH_MASK(m_sbin,
+                         AVX512_FMA_ADD_TRUNCATE_FLOATS(m_s, m_inv_sstep, m_smin_invstep),
+                         m_mask_left);
             }
             else {
                 for(int kbin=nsbin-1;kbin>=1;kbin--) {
-                    const AVX512_MASK m_bin_mask = AVX512_MASK_COMPARE_FLOATS(m_mask_left, m_sqr_s, m_supp_sqr[kbin-1],_CMP_GE_OQ);
-                    m_sbin = AVX512_BLEND_FLOATS_WITH_MASK(m_bin_mask, m_sbin, AVX512_SET_FLOAT(kbin));
-                    m_mask_left = AVX512_MASK_BITWISE_AND_NOT(m_bin_mask, m_mask_left);//ANDNOT(X, Y) -> NOT X AND Y
-                    if(m_mask_left == 0) {
-                        break;
-                    }
+                    const AVX512_FLOATS m_mask_low = AVX512_COMPARE_FLOATS(m_sqr_s, m_supp_sqr[kbin-1], _CMP_GE_OQ);
+                    const AVX512_FLOATS m_bin_mask = AVX512_BITWISE_AND(m_mask_low, m_mask_left);
+                    m_sbin = AVX512_BLEND_FLOATS_WITH_MASK(m_sbin, m_kbin[kbin], m_bin_mask);
+                    m_mask_left = AVX512_COMPARE_FLOATS(m_sqr_s, m_supp_sqr[kbin-1], _CMP_LT_OQ);
+                    if(AVX512_TEST_COMPARISON(m_mask_left) == 0) break;
                 }
             }
-            /* Compute the 1-D index to the [sbin, mubin] := sbin*(nmubin+1) + mubin */
-            const AVX512_FLOATS m_sbin_linear_index = AVX512_MULTIPLY_FLOATS(m_sbin, m_nmu_bins_p1);
-            if(need_savg && need_weightavg) union_mDperp.m_Dperp = AVX512_MASKZ_MULTIPLY_FLOATS(m_mask, union_mDperp.m_Dperp, union_mweight.m_weights);
+            m_sbin = AVX512_MULTIPLY_FLOATS(m_sbin, m_nmu_bins_p1);
 
-            const AVX512_FLOATS m_mu = AVX512_SIGNED_FLOATS(AVX512_MASKZ_SQRT_FLOAT(m_mask, m_sqr_mu), m_s_dot_l);
-            AVX512_FLOATS m_mubin = AVX512_FMA_ADD_TRUNCATE_FLOATS(m_mu, m_inv_dmu, m_mumin_invstep);
-            union_finalbin.m_ibin = AVX512_TRUNCATE_FLOAT_TO_INT(AVX512_MASK_ADD_FLOATS(m_nmu_bins, m_mask, m_sbin_linear_index, m_mubin));
+            /* Compute the 1-D index to the [sbin, mubin] := sbin*(nmu_bins+1) + mubin */
+            union_finalbin.m_ibin = AVX512_TRUNCATE_FLOAT_TO_INT(AVX512_ADD_FLOATS(m_sbin, m_mubin));
 
-#if  __INTEL_COMPILER
-#pragma unroll(AVX512_NVEC)
-#endif
+        #if  __INTEL_COMPILER
+        #pragma unroll(AVX512_NVEC)
+        #endif
             for(int jj=0;jj<AVX512_NVEC;jj++) {
                 const int ibin=union_finalbin.ibin[jj];
                 npairs[ibin]++;
-                if(need_savg) {
-                    savg[ibin] += union_mDperp.Dperp[jj];
-                }
-                if(need_weightavg){
-                    weightavg[ibin] += union_mweight.weights[jj];
-                }
+                if(need_savg) savg[ibin] += union_msep.Dperp[jj];
+                if(need_weightavg) weightavg[ibin] += union_mweight.weights[jj];
             }
             if (autocorr == 1) {
-                m_mubin = AVX512_FMA_ADD_TRUNCATE_FLOATS(m_mu, m_inv_dmu_opp, m_mumin_invstep);
-                union_finalbin.m_ibin = AVX512_TRUNCATE_FLOAT_TO_INT(AVX512_MASK_ADD_FLOATS(m_nmu_bins, m_mask, m_sbin_linear_index, m_mubin));
-#if  __INTEL_COMPILER
-#pragma unroll(AVX512_NVEC)
-#endif
+                union_finalbin.m_ibin = AVX512_TRUNCATE_FLOAT_TO_INT(AVX512_ADD_FLOATS(m_sbin, m_mubin2));
+        #if  __INTEL_COMPILER
+        #pragma unroll(AVX512_NVEC)
+        #endif
                 for(int jj=0;jj<AVX512_NVEC;jj++) {
                     const int ibin=union_finalbin.ibin[jj];
-
                     npairs[ibin]++;
-                    if(need_savg) {
-                        savg[ibin] += union_msep.Dperp[jj];
-                    }
-                    if(need_weightavg){
-                        const DOUBLE weight = union_mweight.weights[jj];
-                        weightavg[ibin] += weight;
-                    }
+                    if(need_savg) savg[ibin] += union_msep.Dperp[jj];
+                    if(need_weightavg) weightavg[ibin] += union_mweight.weights[jj];
                 }
             }
-        }//loop over second set of particles
+        }//AVX512 j loop
     }//loop over first set of particles
 
-    if (need_costheta) free(norm1);
+    if (need_costheta) {
+        free(xhat1);
+        free(yhat1);
+        free(zhat1);
+    }
 
     for(int i=0;i<totnbins;i++) {
       src_npairs[i] += npairs[i];
@@ -472,11 +477,16 @@ static inline int countpairs_s_mu_mocks_avx_intrinsics_DOUBLE(const int64_t N0, 
         avx_weight_func = get_avx_weight_func_by_method_DOUBLE(weight_method);
         fallback_weight_func = get_weight_func_by_method_DOUBLE(weight_method);
     }
-    DOUBLE *norm1 = NULL;
-    if (need_costheta) {
-        norm1 = (DOUBLE *) my_malloc(N1,sizeof(DOUBLE));
+    DOUBLE *xhat1 = NULL, *yhat1 = NULL, *zhat1 = NULL;
+    if (need_costheta || ((autocorr == 1) && (los_type == FIRSTPOINT_LOS))) {
+        xhat1 = (DOUBLE *) my_malloc(N1, sizeof(DOUBLE));
+        yhat1 = (DOUBLE *) my_malloc(N1, sizeof(DOUBLE));
+        zhat1 = (DOUBLE *) my_malloc(N1, sizeof(DOUBLE));
         for(int64_t i=0;i<N1;i++) {
-            norm1[i] = SQRT(x1[i]*x1[i] + y1[i]*y1[i] + z1[i]*z1[i]);
+            const DOUBLE norm1 = SQRT(x1[i]*x1[i] + y1[i]*y1[i] + z1[i]*z1[i]);
+            xhat1[i] = x1[i]/norm1;
+            yhat1[i] = y1[i]/norm1;
+            zhat1[i] = z1[i]/norm1;
         }
     }
 
@@ -492,8 +502,14 @@ static inline int countpairs_s_mu_mocks_avx_intrinsics_DOUBLE(const int64_t N0, 
             // The advancement of the local_w0.weights[w] pointer should always mirror x0.
             pair.weights0[w].a = AVX_SET_FLOAT(*(local_w0.weights[w])++);
         }
-        DOUBLE norm0 = ZERO;
-        if (need_costheta) norm0 = SQRT(xpos*xpos + ypos*ypos + zpos*zpos);
+        DOUBLE xhat0 = ZERO, yhat0 = ZERO, zhat0 = ZERO;
+        if (need_costheta || los_type == FIRSTPOINT_LOS) {
+            const DOUBLE norm0 = SQRT(xpos*xpos + ypos*ypos + zpos*zpos);
+            xhat0 = xpos/norm0;
+            yhat0 = ypos/norm0;
+            zhat0 = zpos/norm0;
+        }
+
         DOUBLE max_dz = max_all_dz;
 
         /* Now consider if this i'th particle can be a valid pair with ANY of the remaining
@@ -561,7 +577,9 @@ static inline int countpairs_s_mu_mocks_avx_intrinsics_DOUBLE(const int64_t N0, 
         const AVX_FLOATS m_xpos = AVX_SET_FLOAT(xpos);
         const AVX_FLOATS m_ypos = AVX_SET_FLOAT(ypos);
         const AVX_FLOATS m_zpos = AVX_SET_FLOAT(zpos);
-        const AVX_FLOATS m_norm0 = AVX_SET_FLOAT(norm0);
+        const AVX_FLOATS m_xhat0 = AVX_SET_FLOAT(xhat0);
+        const AVX_FLOATS m_yhat0 = AVX_SET_FLOAT(yhat0);
+        const AVX_FLOATS m_zhat0 = AVX_SET_FLOAT(zhat0);
 
         const AVX_FLOATS m_max_dz = AVX_SET_FLOAT(max_dz);
         const AVX_FLOATS m_sqr_smax = AVX_SET_FLOAT(sqr_smax);
@@ -576,17 +594,15 @@ static inline int countpairs_s_mu_mocks_avx_intrinsics_DOUBLE(const int64_t N0, 
         const AVX_FLOATS m_nmu_bins_p1 = AVX_ADD_FLOATS(m_nmu_bins, m_one);
 
         for(;j<=(N1-AVX_NVEC);j+=AVX_NVEC){
-            union int8 union_finalbin;
-            union float8 union_msep;
-            union float8_weights union_mweight;
 
             const AVX_FLOATS m_x2 = AVX_LOAD_FLOATS_UNALIGNED(localx1);
             const AVX_FLOATS m_y2 = AVX_LOAD_FLOATS_UNALIGNED(localy1);
             const AVX_FLOATS m_z2 = AVX_LOAD_FLOATS_UNALIGNED(localz1);
-            if(need_costheta) {
-                const AVX_FLOATS m_norm1 = AVX_LOAD_FLOATS_UNALIGNED(norm1 + j);
-                pair.costheta.a = AVX_ADD_FLOATS(AVX_ADD_FLOATS(AVX_MULTIPLY_FLOATS(m_xpos, m_x2), AVX_MULTIPLY_FLOATS(m_ypos, m_y2)), AVX_MULTIPLY_FLOATS(m_zpos, m_z2));
-                pair.costheta.a = AVX_DIVIDE_FLOATS(pair.costheta.a, AVX_MULTIPLY_FLOATS(m_norm0, m_norm1));
+            AVX_FLOATS m_xhat1, m_yhat1, m_zhat1;
+            if (need_costheta || ((autocorr == 1) && (los_type == FIRSTPOINT_LOS))) {
+                m_xhat1 = AVX_LOAD_FLOATS_UNALIGNED(xhat1 + j);
+                m_yhat1 = AVX_LOAD_FLOATS_UNALIGNED(yhat1 + j);
+                m_zhat1 = AVX_LOAD_FLOATS_UNALIGNED(zhat1 + j);
             }
 
             localx1 += AVX_NVEC;
@@ -598,6 +614,10 @@ static inline int countpairs_s_mu_mocks_avx_intrinsics_DOUBLE(const int64_t N0, 
                 local_w1.weights[w] += AVX_NVEC;
             }
 
+            union int8 union_finalbin;
+            union float8 union_msep;
+            union float8_weights union_mweight;
+
             const AVX_FLOATS m_perpx = AVX_SUBTRACT_FLOATS(m_x2, m_xpos);
             const AVX_FLOATS m_perpy = AVX_SUBTRACT_FLOATS(m_y2, m_ypos);
             const AVX_FLOATS m_perpz = AVX_SUBTRACT_FLOATS(m_z2, m_zpos);
@@ -606,68 +626,75 @@ static inline int countpairs_s_mu_mocks_avx_intrinsics_DOUBLE(const int64_t N0, 
             const AVX_FLOATS m_pary = AVX_ADD_FLOATS(m_y2, m_ypos);
             const AVX_FLOATS m_parz = AVX_ADD_FLOATS(m_z2, m_zpos);
 
-            /* Since the particles are sorted on 'z', we can check if any of the dz values >= max_dz */
-            const AVX_FLOATS m_mask_dz = AVX_COMPARE_FLOATS(m_perpz, m_max_dz,_CMP_GE_OQ);
+            const AVX_FLOATS m_mask_dz = AVX_COMPARE_FLOATS(m_perpz, m_max_dz, _CMP_GE_OQ);
             if(AVX_TEST_COMPARISON(m_mask_dz) > 0) {
                 /* this means the next chunk of particles can not be within 's' */
                 j = N1;/* but do not break out of the loop because this chunk might contain valid pairs */
             }
 
-            /*
-            //Technically l := 1/2 (v1 + v2) but the factor of 1/2 occurs both in numerator and denominator
-            and cancels out.
-
-            s \dot l := (parx*perpx + pary*perpy + parz*perp)
-            := (x1 + x2)*(x1 - x2) + (y1 + y2)*(y1 - y2) + (z1 + z2)*(z1 - z2)
-            := (x1^2 + y1^2 + z1^2) - (x2^2 + y2^2 + z2^2)
-            := d1^2 - d2^2
-            */
-            const AVX_FLOATS m_term1 = AVX_MULTIPLY_FLOATS(m_parx, m_perpx);
-            const AVX_FLOATS m_term2 = AVX_MULTIPLY_FLOATS(m_pary, m_perpy);
-            const AVX_FLOATS m_term3 = AVX_MULTIPLY_FLOATS(m_parz, m_perpz);
-            const AVX_FLOATS m_s_dot_l = AVX_ADD_FLOATS(m_term3, AVX_ADD_FLOATS(m_term2, m_term1));
-            const AVX_FLOATS m_sqr_s_dot_l = AVX_SQUARE_FLOAT(m_s_dot_l);// numerator := |s.l|^2
-
-            const AVX_FLOATS m_sqr_perpx = AVX_SQUARE_FLOAT(m_perpx);
-            const AVX_FLOATS m_sqr_perpy = AVX_SQUARE_FLOAT(m_perpy);
-            const AVX_FLOATS m_sqr_perpz = AVX_SQUARE_FLOAT(m_perpz);
-            AVX_FLOATS m_sqr_s = AVX_ADD_FLOATS(m_sqr_perpx, AVX_ADD_FLOATS(m_sqr_perpy, m_sqr_perpz));//3-d separation
-
-            //Create a mask where s^2 < smax^2
-            const AVX_FLOATS m_mask_3d_sep = AVX_COMPARE_FLOATS(m_sqr_s, m_sqr_smax, _CMP_LT_OQ);
-            if(AVX_TEST_COMPARISON(m_mask_3d_sep) == 0) {
-                continue;
-            }
-            const AVX_FLOATS m_sqr_norm_l = AVX_ADD_FLOATS(AVX_SQUARE_FLOAT(m_parx),
-                                                           AVX_ADD_FLOATS(AVX_SQUARE_FLOAT(m_pary),
-                                                                          AVX_SQUARE_FLOAT(m_parz)));
-
-            // \mu^2 := cos^2(\theta_between_s_and_l) = |s.l|^2 / (|s|^2 * |l|^2)
-            AVX_FLOATS m_sqr_norm_l_norm_s = AVX_MULTIPLY_FLOATS(m_sqr_norm_l, m_sqr_s);
-            const AVX_FLOATS m_mask_szero = AVX_COMPARE_FLOATS(m_sqr_s, m_zero, _CMP_LE_OQ);
-            m_sqr_norm_l_norm_s = AVX_BLEND_FLOATS_WITH_MASK(m_sqr_norm_l_norm_s, m_one, m_mask_szero); // to avoid division by 0
-            AVX_FLOATS m_sqr_mu = AVX_SETZERO_FLOAT();
-            CHECK_AND_FAST_DIVIDE_AVX(m_sqr_mu, m_sqr_s_dot_l, m_sqr_norm_l_norm_s, fast_divide_and_NR_steps);
-
-            AVX_FLOATS m_mask_left;
-            //Do the mask filters in a separate scope
+            AVX_FLOATS m_sqr_s;
             {
+                const AVX_FLOATS m_sqr_perpx = AVX_SQUARE_FLOAT(m_perpx);
+                const AVX_FLOATS m_sqr_perpy = AVX_SQUARE_FLOAT(m_perpy);
+                const AVX_FLOATS m_sqr_perpz = AVX_SQUARE_FLOAT(m_perpz);
+                m_sqr_s = AVX_ADD_FLOATS(m_sqr_perpx, AVX_ADD_FLOATS(m_sqr_perpy, m_sqr_perpz));//3-d separation
+            }
+
+            const AVX_FLOATS m_smax_mask = AVX_COMPARE_FLOATS(m_sqr_s, m_sqr_smax, _CMP_LT_OQ);
+            const AVX_FLOATS m_smin_mask = AVX_COMPARE_FLOATS(m_sqr_s, m_sqr_smin, _CMP_GE_OQ);
+            const AVX_FLOATS m_s_mask = AVX_BITWISE_AND(m_smax_mask, m_smin_mask);
+
+            if(AVX_TEST_COMPARISON(m_s_mask) == 0) continue;
+
+            const AVX_FLOATS m_mask_szero = AVX_COMPARE_FLOATS(m_sqr_s, m_zero, _CMP_LE_OQ);
+            AVX_FLOATS m_s, m_mubin, m_mubin2, m_mask_left;
+            if (los_type == MIDPOINT_LOS) {
+                const AVX_FLOATS m_s_dot_l = AVX_ADD_FLOATS(AVX_MULTIPLY_FLOATS(m_parx, m_perpx), AVX_ADD_FLOATS(AVX_MULTIPLY_FLOATS(m_pary, m_perpy), AVX_MULTIPLY_FLOATS(m_parz, m_perpz)));
+                const AVX_FLOATS m_sqr_l = AVX_ADD_FLOATS(AVX_SQUARE_FLOAT(m_parx), AVX_ADD_FLOATS(AVX_SQUARE_FLOAT(m_pary), AVX_SQUARE_FLOAT(m_parz)));
+                AVX_FLOATS m_sqr_mu = AVX_SETZERO_FLOAT();
+                CHECK_AND_FAST_DIVIDE_AVX(m_sqr_mu, AVX_SQUARE_FLOAT(m_s_dot_l), AVX_BLEND_FLOATS_WITH_MASK(AVX_MULTIPLY_FLOATS(m_sqr_s, m_sqr_l), m_one, m_mask_szero), fast_divide_and_NR_steps);
                 const AVX_FLOATS m_mask_mumax = AVX_COMPARE_FLOATS(m_sqr_mu, m_sqr_mumax, _CMP_LT_OQ);
-                const AVX_FLOATS m_smax_mask = AVX_COMPARE_FLOATS(m_sqr_s, m_sqr_smax, _CMP_LT_OQ);
-                const AVX_FLOATS m_smin_mask = AVX_COMPARE_FLOATS(m_sqr_s, m_sqr_smin, _CMP_GE_OQ);
-                const AVX_FLOATS m_s_mask = AVX_BITWISE_AND(m_smax_mask, m_smin_mask);
-
                 m_mask_left = AVX_BITWISE_AND(m_mask_mumax, m_s_mask);
-                if(AVX_TEST_COMPARISON(m_mask_left)==0) {
-                    continue;
+                if (AVX_TEST_COMPARISON(m_mask_left) == 0) continue;
+                const AVX_FLOATS m_mu = AVX_SIGNED_FLOATS(AVX_SQRT_FLOAT(m_sqr_mu), m_s_dot_l);
+                m_mubin = AVX_BLEND_FLOATS_WITH_MASK(m_nmu_bins, AVX_FMA_ADD_TRUNCATE_FLOATS(m_mu, m_inv_dmu, m_mumin_invstep), m_mask_left);
+                if (autocorr == 1) m_mubin2 = AVX_BLEND_FLOATS_WITH_MASK(m_nmu_bins, AVX_FMA_ADD_TRUNCATE_FLOATS(m_mu, m_inv_dmu_opp, m_mumin_invstep), m_mask_mumax);
+                if (need_savg || bin_type == BIN_LIN) {
+                    m_s = AVX_SQRT_FLOAT(m_sqr_s);
+                    union_msep.m_Dperp = m_s;
                 }
-                m_sqr_s = AVX_BLEND_FLOATS_WITH_MASK(m_zero,m_sqr_s,m_mask_left);
-                m_sqr_mu = AVX_BLEND_FLOATS_WITH_MASK(m_sqr_mumax,m_sqr_mu,m_mask_left);
+            }
+            else {
+                const AVX_FLOATS m_s_dot_l = AVX_ADD_FLOATS(AVX_MULTIPLY_FLOATS(m_xhat0, m_perpx), AVX_ADD_FLOATS(AVX_MULTIPLY_FLOATS(m_yhat0, m_perpy), AVX_MULTIPLY_FLOATS(m_zhat0, m_perpz)));
+                AVX_FLOATS m_sqr_mu = AVX_SETZERO_FLOAT();
+                CHECK_AND_FAST_DIVIDE_AVX(m_sqr_mu, AVX_SQUARE_FLOAT(m_s_dot_l), AVX_BLEND_FLOATS_WITH_MASK(m_sqr_s, m_one, m_mask_szero), fast_divide_and_NR_steps);
+                const AVX_FLOATS m_mask_mumax = AVX_COMPARE_FLOATS(m_sqr_mu, m_sqr_mumax, _CMP_LT_OQ);
+                m_mask_left = AVX_BITWISE_AND(m_mask_mumax, m_s_mask);
+                if (autocorr == 1) {
+                    const AVX_FLOATS m_s_dot_l2 = AVX_ADD_FLOATS(AVX_MULTIPLY_FLOATS(m_xhat1, m_perpx), AVX_ADD_FLOATS(AVX_MULTIPLY_FLOATS(m_yhat1, m_perpy), AVX_MULTIPLY_FLOATS(m_zhat1, m_perpz)));
+                    AVX_FLOATS m_sqr_mu2 = AVX_SETZERO_FLOAT();
+                    CHECK_AND_FAST_DIVIDE_AVX(m_sqr_mu2, AVX_SQUARE_FLOAT(m_s_dot_l2), AVX_BLEND_FLOATS_WITH_MASK(m_sqr_s, m_one, m_mask_szero), fast_divide_and_NR_steps);
+                    const AVX_FLOATS m_mask_mumax2 = AVX_COMPARE_FLOATS(m_sqr_mu2, m_sqr_mumax, _CMP_LT_OQ);
+                    const AVX_FLOATS m_mask_left1 = m_mask_left;
+                    const AVX_FLOATS m_mask_left2 = AVX_BITWISE_AND(m_mask_mumax2, m_s_mask);
+                    m_mask_left = AVX_BITWISE_OR(m_mask_left1, m_mask_left2);
+                    if (AVX_TEST_COMPARISON(m_mask_left) == 0) continue;
+                    m_s = AVX_SQRT_FLOAT(m_sqr_s);
+                    const AVX_FLOATS m_s_nonzero = AVX_BLEND_FLOATS_WITH_MASK(m_s, m_one, m_mask_szero);
+                    m_mubin = AVX_BLEND_FLOATS_WITH_MASK(m_nmu_bins, AVX_FMA_ADD_TRUNCATE_FLOATS(AVX_DIVIDE_FLOATS(m_s_dot_l, m_s_nonzero), m_inv_dmu, m_mumin_invstep), m_mask_left1);
+                    m_mubin2 = AVX_BLEND_FLOATS_WITH_MASK(m_nmu_bins, AVX_FMA_ADD_TRUNCATE_FLOATS(AVX_DIVIDE_FLOATS(m_s_dot_l2, m_s_nonzero), m_inv_dmu_opp, m_mumin_invstep), m_mask_left2);
+                }
+                else {
+                    if (AVX_TEST_COMPARISON(m_mask_left) == 0) continue;
+                    m_s = AVX_SQRT_FLOAT(m_sqr_s);
+                    const AVX_FLOATS m_s_nonzero = AVX_BLEND_FLOATS_WITH_MASK(m_s, m_one, m_mask_szero);
+                    m_mubin = AVX_BLEND_FLOATS_WITH_MASK(m_nmu_bins, AVX_FMA_ADD_TRUNCATE_FLOATS(AVX_DIVIDE_FLOATS(m_s_dot_l, m_s_nonzero), m_inv_dmu, m_mumin_invstep), m_mask_left);
+                }
+                union_msep.m_Dperp = m_s;
             }
 
-            if(need_savg || bin_type == BIN_LIN) {
-                union_msep.m_Dperp = AVX_SQRT_FLOAT(m_sqr_s);
-            }
+            if(need_costheta) pair.costheta.a = AVX_ADD_FLOATS(AVX_ADD_FLOATS(AVX_MULTIPLY_FLOATS(m_xhat0, m_xhat1), AVX_MULTIPLY_FLOATS(m_yhat0, m_yhat1)), AVX_MULTIPLY_FLOATS(m_zhat0, m_zhat1));
+
             if(need_weightavg){
                 pair.dx.a = m_perpx;
                 pair.dy.a = m_perpy;
@@ -678,80 +705,56 @@ static inline int countpairs_s_mu_mocks_avx_intrinsics_DOUBLE(const int64_t N0, 
                 pair.parz.a = m_parz;
 
                 union_mweight.m_weights = avx_weight_func(&pair);
+                if(need_savg) union_msep.m_Dperp = AVX_MULTIPLY_FLOATS(m_s, union_mweight.m_weights);
             }
 
-            const AVX_FLOATS m_mask = m_mask_left;
             AVX_FLOATS m_sbin = AVX_SETZERO_FLOAT();
 
             if (bin_type == BIN_LIN) {
                 m_sbin = AVX_BLEND_FLOATS_WITH_MASK(m_sbin,
-                         AVX_FMA_ADD_TRUNCATE_FLOATS(union_msep.m_Dperp, m_inv_sstep, m_smin_invstep),
+                         AVX_FMA_ADD_TRUNCATE_FLOATS(m_s, m_inv_sstep, m_smin_invstep),
                          m_mask_left);
             }
             else {
                 for(int kbin=nsbin-1;kbin>=1;kbin--) {
-                    const AVX_FLOATS m_mask_low = AVX_COMPARE_FLOATS(m_sqr_s,m_supp_sqr[kbin-1],_CMP_GE_OQ);
-                    const AVX_FLOATS m_bin_mask = AVX_BITWISE_AND(m_mask_low,m_mask_left);
-                    m_sbin = AVX_BLEND_FLOATS_WITH_MASK(m_sbin,m_kbin[kbin], m_bin_mask);
-                    m_mask_left = AVX_COMPARE_FLOATS(m_sqr_s, m_supp_sqr[kbin-1],_CMP_LT_OQ);
-                    if(AVX_TEST_COMPARISON(m_mask_left) == 0) {
-                        break;
-                    }
+                    const AVX_FLOATS m_mask_low = AVX_COMPARE_FLOATS(m_sqr_s, m_supp_sqr[kbin-1], _CMP_GE_OQ);
+                    const AVX_FLOATS m_bin_mask = AVX_BITWISE_AND(m_mask_low, m_mask_left);
+                    m_sbin = AVX_BLEND_FLOATS_WITH_MASK(m_sbin, m_kbin[kbin], m_bin_mask);
+                    m_mask_left = AVX_COMPARE_FLOATS(m_sqr_s, m_supp_sqr[kbin-1], _CMP_LT_OQ);
+                    if(AVX_TEST_COMPARISON(m_mask_left) == 0) break;
                 }
             }
-            if(need_savg && need_weightavg) union_msep.m_Dperp = AVX_MULTIPLY_FLOATS(union_msep.m_Dperp, union_mweight.m_weights);
             m_sbin = AVX_MULTIPLY_FLOATS(m_sbin, m_nmu_bins_p1);
+
             /* Compute the 1-D index to the [sbin, mubin] := sbin*(nmu_bins+1) + mubin */
-            const AVX_FLOATS m_mu = AVX_SIGNED_FLOATS(AVX_SQRT_FLOAT(m_sqr_mu), m_s_dot_l);
-            AVX_FLOATS m_mubin = AVX_FMA_ADD_TRUNCATE_FLOATS(m_mu, m_inv_dmu, m_mumin_invstep);
-            m_mubin = AVX_BLEND_FLOATS_WITH_MASK(m_nmu_bins, m_mubin, m_mask);
             union_finalbin.m_ibin = AVX_TRUNCATE_FLOAT_TO_INT(AVX_ADD_FLOATS(m_sbin, m_mubin));
 
-#if  __INTEL_COMPILER
-#pragma unroll(AVX_NVEC)
-#endif
+        #if  __INTEL_COMPILER
+        #pragma unroll(AVX_NVEC)
+        #endif
             for(int jj=0;jj<AVX_NVEC;jj++) {
                 const int ibin=union_finalbin.ibin[jj];
-
                 npairs[ibin]++;
-                if(need_savg) {
-                    savg[ibin] += union_msep.Dperp[jj];
-                }
-                if(need_weightavg){
-                    const DOUBLE weight = union_mweight.weights[jj];
-                    weightavg[ibin] += weight;
-                }
+                if(need_savg) savg[ibin] += union_msep.Dperp[jj];
+                if(need_weightavg) weightavg[ibin] += union_mweight.weights[jj];
             }
             if (autocorr == 1) {
-                m_mubin = AVX_FMA_ADD_TRUNCATE_FLOATS(m_mu, m_inv_dmu_opp, m_mumin_invstep);
-                m_mubin = AVX_BLEND_FLOATS_WITH_MASK(m_nmu_bins, m_mubin, m_mask);
-                union_finalbin.m_ibin = AVX_TRUNCATE_FLOAT_TO_INT(AVX_ADD_FLOATS(m_sbin, m_mubin));
-#if  __INTEL_COMPILER
-#pragma unroll(AVX_NVEC)
-#endif
+                union_finalbin.m_ibin = AVX_TRUNCATE_FLOAT_TO_INT(AVX_ADD_FLOATS(m_sbin, m_mubin2));
+        #if  __INTEL_COMPILER
+        #pragma unroll(AVX_NVEC)
+        #endif
                 for(int jj=0;jj<AVX_NVEC;jj++) {
                     const int ibin=union_finalbin.ibin[jj];
-
                     npairs[ibin]++;
-                    if(need_savg) {
-                        savg[ibin] += union_msep.Dperp[jj];
-                    }
-                    if(need_weightavg){
-                        const DOUBLE weight = union_mweight.weights[jj];
-                        weightavg[ibin] += weight;
-                    }
+                    if(need_savg) savg[ibin] += union_msep.Dperp[jj];
+                    if(need_weightavg) weightavg[ibin] += union_mweight.weights[jj];
                 }
             }
         }//AVX j loop
-
         //Take care of the remainder
         for(;j<N1;j++) {
 
-            if(need_costheta) {
-                DOUBLE localnorm1 = norm1[j];
-                pair.costheta.d = (*localx1)*xpos + (*localy1)*ypos + (*localz1)*zpos;
-                pair.costheta.d /= localnorm1*norm0;
-            }
+            if(need_costheta) pair.costheta.d = xhat1[j]*xhat0 + yhat1[j]*yhat0 + zhat1[j]*zhat0;
 
             const DOUBLE parx = xpos + *localx1;
             const DOUBLE pary = ypos + *localy1;
@@ -761,35 +764,51 @@ static inline int countpairs_s_mu_mocks_avx_intrinsics_DOUBLE(const int64_t N0, 
             const DOUBLE perpy = *localy1++ - ypos;
             const DOUBLE perpz = *localz1++ - zpos;
 
-            /*
-              s := (perpx, perpy, perpz)
-              l := 1/2 (parx, pary, parz)  //ignoring the factor 1/2 since it cancels out in both numerator and denominator
-
-              s \dot l := (parx*perpx + pary*perpy + parz*perpz)
-              := (x1 + x2)*(x1 - x2) + (y1 + y2)*(y1 - y2) + (z1 + z2)*(z1 - z2)
-              := (x1^2 + y1^2 + z1^2) - (x2^2 + y2^2 + z2^2)
-              := d1^2 - d2^2
-            */
-
-            for(int w = 0; w < pair.num_weights; w++){
-                pair.weights1[w].d = *local_w1.weights[w]++;
-            }
+            for (int w = 0; w < pair.num_weights; w++) pair.weights1[w].d = *local_w1.weights[w]++;
 
             if(perpz >= max_dz) break;
 
             const DOUBLE sqr_s = perpx*perpx + perpy*perpy + perpz*perpz;
             if(sqr_s >= sqr_smax || sqr_s < sqr_smin) continue;
 
-            const DOUBLE s_dot_l = parx*perpx + pary*perpy + parz*perpz;
-            const DOUBLE sqr_l = parx*parx + pary*pary + parz*parz;// := |l|^2
-            const DOUBLE sqr_s_dot_l = s_dot_l * s_dot_l;
-            //const DOUBLE sqr_mu = sqr_s_dot_l/(sqr_l * sqr_s);
-            const DOUBLE sqr_mu = sqr_s > 0. ? sqr_s_dot_l/(sqr_l * sqr_s) : 0.;
-            if (sqr_mu >= sqr_mumax) continue;
-            DOUBLE s = ZERO, pairweight = ZERO;
-            if(need_savg || bin_type == BIN_LIN) {
-                s = SQRT(sqr_s);
+            DOUBLE s = ZERO;
+            int mubin = nmu_bins, mubin2 = nmu_bins;
+            if (sqr_s <= 0.) {
+                mubin2 = mubin = (int) mumin_invstep;
             }
+            else if (los_type == MIDPOINT_LOS) {
+                const DOUBLE s_dot_l = parx*perpx + pary*perpy + parz*perpz;
+                const DOUBLE sqr_l = parx*parx + pary*pary + parz*parz;
+                const DOUBLE sqr_mu = s_dot_l * s_dot_l/(sqr_l * sqr_s);
+                if (sqr_mu >= sqr_mumax) continue;
+                const DOUBLE mu = SIGNED(SQRT(sqr_mu), s_dot_l);
+                mubin = (int) (mu * inv_dmu + mumin_invstep);
+                if (autocorr == 1) mubin2 = (int) (- mu * inv_dmu + mumin_invstep);
+                if(need_savg || bin_type == BIN_LIN) s = SQRT(sqr_s);
+            }
+            else {
+                const DOUBLE s_dot_l = xhat0*perpx + yhat0*perpy + zhat0*perpz;
+                const DOUBLE sqr_mu = s_dot_l * s_dot_l/sqr_s;
+                if (autocorr == 1) {
+                    const DOUBLE s_dot_l2 = xhat1[j]*perpx + yhat1[j]*perpy + zhat1[j]*perpz;
+                    const DOUBLE sqr_mu2 = s_dot_l2 * s_dot_l2/sqr_s;
+                    const int skip_mu = (sqr_mu >= sqr_mumax);
+                    const int skip_mu2 = (sqr_mu2 >= sqr_mumax);
+                    if (skip_mu && skip_mu2) continue;
+                    s = SQRT(sqr_s);
+                    if (skip_mu == 0) mubin = (int) (s_dot_l/s * inv_dmu + mumin_invstep);
+                    if (skip_mu2 == 0) mubin2 = (int) (- s_dot_l2/s * inv_dmu + mumin_invstep);
+                }
+                else {
+                    if (sqr_mu >= sqr_mumax) continue;
+                    s = SQRT(sqr_s);
+                    mubin = (int) (s_dot_l/s * inv_dmu + mumin_invstep);
+                }
+            }
+
+            DOUBLE pairweight = ZERO;
+            DOUBLE sw = s;
+
             if(need_weightavg){
                 pair.dx.d = perpx;
                 pair.dy.d = perpy;
@@ -800,6 +819,7 @@ static inline int countpairs_s_mu_mocks_avx_intrinsics_DOUBLE(const int64_t N0, 
                 pair.parz.d = parz;
 
                 pairweight = fallback_weight_func(&pair);
+                if(need_savg) sw = s*pairweight;
             }
 
             int kbin = 0;
@@ -809,32 +829,31 @@ static inline int countpairs_s_mu_mocks_avx_intrinsics_DOUBLE(const int64_t N0, 
             else {
                 for(kbin=nsbin-1;kbin>=1;kbin--) {
                     if(sqr_s >= supp_sqr[kbin-1]) {
-                      break;
+                        break;
                     }
                 }//finding kbin
             }
-
             kbin *= nmu_bins+1;
-            const DOUBLE mubin = SIGNED(SQRT(sqr_mu), s_dot_l) * inv_dmu;
-            int ibin = kbin + (int) (mubin + mumin_invstep);
-            npairs[ibin]++;
-            if(need_savg) {
-                if(need_weightavg) s *= pairweight;
-                savg[ibin] += s;
+            {
+              const int ibin = kbin + mubin;
+              npairs[ibin]++;
+              if(need_savg) savg[ibin] += sw;
+              if(need_weightavg) weightavg[ibin] += pairweight;
             }
-            if(need_weightavg){
-                weightavg[ibin] += pairweight;
-            }
-            if(autocorr == 1){
-                ibin = kbin + (int) (-mubin + mumin_invstep);
+            if (autocorr == 1) {
+                const int ibin = kbin + mubin2;
                 npairs[ibin]++;
-                if(need_savg) savg[ibin] += s;
+                if(need_savg) savg[ibin] += sw;
                 if(need_weightavg) weightavg[ibin] += pairweight;
             }
         }//remainder jloop
     }//i-loop
 
-    if (need_costheta) free(norm1);
+    if (need_costheta) {
+        free(xhat1);
+        free(yhat1);
+        free(zhat1);
+    }
 
     for(int i=0;i<totnbins;i++) {
         src_npairs[i] += npairs[i];
@@ -932,11 +951,16 @@ static inline int countpairs_s_mu_mocks_sse_intrinsics_DOUBLE(const int64_t N0, 
       sse_weight_func = get_sse_weight_func_by_method_DOUBLE(weight_method);
       fallback_weight_func = get_weight_func_by_method_DOUBLE(weight_method);
     }
-    DOUBLE *norm1 = NULL;
-    if (need_costheta) {
-        norm1 = (DOUBLE *) my_malloc(N1,sizeof(DOUBLE));
+    DOUBLE *xhat1 = NULL, *yhat1 = NULL, *zhat1 = NULL;
+    if (need_costheta || ((autocorr == 1) && (los_type == FIRSTPOINT_LOS))) {
+        xhat1 = (DOUBLE *) my_malloc(N1, sizeof(DOUBLE));
+        yhat1 = (DOUBLE *) my_malloc(N1, sizeof(DOUBLE));
+        zhat1 = (DOUBLE *) my_malloc(N1, sizeof(DOUBLE));
         for(int64_t i=0;i<N1;i++) {
-            norm1[i] = SQRT(x1[i]*x1[i] + y1[i]*y1[i] + z1[i]*z1[i]);
+            const DOUBLE norm1 = SQRT(x1[i]*x1[i] + y1[i]*y1[i] + z1[i]*z1[i]);
+            xhat1[i] = x1[i]/norm1;
+            yhat1[i] = y1[i]/norm1;
+            zhat1[i] = z1[i]/norm1;
         }
     }
 
@@ -952,8 +976,14 @@ static inline int countpairs_s_mu_mocks_sse_intrinsics_DOUBLE(const int64_t N0, 
             // The advancement of the local_w0.weights[w] pointer should always mirror x0.
             pair.weights0[w].s = SSE_SET_FLOAT(*local_w0.weights[w]++);
         }
-        DOUBLE norm0 = ZERO;
-        if (need_costheta) norm0 = SQRT(xpos*xpos + ypos*ypos + zpos*zpos);
+        DOUBLE xhat0 = ZERO, yhat0 = ZERO, zhat0 = ZERO;
+        if (need_costheta || los_type == FIRSTPOINT_LOS) {
+            const DOUBLE norm0 = SQRT(xpos*xpos + ypos*ypos + zpos*zpos);
+            xhat0 = xpos/norm0;
+            yhat0 = ypos/norm0;
+            zhat0 = zpos/norm0;
+        }
+
         DOUBLE max_dz = max_all_dz;
 
         /* Now consider if this i'th particle can be a valid pair with ANY of the remaining
@@ -1022,7 +1052,9 @@ static inline int countpairs_s_mu_mocks_sse_intrinsics_DOUBLE(const int64_t N0, 
         const SSE_FLOATS m_xpos = SSE_SET_FLOAT(xpos);
         const SSE_FLOATS m_ypos = SSE_SET_FLOAT(ypos);
         const SSE_FLOATS m_zpos = SSE_SET_FLOAT(zpos);
-        const SSE_FLOATS m_norm0 = SSE_SET_FLOAT(norm0);
+        const SSE_FLOATS m_xhat0 = SSE_SET_FLOAT(xhat0);
+        const SSE_FLOATS m_yhat0 = SSE_SET_FLOAT(yhat0);
+        const SSE_FLOATS m_zhat0 = SSE_SET_FLOAT(zhat0);
 
         const SSE_FLOATS m_max_dz = SSE_SET_FLOAT(max_dz);
         const SSE_FLOATS m_sqr_smax = SSE_SET_FLOAT(sqr_smax);
@@ -1040,10 +1072,11 @@ static inline int countpairs_s_mu_mocks_sse_intrinsics_DOUBLE(const int64_t N0, 
             const SSE_FLOATS m_x2 = SSE_LOAD_FLOATS_UNALIGNED(localx1);
             const SSE_FLOATS m_y2 = SSE_LOAD_FLOATS_UNALIGNED(localy1);
             const SSE_FLOATS m_z2 = SSE_LOAD_FLOATS_UNALIGNED(localz1);
-            if(need_costheta) {
-                const SSE_FLOATS m_norm1 = SSE_LOAD_FLOATS_UNALIGNED(norm1 + j);
-                pair.costheta.s = SSE_ADD_FLOATS(SSE_ADD_FLOATS(SSE_MULTIPLY_FLOATS(m_xpos, m_x2), SSE_MULTIPLY_FLOATS(m_ypos, m_y2)), SSE_MULTIPLY_FLOATS(m_zpos, m_z2));
-                pair.costheta.s = SSE_DIVIDE_FLOATS(pair.costheta.s, SSE_MULTIPLY_FLOATS(m_norm0, m_norm1));
+            SSE_FLOATS m_xhat1, m_yhat1, m_zhat1;
+            if (need_costheta || ((autocorr == 1) && (los_type == FIRSTPOINT_LOS))) {
+                m_xhat1 = SSE_LOAD_FLOATS_UNALIGNED(xhat1 + j);
+                m_yhat1 = SSE_LOAD_FLOATS_UNALIGNED(yhat1 + j);
+                m_zhat1 = SSE_LOAD_FLOATS_UNALIGNED(zhat1 + j);
             }
 
             localx1 += SSE_NVEC;
@@ -1073,53 +1106,65 @@ static inline int countpairs_s_mu_mocks_sse_intrinsics_DOUBLE(const int64_t N0, 
                 j = N1;/* but do not break out of the loop because this chunk might contain valid pairs */
             }
 
-            SSE_FLOATS m_sqr_s, m_sqr_mu, m_s_dot_l;
+            SSE_FLOATS m_sqr_s;
             {
-                const SSE_FLOATS m_term1 = SSE_MULTIPLY_FLOATS(m_parx, m_perpx);
-                const SSE_FLOATS m_term2 = SSE_MULTIPLY_FLOATS(m_pary, m_perpy);
-                const SSE_FLOATS m_term3 = SSE_MULTIPLY_FLOATS(m_parz, m_perpz);
-                m_s_dot_l = SSE_ADD_FLOATS(m_term3, SSE_ADD_FLOATS(m_term2, m_term1));
-
-                const SSE_FLOATS m_sqr_s_dot_l = SSE_SQUARE_FLOAT(m_s_dot_l);
                 const SSE_FLOATS m_sqr_perpx = SSE_SQUARE_FLOAT(m_perpx);
                 const SSE_FLOATS m_sqr_perpy = SSE_SQUARE_FLOAT(m_perpy);
                 const SSE_FLOATS m_sqr_perpz = SSE_SQUARE_FLOAT(m_perpz);
                 m_sqr_s = SSE_ADD_FLOATS(m_sqr_perpx, SSE_ADD_FLOATS(m_sqr_perpy, m_sqr_perpz));//3-d separation
-
-                const SSE_FLOATS m_mask_3d_sep = SSE_COMPARE_FLOATS_LT(m_sqr_s, m_sqr_smax);
-                const SSE_FLOATS m_sqr_norm_l = SSE_ADD_FLOATS(SSE_SQUARE_FLOAT(m_parx), SSE_ADD_FLOATS(SSE_SQUARE_FLOAT(m_pary), SSE_SQUARE_FLOAT(m_parz)));
-
-                if(SSE_TEST_COMPARISON(m_mask_3d_sep)==0) {
-                    continue;
-                }
-
-                // \mu^2 = \pi^2 / s^2
-                SSE_FLOATS m_sqr_norm_l_norm_s = SSE_MULTIPLY_FLOATS(m_sqr_norm_l, m_sqr_s);
-                const SSE_FLOATS m_mask_szero = SSE_COMPARE_FLOATS_LE(m_sqr_s, m_zero);
-                m_sqr_norm_l_norm_s = SSE_BLEND_FLOATS_WITH_MASK(m_sqr_norm_l_norm_s, m_one, m_mask_szero); // to avoid division by 0
-                m_sqr_mu = SSE_DIVIDE_FLOATS(m_sqr_s_dot_l, m_sqr_norm_l_norm_s);
             }
 
-            SSE_FLOATS m_mask_left;
-            //Do the mask filters in a separate scope
-            {
+            const SSE_FLOATS m_smax_mask = SSE_COMPARE_FLOATS_LT(m_sqr_s, m_sqr_smax);
+            const SSE_FLOATS m_smin_mask = SSE_COMPARE_FLOATS_GE(m_sqr_s, m_sqr_smin);
+            const SSE_FLOATS m_s_mask = SSE_BITWISE_AND(m_smax_mask, m_smin_mask);
+
+            if(SSE_TEST_COMPARISON(m_s_mask) == 0) continue;
+
+            const SSE_FLOATS m_mask_szero = SSE_COMPARE_FLOATS_LE(m_sqr_s, m_zero);
+            SSE_FLOATS m_s, m_mubin, m_mubin2, m_mask_left;
+            if (los_type == MIDPOINT_LOS) {
+                const SSE_FLOATS m_s_dot_l = SSE_ADD_FLOATS(SSE_MULTIPLY_FLOATS(m_parx, m_perpx), SSE_ADD_FLOATS(SSE_MULTIPLY_FLOATS(m_pary, m_perpy), SSE_MULTIPLY_FLOATS(m_parz, m_perpz)));
+                const SSE_FLOATS m_sqr_l = SSE_ADD_FLOATS(SSE_SQUARE_FLOAT(m_parx), SSE_ADD_FLOATS(SSE_SQUARE_FLOAT(m_pary), SSE_SQUARE_FLOAT(m_parz)));
+                const SSE_FLOATS m_sqr_mu = SSE_DIVIDE_FLOATS(SSE_SQUARE_FLOAT(m_s_dot_l), SSE_BLEND_FLOATS_WITH_MASK(SSE_MULTIPLY_FLOATS(m_sqr_s, m_sqr_l), m_one, m_mask_szero)); // to avoid division by 0
                 const SSE_FLOATS m_mask_mumax = SSE_COMPARE_FLOATS_LT(m_sqr_mu, m_sqr_mumax);
-                const SSE_FLOATS m_smax_mask = SSE_COMPARE_FLOATS_LT(m_sqr_s, m_sqr_smax);
-                const SSE_FLOATS m_smin_mask = SSE_COMPARE_FLOATS_GE(m_sqr_s, m_sqr_smin);
-                const SSE_FLOATS m_s_mask = SSE_BITWISE_AND(m_smax_mask, m_smin_mask);
-
                 m_mask_left = SSE_BITWISE_AND(m_mask_mumax, m_s_mask);
-                if(SSE_TEST_COMPARISON(m_mask_left) == 0) {
-                    continue;
+                if (SSE_TEST_COMPARISON(m_mask_left) == 0) continue;
+                const SSE_FLOATS m_mu = SSE_SIGNED_FLOATS(SSE_SQRT_FLOAT(m_sqr_mu), m_s_dot_l);
+                m_mubin = SSE_BLEND_FLOATS_WITH_MASK(m_nmu_bins, SSE_FMA_ADD_TRUNCATE_FLOATS(m_mu, m_inv_dmu, m_mumin_invstep), m_mask_left);
+                if (autocorr == 1) m_mubin2 = SSE_BLEND_FLOATS_WITH_MASK(m_nmu_bins, SSE_FMA_ADD_TRUNCATE_FLOATS(m_mu, m_inv_dmu_opp, m_mumin_invstep), m_mask_mumax);
+                if (need_savg || bin_type == BIN_LIN) {
+                    m_s = SSE_SQRT_FLOAT(m_sqr_s);
+                    union_msep.m_Dperp = m_s;
                 }
-
-                m_sqr_s = SSE_BLEND_FLOATS_WITH_MASK(m_zero, m_sqr_s, m_mask_left);
-                //m_sqr_mu = SSE_BLEND_FLOATS_WITH_MASK(m_sqr_mumax, m_sqr_mu, m_mask_left);
+            }
+            else {
+                const SSE_FLOATS m_s_dot_l = SSE_ADD_FLOATS(SSE_MULTIPLY_FLOATS(m_xhat0, m_perpx), SSE_ADD_FLOATS(SSE_MULTIPLY_FLOATS(m_yhat0, m_perpy), SSE_MULTIPLY_FLOATS(m_zhat0, m_perpz)));
+                const SSE_FLOATS m_sqr_mu = SSE_DIVIDE_FLOATS(SSE_SQUARE_FLOAT(m_s_dot_l), SSE_BLEND_FLOATS_WITH_MASK(m_sqr_s, m_one, m_mask_szero)); // to avoid division by 0
+                const SSE_FLOATS m_mask_mumax = SSE_COMPARE_FLOATS_LT(m_sqr_mu, m_sqr_mumax);
+                m_mask_left = SSE_BITWISE_AND(m_mask_mumax, m_s_mask);
+                if (autocorr == 1) {
+                    const SSE_FLOATS m_s_dot_l2 = SSE_ADD_FLOATS(SSE_MULTIPLY_FLOATS(m_xhat1, m_perpx), SSE_ADD_FLOATS(SSE_MULTIPLY_FLOATS(m_yhat1, m_perpy), SSE_MULTIPLY_FLOATS(m_zhat1, m_perpz)));
+                    const SSE_FLOATS m_sqr_mu2 = SSE_DIVIDE_FLOATS(SSE_SQUARE_FLOAT(m_s_dot_l2), SSE_BLEND_FLOATS_WITH_MASK(m_sqr_s, m_one, m_mask_szero)); // to avoid division by 0
+                    const SSE_FLOATS m_mask_mumax2 = SSE_COMPARE_FLOATS_LT(m_sqr_mu2, m_sqr_mumax);
+                    const SSE_FLOATS m_mask_left1 = m_mask_left;
+                    const SSE_FLOATS m_mask_left2 = SSE_BITWISE_AND(m_mask_mumax2, m_s_mask);
+                    m_mask_left = SSE_BITWISE_OR(m_mask_left1, m_mask_left2);
+                    if (SSE_TEST_COMPARISON(m_mask_left) == 0) continue;
+                    m_s = SSE_SQRT_FLOAT(m_sqr_s);
+                    const SSE_FLOATS m_s_nonzero = SSE_BLEND_FLOATS_WITH_MASK(m_s, m_one, m_mask_szero);
+                    m_mubin = SSE_BLEND_FLOATS_WITH_MASK(m_nmu_bins, SSE_FMA_ADD_TRUNCATE_FLOATS(SSE_DIVIDE_FLOATS(m_s_dot_l, m_s_nonzero), m_inv_dmu, m_mumin_invstep), m_mask_left1);
+                    m_mubin2 = SSE_BLEND_FLOATS_WITH_MASK(m_nmu_bins, SSE_FMA_ADD_TRUNCATE_FLOATS(SSE_DIVIDE_FLOATS(m_s_dot_l2, m_s_nonzero), m_inv_dmu_opp, m_mumin_invstep), m_mask_left2);
+                }
+                else {
+                    if (SSE_TEST_COMPARISON(m_mask_left) == 0) continue;
+                    m_s = SSE_SQRT_FLOAT(m_sqr_s);
+                    const SSE_FLOATS m_s_nonzero = SSE_BLEND_FLOATS_WITH_MASK(m_s, m_one, m_mask_szero);
+                    m_mubin = SSE_BLEND_FLOATS_WITH_MASK(m_nmu_bins, SSE_FMA_ADD_TRUNCATE_FLOATS(SSE_DIVIDE_FLOATS(m_s_dot_l, m_s_nonzero), m_inv_dmu, m_mumin_invstep), m_mask_left);
+                }
+                union_msep.m_Dperp = m_s;
             }
 
-            if(need_savg || bin_type == BIN_LIN) {
-                union_msep.m_Dperp = SSE_SQRT_FLOAT(m_sqr_s);
-            }
+            if(need_costheta) pair.costheta.s = SSE_ADD_FLOATS(SSE_ADD_FLOATS(SSE_MULTIPLY_FLOATS(m_xhat0, m_xhat1), SSE_MULTIPLY_FLOATS(m_yhat0, m_yhat1)), SSE_MULTIPLY_FLOATS(m_zhat0, m_zhat1));
 
             if(need_weightavg){
                 pair.dx.s = m_perpx;
@@ -1131,14 +1176,14 @@ static inline int countpairs_s_mu_mocks_sse_intrinsics_DOUBLE(const int64_t N0, 
                 pair.parz.s = m_parz;
 
                 union_mweight.m_weights = sse_weight_func(&pair);
+                if(need_savg) union_msep.m_Dperp = SSE_MULTIPLY_FLOATS(m_s, union_mweight.m_weights);
             }
 
-            const SSE_FLOATS m_mask = m_mask_left;
             SSE_FLOATS m_sbin = SSE_SETZERO_FLOAT();
 
             if (bin_type == BIN_LIN) {
                 m_sbin = SSE_BLEND_FLOATS_WITH_MASK(m_sbin,
-                         SSE_FMA_ADD_TRUNCATE_FLOATS(union_msep.m_Dperp, m_inv_sstep, m_smin_invstep),
+                         SSE_FMA_ADD_TRUNCATE_FLOATS(m_s, m_inv_sstep, m_smin_invstep),
                          m_mask_left);
             }
             else {
@@ -1147,18 +1192,12 @@ static inline int countpairs_s_mu_mocks_sse_intrinsics_DOUBLE(const int64_t N0, 
                     const SSE_FLOATS m_bin_mask = SSE_BITWISE_AND(m_mask_low, m_mask_left);
                     m_sbin = SSE_BLEND_FLOATS_WITH_MASK(m_sbin, m_kbin[kbin], m_bin_mask);
                     m_mask_left = SSE_COMPARE_FLOATS_LT(m_sqr_s, m_supp_sqr[kbin-1]);
-                    if(SSE_TEST_COMPARISON(m_mask_left) == 0) {
-                        break;
-                    }
+                    if(SSE_TEST_COMPARISON(m_mask_left) == 0) break;
                 }
             }
-            if(need_savg && need_weightavg) union_msep.m_Dperp = SSE_MULTIPLY_FLOATS(union_msep.m_Dperp, union_mweight.m_weights);
             m_sbin = SSE_MULTIPLY_FLOATS(m_sbin, m_nmu_bins_p1);
 
             /* Compute the 1-D index to the [sbin, mubin] := sbin*(nmu_bins+1) + mubin */
-            const SSE_FLOATS m_mu = SSE_SIGNED_FLOATS(SSE_SQRT_FLOAT(m_sqr_mu), m_s_dot_l);
-            SSE_FLOATS m_mubin = SSE_FMA_ADD_TRUNCATE_FLOATS(m_mu, m_inv_dmu, m_mumin_invstep);
-            m_mubin = SSE_BLEND_FLOATS_WITH_MASK(m_nmu_bins, m_mubin, m_mask);
             union_finalbin.m_ibin = SSE_TRUNCATE_FLOAT_TO_INT(SSE_ADD_FLOATS(m_sbin, m_mubin));
 
 #if  __INTEL_COMPILER
@@ -1166,48 +1205,28 @@ static inline int countpairs_s_mu_mocks_sse_intrinsics_DOUBLE(const int64_t N0, 
 #endif
             for(int jj=0;jj<SSE_NVEC;jj++) {
                 const int ibin=union_finalbin.ibin[jj];
-
                 npairs[ibin]++;
-                if(need_savg) {
-                    savg[ibin] += union_msep.Dperp[jj];
-                }
-                if(need_weightavg){
-                    const DOUBLE weight = union_mweight.weights[jj];
-                    weightavg[ibin] += weight;
-                }
+                if(need_savg) savg[ibin] += union_msep.Dperp[jj];
+                if(need_weightavg) weightavg[ibin] += union_mweight.weights[jj];
             }
             if (autocorr == 1) {
-                m_mubin = SSE_FMA_ADD_TRUNCATE_FLOATS(m_mu, m_inv_dmu_opp, m_mumin_invstep);
-                m_mubin = SSE_BLEND_FLOATS_WITH_MASK(m_nmu_bins, m_mubin, m_mask);
-                union_finalbin.m_ibin = SSE_TRUNCATE_FLOAT_TO_INT(SSE_ADD_FLOATS(m_sbin, m_mubin));
+                union_finalbin.m_ibin = SSE_TRUNCATE_FLOAT_TO_INT(SSE_ADD_FLOATS(m_sbin, m_mubin2));
 #if  __INTEL_COMPILER
 #pragma unroll(SSE_NVEC)
 #endif
                 for(int jj=0;jj<SSE_NVEC;jj++) {
                     const int ibin=union_finalbin.ibin[jj];
-
                     npairs[ibin]++;
-                    if(need_savg) {
-                        savg[ibin] += union_msep.Dperp[jj];
-                    }
-                    if(need_weightavg){
-                        const DOUBLE weight = union_mweight.weights[jj];
-                        weightavg[ibin] += weight;
-                    }
+                    if(need_savg) savg[ibin] += union_msep.Dperp[jj];
+                    if(need_weightavg) weightavg[ibin] += union_mweight.weights[jj];
                 }
             }
-
-
         }//SSE j loop
 
         //Take care of the remainder
         for(;j<N1;j++) {
 
-            if(need_costheta) {
-                DOUBLE localnorm1 = norm1[j];
-                pair.costheta.d = (*localx1)*xpos + (*localy1)*ypos + (*localz1)*zpos;
-                pair.costheta.d /= localnorm1*norm0;
-            }
+            if(need_costheta) pair.costheta.d = xhat1[j]*xhat0 + yhat1[j]*yhat0 + zhat1[j]*zhat0;
 
             const DOUBLE parx = xpos + *localx1;
             const DOUBLE pary = ypos + *localy1;
@@ -1217,25 +1236,51 @@ static inline int countpairs_s_mu_mocks_sse_intrinsics_DOUBLE(const int64_t N0, 
             const DOUBLE perpy = *localy1++ - ypos;
             const DOUBLE perpz = *localz1++ - zpos;
 
-            for(int w = 0; w < pair.num_weights; w++){
-                pair.weights1[w].d = *local_w1.weights[w]++;
-            }
+            for (int w = 0; w < pair.num_weights; w++) pair.weights1[w].d = *local_w1.weights[w]++;
 
             if(perpz >= max_dz) break;
 
             const DOUBLE sqr_s = perpx*perpx + perpy*perpy + perpz*perpz;
             if(sqr_s >= sqr_smax || sqr_s < sqr_smin) continue;
 
-            const DOUBLE s_dot_l = parx*perpx + pary*perpy + parz*perpz;
-            const DOUBLE sqr_l = parx*parx + pary*pary + parz*parz;
-            const DOUBLE sqr_s_dot_l = s_dot_l * s_dot_l;
-            //const DOUBLE sqr_mu = sqr_s_dot_l/(sqr_l * sqr_s);
-            const DOUBLE sqr_mu = sqr_s > 0. ? sqr_s_dot_l/(sqr_l * sqr_s) : 0.;
-            if (sqr_mu >= sqr_mumax) continue;
-            DOUBLE s = ZERO, pairweight = ZERO;
-            if(need_savg || bin_type == BIN_LIN) {
-                s = SQRT(sqr_s);
+            DOUBLE s = ZERO;
+            int mubin = nmu_bins, mubin2 = nmu_bins;
+            if (sqr_s <= 0.) {
+                mubin2 = mubin = (int) mumin_invstep;
             }
+            else if (los_type == MIDPOINT_LOS) {
+                const DOUBLE s_dot_l = parx*perpx + pary*perpy + parz*perpz;
+                const DOUBLE sqr_l = parx*parx + pary*pary + parz*parz;
+                const DOUBLE sqr_mu = s_dot_l * s_dot_l/(sqr_l * sqr_s);
+                if (sqr_mu >= sqr_mumax) continue;
+                const DOUBLE mu = SIGNED(SQRT(sqr_mu), s_dot_l);
+                mubin = (int) (mu * inv_dmu + mumin_invstep);
+                if (autocorr == 1) mubin2 = (int) (- mu * inv_dmu + mumin_invstep);
+                if(need_savg || bin_type == BIN_LIN) s = SQRT(sqr_s);
+            }
+            else {
+                const DOUBLE s_dot_l = xhat0*perpx + yhat0*perpy + zhat0*perpz;
+                const DOUBLE sqr_mu = s_dot_l * s_dot_l/sqr_s;
+                if (autocorr == 1) {
+                    const DOUBLE s_dot_l2 = xhat1[j]*perpx + yhat1[j]*perpy + zhat1[j]*perpz;
+                    const DOUBLE sqr_mu2 = s_dot_l2 * s_dot_l2/sqr_s;
+                    const int skip_mu = (sqr_mu >= sqr_mumax);
+                    const int skip_mu2 = (sqr_mu2 >= sqr_mumax);
+                    if (skip_mu && skip_mu2) continue;
+                    s = SQRT(sqr_s);
+                    if (skip_mu == 0) mubin = (int) (s_dot_l/s * inv_dmu + mumin_invstep);
+                    if (skip_mu2 == 0) mubin2 = (int) (- s_dot_l2/s * inv_dmu + mumin_invstep);
+                }
+                else {
+                    if (sqr_mu >= sqr_mumax) continue;
+                    s = SQRT(sqr_s);
+                    mubin = (int) (s_dot_l/s * inv_dmu + mumin_invstep);
+                }
+            }
+
+            DOUBLE pairweight = ZERO;
+            DOUBLE sw = s;
+
             if(need_weightavg){
                 pair.dx.d = perpx;
                 pair.dy.d = perpy;
@@ -1246,6 +1291,7 @@ static inline int countpairs_s_mu_mocks_sse_intrinsics_DOUBLE(const int64_t N0, 
                 pair.parz.d = parz;
 
                 pairweight = fallback_weight_func(&pair);
+                if(need_savg) sw = s*pairweight;
             }
 
             int kbin = 0;
@@ -1255,32 +1301,31 @@ static inline int countpairs_s_mu_mocks_sse_intrinsics_DOUBLE(const int64_t N0, 
             else {
                 for(kbin=nsbin-1;kbin>=1;kbin--) {
                     if(sqr_s >= supp_sqr[kbin-1]) {
-                      break;
+                        break;
                     }
                 }//finding kbin
             }
-
             kbin *= nmu_bins+1;
-            const DOUBLE mubin = SIGNED(SQRT(sqr_mu), s_dot_l) * inv_dmu;
-            int ibin = kbin + (int) (mubin + mumin_invstep);
-            npairs[ibin]++;
-            if(need_savg) {
-                if(need_weightavg) s *= pairweight;
-                savg[ibin] += s;
+            {
+              const int ibin = kbin + mubin;
+              npairs[ibin]++;
+              if(need_savg) savg[ibin] += sw;
+              if(need_weightavg) weightavg[ibin] += pairweight;
             }
-            if(need_weightavg){
-                weightavg[ibin] += pairweight;
-            }
-            if(autocorr == 1){
-                ibin = kbin + (int) (-mubin + mumin_invstep);
+            if (autocorr == 1) {
+                const int ibin = kbin + mubin2;
                 npairs[ibin]++;
-                if(need_savg) savg[ibin] += s;
+                if(need_savg) savg[ibin] += sw;
                 if(need_weightavg) weightavg[ibin] += pairweight;
             }
         }//remainder jloop
     }//i-loop
 
-    if (need_costheta) free(norm1);
+    if (need_costheta) {
+        free(xhat1);
+        free(yhat1);
+        free(zhat1);
+    }
 
     for(int i=0;i<totnbins;i++) {
         src_npairs[i] += npairs[i];
@@ -1364,12 +1409,12 @@ static inline int countpairs_s_mu_mocks_fallback_DOUBLE(const int64_t N0, DOUBLE
         weight_func = get_weight_func_by_method_DOUBLE(weight_method);
     }
     DOUBLE *xhat1 = NULL, *yhat1 = NULL, *zhat1 = NULL;
-    if (need_costheta) {
+    if (need_costheta || ((autocorr == 1) && (los_type == FIRSTPOINT_LOS))) {
         xhat1 = (DOUBLE *) my_malloc(N1, sizeof(DOUBLE));
         yhat1 = (DOUBLE *) my_malloc(N1, sizeof(DOUBLE));
         zhat1 = (DOUBLE *) my_malloc(N1, sizeof(DOUBLE));
         for(int64_t i=0;i<N1;i++) {
-            norm1 = SQRT(x1[i]*x1[i] + y1[i]*y1[i] + z1[i]*z1[i]);
+            const DOUBLE norm1 = SQRT(x1[i]*x1[i] + y1[i]*y1[i] + z1[i]*z1[i]);
             xhat1[i] = x1[i]/norm1;
             yhat1[i] = y1[i]/norm1;
             zhat1[i] = z1[i]/norm1;
@@ -1387,7 +1432,7 @@ static inline int countpairs_s_mu_mocks_fallback_DOUBLE(const int64_t N0, DOUBLE
         }
         DOUBLE xhat0 = ZERO, yhat0 = ZERO, zhat0 = ZERO;
         if (need_costheta || los_type == FIRSTPOINT_LOS) {
-            const DOUBLE norm0 = SQRT(xpos0*xpos0 + ypos0*ypos0 + zpos0*zpos0);
+            const DOUBLE norm0 = SQRT(xpos*xpos + ypos*ypos + zpos*zpos);
             xhat0 = xpos/norm0;
             yhat0 = ypos/norm0;
             zhat0 = zpos/norm0;
@@ -1463,9 +1508,7 @@ static inline int countpairs_s_mu_mocks_fallback_DOUBLE(const int64_t N0, DOUBLE
 
             localj++;
 
-            if(need_costheta) {
-                pair.costheta.d = xhat1[localj]*xhat0 + yhat1[localj]*yhat0 + zhat1[localj]*zhat0;
-            }
+            if(need_costheta) pair.costheta.d = xhat1[localj]*xhat0 + yhat1[localj]*yhat0 + zhat1[localj]*zhat0;
 
             const DOUBLE parx = xpos + *localx1;
             const DOUBLE pary = ypos + *localy1;
@@ -1475,30 +1518,50 @@ static inline int countpairs_s_mu_mocks_fallback_DOUBLE(const int64_t N0, DOUBLE
             const DOUBLE perpy = *localy1++ - ypos;
             const DOUBLE perpz = *localz1++ - zpos;
 
-            for(int w = 0; w < pair.num_weights; w++){
-                pair.weights1[w].d = *local_w1.weights[w]++;
-            }
+            for (int w = 0; w < pair.num_weights; w++) pair.weights1[w].d = *local_w1.weights[w]++;
 
             if(perpz >= max_dz) break;
 
             const DOUBLE sqr_s = perpx*perpx + perpy*perpy + perpz*perpz;
             if(sqr_s >= sqr_smax || sqr_s < sqr_smin) continue;
 
-            DOUBLE s_dot_l;
-            if (los_type == MIDPOINT_LOS) {
-                s_dot_l = parx*perpx + pary*perpy + parz*perpz;
-                sqr_l = parx*parx + pary*pary + parz*parz;
+            DOUBLE s = ZERO;
+            int mubin = nmu_bins, mubin2 = nmu_bins;
+            if (sqr_s <= 0.) {
+                mubin2 = mubin = (int) mumin_invstep;
+            }
+            else if (los_type == MIDPOINT_LOS) {
+                const DOUBLE s_dot_l = parx*perpx + pary*perpy + parz*perpz;
+                const DOUBLE sqr_l = parx*parx + pary*pary + parz*parz;
+                const DOUBLE sqr_mu = s_dot_l * s_dot_l/(sqr_l * sqr_s);
+                if (sqr_mu >= sqr_mumax) continue;
+                const DOUBLE mu = SIGNED(SQRT(sqr_mu), s_dot_l);
+                mubin = (int) (mu * inv_dmu + mumin_invstep);
+                if (autocorr == 1) mubin2 = (int) (- mu * inv_dmu + mumin_invstep);
+                if(need_savg || bin_type == BIN_LIN) s = SQRT(sqr_s);
             }
             else {
-                s_dot_l = xhat*perpx + yhat*perpy + zhat*perpz;
-                sqr_l = 1.;
+                const DOUBLE s_dot_l = xhat0*perpx + yhat0*perpy + zhat0*perpz;
+                const DOUBLE sqr_mu = s_dot_l * s_dot_l/sqr_s;
+                if (autocorr == 1) {
+                    const DOUBLE s_dot_l2 = xhat1[localj]*perpx + yhat1[localj]*perpy + zhat1[localj]*perpz;
+                    const DOUBLE sqr_mu2 = s_dot_l2 * s_dot_l2/sqr_s;
+                    const int skip_mu = (sqr_mu >= sqr_mumax);
+                    const int skip_mu2 = (sqr_mu2 >= sqr_mumax);
+                    if (skip_mu && skip_mu2) continue;
+                    s = SQRT(sqr_s);
+                    if (skip_mu == 0) mubin = (int) (s_dot_l/s * inv_dmu + mumin_invstep);
+                    if (skip_mu2 == 0) mubin2 = (int) (- s_dot_l2/s * inv_dmu + mumin_invstep);
+                }
+                else {
+                    if (sqr_mu >= sqr_mumax) continue;
+                    s = SQRT(sqr_s);
+                    mubin = (int) (s_dot_l/s * inv_dmu + mumin_invstep);
+                }
             }
-            const DOUBLE sqr_mu = sqr_s > 0. ? (s_dot_l * s_dot_l)/(sqr_l * sqr_s) : 0.;
-            if (sqr_mu >= sqr_mumax) continue;
-            DOUBLE s = ZERO, pairweight = ZERO;
-            if(need_savg || bin_type == BIN_LIN || los_type == FIRSTPOINT_LOS) {
-                s = SQRT(sqr_s);
-            }
+
+            DOUBLE pairweight = ZERO;
+            DOUBLE sw = s;
 
             if(need_weightavg){
                 pair.dx.d = perpx;
@@ -1510,6 +1573,7 @@ static inline int countpairs_s_mu_mocks_fallback_DOUBLE(const int64_t N0, DOUBLE
                 pair.parz.d = parz;
 
                 pairweight = weight_func(&pair);
+                if(need_savg) sw = s*pairweight;
             }
 
             int kbin = 0;
@@ -1523,40 +1587,27 @@ static inline int countpairs_s_mu_mocks_fallback_DOUBLE(const int64_t N0, DOUBLE
                     }
                 }//finding kbin
             }
-            if (los_type == MIDPOINT_LOS) {
-                mu = SIGNED(SQRT(sqr_mu), s_dot_l);
-            }
-            else {
-                mu = s_dot_l/s;
-            }
-
             kbin *= nmu_bins+1;
-            const DOUBLE mubin = mu * inv_dmu;
-            int ibin = kbin + (int) (mubin + mumin_invstep);
-            npairs[ibin]++;
-            if(need_savg) {
-                if(need_weightavg) s *= pairweight;
-                savg[ibin] += s;
+            {
+              const int ibin = kbin + mubin;
+              npairs[ibin]++;
+              if(need_savg) savg[ibin] += sw;
+              if(need_weightavg) weightavg[ibin] += pairweight;
             }
-            if(need_weightavg){
-                weightavg[ibin] += pairweight;
-            }
-            if(autocorr == 1){
-                if (los_type == MIDPOINT_LOS) {
-                    ibin = kbin + (int) (-mubin + mumin_invstep);
-                else {
-                    s_dot_l = xhat1[localj]*perpx + yhat1[localj]*perpy + zhat1[localj]*perpz;
-                    ibin = kbin + (int) (-s_dot_l / s * inv_dmu + mumin_invstep);
-                }
+            if (autocorr == 1) {
+                const int ibin = kbin + mubin2;
                 npairs[ibin]++;
-                if(need_savg) savg[ibin] += s;
+                if(need_savg) savg[ibin] += sw;
                 if(need_weightavg) weightavg[ibin] += pairweight;
             }
         }//j loop over second set of particles
     }//i loop over first set of particles
 
-    if (need_costheta) free(norm1);
-
+    if (need_costheta) {
+        free(xhat1);
+        free(yhat1);
+        free(zhat1);
+    }
     for(int i=0;i<totnbins;i++) {
         src_npairs[i] += npairs[i];
         if(need_savg) {

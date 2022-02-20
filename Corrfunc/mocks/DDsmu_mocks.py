@@ -23,7 +23,7 @@ def DDsmu_mocks(autocorr, cosmology, nthreads, binfile, mumax, nmubins,
                 zbin_refine_factor=1, max_cells_per_dim=100,
                 copy_particles=True, enable_min_sep_opt=True,
                 c_api_timer=False, isa='fastest',
-                weight_type=None, bin_type='custom',
+                weight_type=None, bin_type='custom', los_type='midpoint',
                 pair_weights=None, sep_pair_weights=None, attrs_pair_weights=None):
     """
     Calculate the 2-D pair-counts corresponding to the projected correlation
@@ -238,6 +238,11 @@ def DDsmu_mocks(autocorr, cosmology, nthreads, binfile, mumax, nmubins,
         ``rtol = 1e-05`` *and* ``atol = 1e-08`` (relative and absolute tolerance)
         of ``np.linspace(binfile[0], binfile[-1], len(binfile))``.
 
+    los_type : string, case-insensitive (default ``midpoint``)
+        Choice of line-of-sight :math:`d`:
+        - "midpoint": :math:`d = \hat{r_{1} + r_{2}}`
+        - "firstpoint": :math:`d = \hat{r_{1}}`
+
     pair_weights : array-like, optional. Default: None.
         Array of pair weights.
 
@@ -333,6 +338,7 @@ def DDsmu_mocks(autocorr, cosmology, nthreads, binfile, mumax, nmubins,
 
     integer_isa = translate_isa_string_to_enum(isa)
     integer_bin_type = translate_bin_type_string_to_enum(bin_type)
+    integer_los_type = {'midpoint':0, 'firstpoint':1}[los_type.lower()]
     sbinfile = get_edges(binfile)
     with sys_pipes():
         extn_results = DDsmu_extn(autocorr, cosmology, nthreads,
@@ -350,7 +356,9 @@ def DDsmu_mocks(autocorr, cosmology, nthreads, binfile, mumax, nmubins,
                                   enable_min_sep_opt=enable_min_sep_opt,
                                   c_api_timer=c_api_timer,
                                   isa=integer_isa,
-                                  bin_type=integer_bin_type, **kwargs)
+                                  bin_type=integer_bin_type,
+                                  los_type=integer_los_type,
+                                  **kwargs)
     if extn_results is None:
         msg = "RuntimeError occurred"
         raise RuntimeError(msg)

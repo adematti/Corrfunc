@@ -53,6 +53,9 @@ struct api_cell_timings
 typedef enum {BIN_AUTO, BIN_LIN, BIN_CUSTOM} bin_type_t; // type of weighting to apply
 
 
+typedef enum {MIDPOINT_LOS, FIRSTPOINT_LOS} los_type_t;
+
+
 struct config_options
 {
     /* The fields should appear here in decreasing order of
@@ -147,12 +150,13 @@ struct config_options
         uint8_t bin_masks[4];
     };
     bin_type_t bin_type; /* binning type, allow significant speed-up with higher number of linear bins */
+    los_type_t los_type; /* line-of-sight type */
 
     /* Reserving to maintain ABI compatibility for the future */
     /* Note that the math here assumes no padding bytes, that's because of the
        order in which the fields are declared (largest to smallest alignments)  */
     uint8_t reserved[OPTIONS_HEADER_SIZE - 33*sizeof(char) - sizeof(size_t) - 9*sizeof(double) - 3*sizeof(int)
-                     - sizeof(uint16_t) - 16*sizeof(uint8_t) - sizeof(bin_type_t) - sizeof(struct api_cell_timings *) - sizeof(int64_t) ];
+                     - sizeof(uint16_t) - 16*sizeof(uint8_t) - sizeof(bin_type_t) - sizeof(los_type_t) - sizeof(struct api_cell_timings *) - sizeof(int64_t)];
 };
 
 static inline void set_bin_refine_scheme(struct config_options *options, const int8_t flag)
@@ -350,12 +354,6 @@ static inline struct config_options get_config_options(void)
 
 
 #define MAX_NUM_WEIGHTS 10
-
-
-typedef enum {
-    MIDPOINT_LOS,
-    FIRSTPOINT_LOS
-} los_type_t;
 
 
 typedef enum {

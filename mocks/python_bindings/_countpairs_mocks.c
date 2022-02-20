@@ -1632,10 +1632,11 @@ static PyObject *countpairs_countpairs_s_mu_mocks(PyObject *self, PyObject *args
         "sep_pair_weights",
         "attrs_pair_weights",
         "bin_type",
+        "los_type",
         NULL
     };
 
-    if ( ! PyArg_ParseTupleAndKeywords(args, kwargs, "iiiO!diO!O!O!|OO!O!O!ObbbbbbbhbbbisO!O!OI", kwlist,
+    if ( ! PyArg_ParseTupleAndKeywords(args, kwargs, "iiiO!diO!O!O!|OO!O!O!ObbbbbbbhbbbisO!O!OII", kwlist,
                                        &autocorr,&cosmology,&nthreads,
                                        &PyArray_Type,&bins_obj,
                                        &mu_max,&nmu_bins,
@@ -1661,7 +1662,8 @@ static PyObject *countpairs_countpairs_s_mu_mocks(PyObject *self, PyObject *args
                                        &PyArray_Type,&pair_weight_obj,
                                        &PyArray_Type,&sep_pair_weight_obj,
                                        &attrs_pair_weight,
-                                       &(options.bin_type))
+                                       &(options.bin_type),
+                                       &(options.los_type))
 
          ) {
 
