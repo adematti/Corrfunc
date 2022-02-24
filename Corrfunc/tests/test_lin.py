@@ -84,7 +84,7 @@ def test_linear_binning_mocks_DDrppi(points_mock, linbins, isa, nthreads, autoco
 
 
 @pytest.mark.parametrize('isa', ['fallback','sse42','avx','avx512f'])
-def test_linear_binning_mocks_DDsmu(points_mock, linbins, isa, nthreads, autocorr=True, periodic=True, cosmology=1, nmu_bins=10, mu_max=1.0):
+def test_linear_binning_mocks_DDsmu(points_mock, linbins, isa, nthreads, autocorr=True, periodic=True, cosmology=1, nmu_bins=11, mu_max=1.0):
     from Corrfunc.mocks import DDsmu_mocks
     ra,dec,cz,w = points_mock['data']
 
@@ -134,7 +134,7 @@ def test_linear_binning_theory_DDrppi(points, linbins, isa, nthreads, autocorr=T
 
 @pytest.mark.parametrize('isa', ['fallback','sse42','avx','avx512f'])
 def test_linear_binning_theory_DDsmu(points, linbins, isa, nthreads, autocorr=True, periodic=True,
-                                      mu_max=0.5, nmu_bins=10):
+                                      mu_max=0.5, nmu_bins=11):
     from Corrfunc.theory import DDsmu
     x,y,z,w = points['data']
     boxsize = points['boxsize']

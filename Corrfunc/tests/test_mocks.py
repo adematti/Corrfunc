@@ -42,7 +42,7 @@ def test_DDsmu_mocks(Mr19_randoms_northonly, isa, nthreads):
                      "../../mocks/tests/", "bins")
     autocorr = 1
     mu_max = 1.0
-    nmu_bins = 10
+    nmu_bins = 11
     cosmology = 1
 
     ra,dec,cz,w = Mr19_randoms_northonly

@@ -68,7 +68,7 @@ def test_DDsmu(gals_Mr19, isa, nthreads):
     autocorr = 1
     periodic = 1
     mu_max = 0.5
-    nmu_bins = 10
+    nmu_bins = 11
 
     x,y,z,w = gals_Mr19
     results_DDsmu = DDsmu(autocorr, nthreads, binfile,

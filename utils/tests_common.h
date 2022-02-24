@@ -73,13 +73,13 @@ char angular_binfile[]="../tests/angular_bins";
 double pimax=40.0;
 double theory_mu_max=0.5;
 double mocks_mu_max=1.0;
-int nmu_bins=10;
+int nmu_bins=11;
 double boxsize=420.0;
 int nthreads = 1;  // a safe default, but each tests should fill this with get_nthreads_from_affinity()
 
 int get_nthreads_from_affinity(void){
 #ifdef _OPENMP
-#ifdef __linux__ 
+#ifdef __linux__
     // Look at the processor affinity mask to determine the number of available CPUs
     cpu_set_t cs;
     CPU_ZERO(&cs);
@@ -88,7 +88,7 @@ int get_nthreads_from_affinity(void){
 #else
     // non-linux, revert to the old behavior, which was just a constant
     // we'll use 3 because that's the number of GitHub CI cores for Mac
-    return 3;  
+    return 3;
 #endif  // __linux__
 #else
     return 1;
@@ -279,4 +279,3 @@ const int min_bin_ref = 1, max_bin_ref = 3;
 #define END_DDTHETA_INTEGRATION_TEST_SECTION(code_to_free_results_memory)   } while(0)
 
 #endif/*INTEGRATION_TESTS*/
-
