@@ -13,6 +13,7 @@
 #include <arrayobject.h>
 
 //for correlation functions
+#include "countpairs_bessel_mocks.h"
 #include "countpairs_rp_pi_mocks.h"
 #include "countpairs_s_mu_mocks.h"
 #include "countpairs_theta_mocks.h"
@@ -62,6 +63,7 @@ static char module_docstring[] =    "Python extensions for calculating clusterin
     "See `Corrfunc/call_correlation_functions_mocks.py` for example calls to each function.\n";
 
 /* function proto-type*/
+static PyObject *countpairs_countpairs_bessel_mocks(PyObject *self, PyObject *args, PyObject *kwargs);
 static PyObject *countpairs_countpairs_rp_pi_mocks(PyObject *self, PyObject *args, PyObject *kwargs);
 static PyObject *countpairs_countpairs_s_mu_mocks(PyObject *self, PyObject *args, PyObject *kwargs);
 static PyObject *countpairs_countpairs_theta_mocks(PyObject *self, PyObject *args, PyObject *kwargs);
@@ -69,6 +71,7 @@ static PyObject *countpairs_countspheres_vpf_mocks(PyObject *self, PyObject *arg
 static PyObject *countpairs_mocks_error_out(PyObject *module, const char *msg);
 
 static PyMethodDef module_methods[] = {
+    {"countpairs_bessel_mocks"      ,(PyCFunction)(void(*)(void)) countpairs_countpairs_bessel_mocks ,METH_VARARGS | METH_KEYWORDS, ""},
     {"countpairs_rp_pi_mocks"       ,(PyCFunction)(void(*)(void)) countpairs_countpairs_rp_pi_mocks ,METH_VARARGS | METH_KEYWORDS,
      "countpairs_rp_pi_mocks(autocorr, cosmology, nthreads, pimax, binfile,\n"
      "                       RA1, DEC1, CZ1, weights1=None, weight_type=None,\n"
@@ -1240,7 +1243,378 @@ static int check_binarray(PyObject *module, binarray* bins, PyArrayObject *bins_
         countpairs_mocks_error_out(module, msg);
         return EXIT_FAILURE;
     }
+    const int type = PyArray_TYPE(bins_obj);
+    if (type != NPY_DOUBLE) {
+        PyArray_Descr *descr = PyArray_DescrFromType(type);
+        if(descr == NULL) {
+            /* Generating the dtype descriptor failed somehow. At least provide some information */
+            snprintf(msg, 1024, "TypeError: Expected double-precision floating point bin array. Instead found type-num (%d)\n", type);
+        } else {
+            snprintf(msg, 1024, "TypeError: Expected double-precision floating point bin array. Instead found type-num (%d) with type-name = (%s)\n", type, descr->typeobj->tp_name);
+        }
+        Py_XDECREF(descr);
+        countpairs_mocks_error_out(module, msg);
+        return -1;
+    }
     return set_binarray(bins, (double *) PyArray_DATA(bins_obj), (int) PyArray_SIZE(bins_obj));
+}
+
+
+static int check_polearray(PyObject *module, polearray* bins, PyArrayObject *bins_obj, PyArrayObject *ells_obj) {
+
+    char msg[1024];
+
+    /* All the arrays should be 1-D*/
+    const int ndims = PyArray_NDIM(bins_obj);
+
+    if(ndims != 1) {
+        snprintf(msg, 1024, "ERROR: Expected 1-D numpy arrays.\nFound ndims = %d instead", ndims);
+        countpairs_mocks_error_out(module, msg);
+        return EXIT_FAILURE;
+    }
+    int type = PyArray_TYPE(bins_obj);
+    if (type != NPY_DOUBLE) {
+        PyArray_Descr *descr = PyArray_DescrFromType(type);
+        if(descr == NULL) {
+            /* Generating the dtype descriptor failed somehow. At least provide some information */
+            snprintf(msg, 1024, "TypeError: Expected double-precision floating point bin array. Instead found type-num (%d)\n", type);
+        } else {
+            snprintf(msg, 1024, "TypeError: Expected double-precision floating point bin array. Instead found type-num (%d) with type-name = (%s)\n", type, descr->typeobj->tp_name);
+        }
+        Py_XDECREF(descr);
+        countpairs_mocks_error_out(module, msg);
+        return -1;
+    }
+    type = PyArray_TYPE(ells_obj);
+    if (type != NPY_INT) {
+        PyArray_Descr *descr = PyArray_DescrFromType(type);
+        if(descr == NULL) {
+            /* Generating the dtype descriptor failed somehow. At least provide some information */
+            snprintf(msg, 1024, "TypeError: Expected integer ells array. Instead found type-num (%d)\n", type);
+        } else {
+            snprintf(msg, 1024, "TypeError: Expected integer ells array. Instead found type-num (%d) with type-name = (%s)\n", type, descr->typeobj->tp_name);
+        }
+        Py_XDECREF(descr);
+        countpairs_mocks_error_out(module, msg);
+        return -1;
+    }
+
+    return set_polearray(bins, (double *) PyArray_DATA(bins_obj), (int) PyArray_SIZE(bins_obj), (int *) PyArray_DATA(ells_obj), (int) PyArray_SIZE(ells_obj));
+}
+
+
+static PyObject *countpairs_countpairs_bessel_mocks(PyObject *self, PyObject *args, PyObject *kwargs)
+{
+    //Error-handling is global in python2 -> stored in struct module_state _struct declared at the top of this file
+#if PY_MAJOR_VERSION < 3
+    (void) self;
+    PyObject *module = NULL;//should not be used -> setting to NULL so any attempts to dereference will result in a crash.
+#else
+    //In python3, self is simply the module object that was returned earlier by init
+    PyObject *module = self;
+#endif
+
+    //x1->ra (phi), y1-> declination (theta1), z1->cz (cz1)
+    //x2->ra (ph2), y2-> declination (theta2), z2->cz (cz2)
+    PyArrayObject *x1_obj=NULL, *y1_obj=NULL, *z1_obj=NULL;
+    PyArrayObject *x2_obj=NULL, *y2_obj=NULL, *z2_obj=NULL;
+    PyArrayObject *bins_obj=NULL, *ells_obj=NULL;
+    PyObject *weights1_obj=NULL, *weights2_obj=NULL;
+
+    struct config_options options = get_config_options();
+    options.is_comoving_dist = 0;
+    options.verbose = 0;
+    options.instruction_set = -1;
+    options.periodic = 0;
+    options.fast_divide_and_NR_steps=0;
+    options.enable_min_sep_opt = 1;
+    options.copy_particles = 1;
+    options.c_api_timer = 0;
+    int8_t xbin_ref=options.bin_refine_factors[0],
+        ybin_ref=options.bin_refine_factors[1],
+        zbin_ref=options.bin_refine_factors[2];
+
+    int autocorr=1;
+    int nthreads=4;
+    double rmin=0.0;
+    double rmax=0.0;
+    double mumax=1.0;
+    char *weighting_method_str = NULL;
+    PyObject *pair_weight_obj=NULL, *sep_pair_weight_obj=NULL, *attrs_pair_weight=NULL;
+
+    static char *kwlist[] = {
+        "autocorr",
+        "nthreads",
+        "binfile",
+        "ells",
+        "rmin",
+        "rmax",
+        "mumax",
+        "X1",
+        "Y1",
+        "Z1",
+        "weights1",
+        "X2",
+        "Y2",
+        "Z2",
+        "weights2",
+        "verbose", /* keyword verbose -> print extra info at runtime + progressbar */
+        "xbin_refine_factor",
+        "ybin_refine_factor",
+        "zbin_refine_factor",
+        "max_cells_per_dim",
+        "copy_particles",
+        "enable_min_sep_opt",
+        "c_api_timer",
+        "isa",/* instruction set to use of type enum isa; valid values are AVX512F, AVX, SSE, FALLBACK (enum) */
+        "weight_type",
+        "pair_weights",
+        "sep_pair_weights",
+        "attrs_pair_weights",
+        "los_type",
+        NULL
+    };
+
+    if ( ! PyArg_ParseTupleAndKeywords(args, kwargs, "iiO!O!dddO!O!O!|OO!O!O!ObbbbhbbbisO!O!OI", kwlist,
+                                       &autocorr,&nthreads,
+                                       &PyArray_Type,&bins_obj,
+                                       &PyArray_Type,&ells_obj,
+                                       &rmin,&rmax,&mumax,
+                                       &PyArray_Type,&x1_obj,
+                                       &PyArray_Type,&y1_obj,
+                                       &PyArray_Type,&z1_obj,
+                                       &weights1_obj,
+                                       &PyArray_Type,&x2_obj,//optional parameters -> if autocorr == 1, not checked; required if autocorr=0
+                                       &PyArray_Type,&y2_obj,
+                                       &PyArray_Type,&z2_obj,
+                                       &weights2_obj,
+                                       &(options.verbose),
+                                       &xbin_ref, &ybin_ref, &zbin_ref,
+                                       &(options.max_cells_per_dim),
+                                       &(options.copy_particles),
+                                       &(options.enable_min_sep_opt),
+                                       &(options.c_api_timer),
+                                       &(options.instruction_set),
+                                       &weighting_method_str,
+                                       &PyArray_Type,&pair_weight_obj,
+                                       &PyArray_Type,&sep_pair_weight_obj,
+                                       &attrs_pair_weight,
+                                       &(options.los_type))
+
+         ) {
+
+        PyObject_Print(kwargs, stdout, 0);
+        fprintf(stdout, "\n");
+
+        char msg[1024];
+        int len=snprintf(msg, 1024,"ArgumentError: In DDsmu_mocks> Could not parse the arguments. Input parameters are: \n");
+
+        /* How many keywords do we have? Subtract 1 because of the last NULL */
+        const size_t nitems = sizeof(kwlist)/sizeof(*kwlist) - 1;
+        int status = print_kwlist_into_msg(msg, 1024, len, kwlist, nitems);
+        if(status != EXIT_SUCCESS) {
+            fprintf(stderr,"Error message does not contain all of the keywords\n");
+        }
+
+        countpairs_mocks_error_out(module,msg);
+
+        Py_RETURN_NONE;
+    }
+
+    /*This is for the fastest isa */
+    if(options.instruction_set == -1) {
+        options.instruction_set = highest_isa_mocks;
+    }
+    if(xbin_ref != options.bin_refine_factors[0] ||
+       ybin_ref != options.bin_refine_factors[1] ||
+       zbin_ref != options.bin_refine_factors[2]) {
+        options.bin_refine_factors[0] = xbin_ref;
+        options.bin_refine_factors[1] = ybin_ref;
+        options.bin_refine_factors[2] = zbin_ref;
+        set_bin_refine_scheme(&options, BINNING_CUST);//custom binning -> code will honor requested binning scheme
+    }
+
+    /* Validate the user's choice of weighting method */
+    weight_method_t weighting_method;
+    int wstatus = get_weight_method_by_name(weighting_method_str, &weighting_method);
+    if(wstatus != EXIT_SUCCESS){
+        char msg[1024];
+        snprintf(msg, 1024, "ValueError: In %s: unknown weight_type \"%s\"!", __FUNCTION__, weighting_method_str);
+        countpairs_mocks_error_out(module, msg);
+        Py_RETURN_NONE;
+    }
+    weight_method_t input_weighting_method = weighting_method;
+    if (weighting_method == NONE) weighting_method = PAIR_PRODUCT;
+
+    /* We have numpy arrays and all the required inputs*/
+    /* How many data points are there? And are they all of floating point type */
+    size_t element_size;
+    const int64_t ND1 = check_dims_and_datatype(module, x1_obj, y1_obj, z1_obj, &element_size);
+    if(ND1 == -1) {
+        //Error has already been set -> simply return
+        Py_RETURN_NONE;
+    }
+
+    struct extra_options extra = get_extra_options(weighting_method);
+
+    int64_t ND2 = ND1;
+    if(autocorr == 0) {
+        char msg[1024];
+        if(x2_obj == NULL || y2_obj == NULL || z2_obj == NULL) {
+            snprintf(msg, 1024, "ValueError: In %s: If autocorr is 0, need to pass the second set of positions (X2=numpy array, Y2=numpy array, Z2=numpy array).\n",
+                     __FUNCTION__);
+            countpairs_mocks_error_out(module, msg);
+            Py_RETURN_NONE;
+        }
+        if((weights1_obj == NULL) != (weights2_obj == NULL)){
+            snprintf(msg, 1024, "ValueError: In %s: If autocorr is 0, must pass either zero or two sets of weights.\n",
+                     __FUNCTION__);
+            countpairs_mocks_error_out(module, msg);
+            Py_RETURN_NONE;
+        }
+
+        size_t element_size2;
+        ND2 = check_dims_and_datatype(module, x2_obj, y2_obj, z2_obj, &element_size2);
+        if(ND2 == -1) {
+            //Error has already been set -> simply return
+            Py_RETURN_NONE;
+        }
+
+        if(element_size != element_size2) {
+            snprintf(msg, 1024, "TypeError: In %s: The two arrays must have the same data-type. First array is of type %s while second array is of type %s\n",
+                     __FUNCTION__, element_size == 4 ? "floats":"doubles", element_size2 == 4 ? "floats":"doubles");
+            countpairs_mocks_error_out(module, msg);
+            Py_RETURN_NONE;
+        }
+    }
+
+    /* Interpret the input objects as numpy arrays. */
+    const int requirements = NPY_ARRAY_IN_ARRAY;
+    PyObject *x1_array = PyArray_FromArray(x1_obj, NOTYPE_DESCR, requirements);
+    PyObject *y1_array = PyArray_FromArray(y1_obj, NOTYPE_DESCR, requirements);
+    PyObject *z1_array = PyArray_FromArray(z1_obj, NOTYPE_DESCR, requirements);
+
+    PyObject *x2_array = NULL, *y2_array = NULL, *z2_array = NULL;
+    if(autocorr == 0) {
+        x2_array = PyArray_FromArray(x2_obj, NOTYPE_DESCR, requirements);
+        y2_array = PyArray_FromArray(y2_obj, NOTYPE_DESCR, requirements);
+        z2_array = PyArray_FromArray(z2_obj, NOTYPE_DESCR, requirements);
+    }
+
+    if (x1_array == NULL || y1_array == NULL || z1_array == NULL ||
+        (autocorr == 0 && (x2_array == NULL || y2_array == NULL || z2_array == NULL))) {
+        Py_XDECREF(x1_array);
+        Py_XDECREF(y1_array);
+        Py_XDECREF(z1_array);
+
+        Py_XDECREF(x2_array);
+        Py_XDECREF(y2_array);
+        Py_XDECREF(z2_array);
+        char msg[1024];
+        snprintf(msg, 1024, "TypeError: In %s: Could not convert input to arrays of allowed floating point types (doubles or floats). Are you passing numpy arrays?",
+                 __FUNCTION__);
+        countpairs_mocks_error_out(module, msg);
+        Py_RETURN_NONE;
+    }
+
+    /* Get pointers to the data as C-types. */
+    void *X1 = PyArray_DATA((PyArrayObject *) x1_array);
+    void *Y1 = PyArray_DATA((PyArrayObject *) y1_array);
+    void *Z1 = PyArray_DATA((PyArrayObject *) z1_array);
+
+    if (weights1_obj != NULL) wstatus = check_weights(module, weights1_obj, &(extra.weights0), extra.weight_method, ND1, element_size);
+
+    void *X2=NULL, *Y2=NULL, *Z2=NULL;
+    if (autocorr == 0) {
+        X2 = PyArray_DATA((PyArrayObject *) x2_array);
+        Y2 = PyArray_DATA((PyArrayObject *) y2_array);
+        Z2 = PyArray_DATA((PyArrayObject *) z2_array);
+
+        if (weights2_obj != NULL) wstatus = check_weights(module, weights2_obj, &(extra.weights1), extra.weight_method, ND2, element_size);
+    }
+    wstatus = check_pair_weight(module, &(extra.pair_weight), sep_pair_weight_obj, pair_weight_obj, element_size, attrs_pair_weight);
+
+    if(wstatus != EXIT_SUCCESS) {
+        Py_RETURN_NONE;
+    }
+    if (extra.weights0.num_weights < extra.weights0.num_integer_weights+3) {
+        char msg[1024];
+        snprintf(msg, 1024, "TypeError: In %s: found %d < %d + 3 weights; pass positions arrays as weights", __FUNCTION__, extra.weights0.num_weights, extra.weights0.num_integer_weights);
+        countpairs_mocks_error_out(module, msg);
+        Py_RETURN_NONE;
+    }
+
+    if (input_weighting_method == NONE) {
+        extra.weights0.num_weights = 3;
+        if (autocorr == 0) extra.weights1.num_weights = 3;
+    }
+
+    polearray bins;
+    wstatus = check_polearray(module, &bins, bins_obj, ells_obj);
+
+    if(wstatus != EXIT_SUCCESS) {
+        Py_RETURN_NONE;
+    }
+
+    options.float_type = element_size;
+
+    NPY_BEGIN_THREADS_DEF;
+    NPY_BEGIN_THREADS;
+
+    results_countpairs_mocks_bessel results;
+    double c_api_time = 0.0;
+
+    int status = countpairs_mocks_bessel(ND1,X1,Y1,Z1,
+                                         ND2,X2,Y2,Z2,
+                                         nthreads,
+                                         autocorr,
+                                         &bins,
+                                         rmin,
+                                         rmax,
+                                         mumax,
+                                         &results,
+                                         &options,
+                                         &extra);
+    if(options.c_api_timer) {
+        c_api_time = options.c_api_time;
+    }
+    NPY_END_THREADS;
+
+    /*
+    results.nells = bins.nells;
+    results.nmodes = bins.nedges;
+    const int nbins2 = results.nmodes * results.nells;
+    results.ells = my_malloc(sizeof(*(results.ells)), nbins2);
+    results.modes = my_malloc(sizeof(*(results.modes)), nbins2);
+    results.poles = my_malloc(sizeof(*(results.poles)), nbins2);
+    */
+
+    /* Clean up. */
+    Py_DECREF(x1_array);Py_DECREF(y1_array);Py_DECREF(z1_array);//x1 should absolutely not be NULL
+    Py_XDECREF(x2_array);Py_XDECREF(y2_array);Py_XDECREF(z2_array);//x2 might be NULL depending on value of autocorr
+    free_polearray(&bins);
+
+    if(status != EXIT_SUCCESS) {
+        Py_RETURN_NONE;
+    }
+
+    /* Build the output list */
+    PyObject *ret = PyList_New(0);//create an empty list
+
+    const int nbins = results.nmodes * results.nells;
+    for(int i=0;i<nbins;i++) {
+        const int ell = results.ells[i];
+        const double mode = results.modes[i];
+        const double pole = results.poles[i];
+        PyObject *item = Py_BuildValue("(idd)", ell, mode, pole);
+        PyList_Append(ret, item);
+        Py_XDECREF(item);
+    }
+    free_results_mocks_bessel(&results);
+
+    PyObject *rettuple = Py_BuildValue("(Od)", ret, c_api_time);
+    Py_DECREF(ret);  // transfer reference ownership to the tuple
+    return rettuple;
 }
 
 
@@ -1561,6 +1935,7 @@ static PyObject *countpairs_countpairs_rp_pi_mocks(PyObject *self, PyObject *arg
     return rettuple;
 }
 
+
 static PyObject *countpairs_countpairs_s_mu_mocks(PyObject *self, PyObject *args, PyObject *kwargs)
 {
     //Error-handling is global in python2 -> stored in struct module_state _struct declared at the top of this file
@@ -1878,6 +2253,7 @@ static PyObject *countpairs_countpairs_s_mu_mocks(PyObject *self, PyObject *args
     Py_DECREF(ret);  // transfer reference ownership to the tuple
     return rettuple;
 }
+
 
 static PyObject *countpairs_countpairs_theta_mocks(PyObject *self, PyObject *args, PyObject *kwargs)
 {

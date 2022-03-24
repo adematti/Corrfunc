@@ -1024,7 +1024,7 @@ def process_weights(weights1, weights2, X1, X2, weight_type, autocorr):
         if weights is None:
             return weights
 
-        if not isinstance(weights, (tuple,list)):
+        if not isinstance(weights, (tuple, list)):
             if isinstance(weights, np.ndarray) and weights.ndim == 2:
                 weights = list(weights)
             else:
@@ -1080,7 +1080,7 @@ def sys_pipes():
     see also https://github.com/manodeep/Corrfunc/issues/157,
     https://github.com/manodeep/Corrfunc/issues/269.
     '''
-    
+
     kwargs = {}
     if sys.stdout.isatty() or (sys.stdout is sys.__stdout__):
         kwargs['stdout'] = None

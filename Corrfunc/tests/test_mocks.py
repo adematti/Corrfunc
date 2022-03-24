@@ -5,10 +5,39 @@ from os.path import dirname, abspath, join as pjoin
 import pytest
 import numpy as np
 
-from Corrfunc.tests.common import Mr19_mock_northonly, Mr19_randoms_northonly
+from Corrfunc.tests.common import gals_Mr19, Mr19_mock_northonly, Mr19_randoms_northonly
 from Corrfunc.tests.common import (check_against_reference,
                                    check_vpf_against_reference)
 from Corrfunc.tests.common import generate_isa_and_nthreads_combos
+
+
+@pytest.mark.parametrize('isa,nthreads', generate_isa_and_nthreads_combos())
+def test_DDbessel_mocks(gals_Mr19, isa, nthreads):
+    from Corrfunc.mocks import DDbessel_mocks
+
+    x,y,z,w = gals_Mr19
+
+    binfile = np.linspace(0.1, 0.3, 21)
+    autocorr = 1
+    ells = (0, 2, 4)
+
+    x, y, z, w = gals_Mr19
+    x, y, z, w = [xx[:100] for xx in [x, y, z, w]]
+    results_DDbessel_mocks = DDbessel_mocks(autocorr, nthreads,
+                                            binfile, ells,
+                                            0., 1., 1.,
+                                            x, y, z, weights1=None,
+                                            weight_type=None,
+                                            verbose=True,
+                                            isa=isa)
+
+    results_DDbessel_mocks = DDbessel_mocks(autocorr, nthreads,
+                                            binfile, ells,
+                                            0., 1., 1.,
+                                            x, y, z, weights1=w,
+                                            weight_type='pair_product',
+                                            verbose=True,
+                                            isa=isa)
 
 
 @pytest.mark.parametrize('isa,nthreads', generate_isa_and_nthreads_combos())

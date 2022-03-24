@@ -1,6 +1,6 @@
 include ../mocks.options ../common.mk
 
-TARGETS:= DDrppi_mocks DDtheta_mocks DDsmu_mocks vpf_mocks examples
+TARGETS:= DDbessel_mocks DDrppi_mocks DDtheta_mocks DDsmu_mocks vpf_mocks examples
 ifneq ($(COMPILE_PYTHON_EXT), 0)
   TARGETS += python_bindings
 else
@@ -16,7 +16,7 @@ dirs: | ../lib ../bin ../include
 
 .PHONY: clean celna clena celan $(TARGETS) tests distclean realclean distclena realclena dirs test  python_bindings libs all
 
-DDrppi_mocks DDtheta_mocks vpf_mocks DDsmu_mocks: | dirs
+DDbessel_mocks DDrppi_mocks DDtheta_mocks vpf_mocks DDsmu_mocks: | dirs
 	$(MAKE) -C $@
 
 examples: libs

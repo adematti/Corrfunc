@@ -451,7 +451,7 @@ static inline int set_weight_struct(weight_struct* weight_st, const weight_metho
         for (int w=0; w<weight_st->num_weights; w++) {
             if (itemtype[w] == INT_TYPE) {
                 if (first_float) {
-                    fprintf(stderr,"Error: inverse_bitwise weights should first include integer weights, then float weights\n");
+                    fprintf(stderr,"Error: inverse_bitwise weights must first include integer weights, then float weights\n");
                     return EXIT_FAILURE;
                 }
                 weight_st->num_integer_weights++;
@@ -506,7 +506,38 @@ typedef struct {
 } binarray;
 
 
+typedef struct {
+    double *edges;
+    int nedges;
+    int *ells;
+    int nells;
+} polearray;
+
+
 static inline int set_binarray(binarray *bins, double* edges, int nedges)
+{
+    bins->nedges = nedges;
+    bins->edges = (double *) malloc(sizeof(double) * bins->nedges);
+    for (int ii=0; ii<bins->nedges; ii++) {
+        bins->edges[ii] = edges[ii];
+        if (ii > 0 && bins->edges[ii] < bins->edges[ii-1]) {
+            fprintf(stderr,"input bins must be sorted\n");
+            return EXIT_FAILURE;
+        }
+    }
+    for (int ii=0; ii<bins->nedges; ii++) bins->edges[ii] = edges[ii];
+    return EXIT_SUCCESS;
+}
+
+
+static inline int free_binarray(binarray *bins)
+{
+    free(bins->edges);
+    return EXIT_SUCCESS;
+}
+
+
+static inline int set_polearray(polearray *bins, double* edges, int nedges, int* ells, int nells)
 {
     bins->nedges = nedges;
     bins->edges = (double *) malloc(sizeof(double) * bins->nedges);
@@ -514,8 +545,34 @@ static inline int set_binarray(binarray *bins, double* edges, int nedges)
         fprintf(stderr,"malloc for %d bins failed...\n",bins->nedges);
         return EXIT_FAILURE;
     }
-    //bins->edges = (double *) my_malloc(sizeof(double), (int64_t) bins->nedges);
-    for (int ii=0; ii<bins->nedges; ii++) bins->edges[ii] = edges[ii];
+    for (int ii=0; ii<bins->nedges; ii++) {
+        bins->edges[ii] = edges[ii];
+        if (ii > 0 && bins->edges[ii] < bins->edges[ii-1]) {
+            fprintf(stderr,"input bins must be sorted\n");
+            return EXIT_FAILURE;
+        }
+    }
+    bins->nells = nells;
+    bins->ells = (int *) malloc(sizeof(int) * bins->nedges);
+    if (bins->edges == NULL){
+        fprintf(stderr,"malloc for %d ells failed...\n",bins->nells);
+        return EXIT_FAILURE;
+    }
+    for (int ii=0; ii<bins->nells; ii++) {
+        bins->ells[ii] = ells[ii];
+        if (ii > 0 && bins->ells[ii] < bins->ells[ii-1]) {
+            fprintf(stderr,"input ells must be sorted\n");
+            return EXIT_FAILURE;
+        }
+    }
+    return EXIT_SUCCESS;
+}
+
+
+static inline int free_polearray(polearray *bins)
+{
+    free(bins->edges);
+    free(bins->ells);
     return EXIT_SUCCESS;
 }
 
@@ -541,13 +598,6 @@ static inline int detect_bin_type(binarray *bins, bin_type_t *bin_type, uint8_t 
         if (*bin_type == BIN_LIN) fprintf(stderr,"Linear binning\n");
         else fprintf(stderr,"Custom binning\n");
     }
-    return EXIT_SUCCESS;
-}
-
-
-static inline int free_binarray(binarray *bins)
-{
-    free(bins->edges);
     return EXIT_SUCCESS;
 }
 

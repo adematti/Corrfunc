@@ -78,8 +78,6 @@ static inline int set_pair_struct_DOUBLE(pair_struct_DOUBLE *pair, const weight_
     return EXIT_SUCCESS;
 }
 
-
-typedef DOUBLE (*weight_func_t_DOUBLE)(pair_struct_DOUBLE*);
 #ifdef __AVX512F__
 typedef AVX512_FLOATS (*avx512_weight_func_t_DOUBLE)(pair_struct_DOUBLE*);
 #endif
@@ -89,6 +87,7 @@ typedef AVX_FLOATS (*avx_weight_func_t_DOUBLE)(pair_struct_DOUBLE*);
 #ifdef __SSE4_2__
 typedef SSE_FLOATS (*sse_weight_func_t_DOUBLE)(pair_struct_DOUBLE*);
 #endif
+typedef DOUBLE (*weight_func_t_DOUBLE)(pair_struct_DOUBLE*);
 
 //////////////////////////////////
 // Weighting functions
@@ -97,10 +96,6 @@ typedef SSE_FLOATS (*sse_weight_func_t_DOUBLE)(pair_struct_DOUBLE*);
 /*
  * The pair weight is the product of the particle weights
  */
-static inline DOUBLE pair_product_DOUBLE(pair_struct_DOUBLE *pair){
-    return pair->weights0[0].d*pair->weights1[0].d;
-}
-
 #ifdef __AVX512F__
 static inline AVX512_FLOATS avx512_pair_product_DOUBLE(pair_struct_DOUBLE *pair){
     return AVX512_MULTIPLY_FLOATS(pair->weights0[0].a512, pair->weights1[0].a512);
@@ -119,40 +114,10 @@ static inline SSE_FLOATS sse_pair_product_DOUBLE(pair_struct_DOUBLE *pair){
 }
 #endif
 
-/*
- * The bitwise weight is a bit product of the particle weights
- */
-static inline DOUBLE inverse_bitwise_DOUBLE(pair_struct_DOUBLE *pair){
-    int nbits = pair->noffset;
-    //printf("%d ", nbits);
-    for (int w=0;w<pair->num_integer_weights;w++) {
-        //printf("w%d %ld %ld\n", w, *((LONG *) &(pair->weights0[w].d)), *((LONG *) &(pair->weights1[w].d)));
-        nbits += POPCOUNT(*((LONG *) &(pair->weights0[w].d)) & *((LONG *) &(pair->weights1[w].d)));
-    }
-    DOUBLE weight = (nbits == 0) ? pair->default_value : 1./nbits;
-    for (int w=pair->num_integer_weights; w<pair->num_weights; w++) {
-        weight *= pair->weights0[w].d*pair->weights1[w].d;
-    }
-    int num = pair->pair_weight.num;
-    if (num) {
-        DOUBLE costheta = pair->costheta.d;
-        DOUBLE *pair_sep = pair->pair_weight.sep;
-        if (costheta > pair_sep[num-1] || (costheta <= pair_sep[0])) {
-            return weight;
-        }
-        else {
-            DOUBLE *pair_weight = pair->pair_weight.weight;
-            for (int kbin=0;kbin<num-1;kbin++) {
-                if(costheta <= pair_sep[kbin+1]) { // ]min, max], as costheta instead of theta
-                    DOUBLE frac = (costheta - pair_sep[kbin])/(pair_sep[kbin+1] - pair_sep[kbin]);
-                    weight *= (1 - frac) * pair_weight[kbin] + frac * pair_weight[kbin+1];
-                    break;
-                }
-            }
-        }
-    }
-    return weight;
+static inline DOUBLE pair_product_DOUBLE(pair_struct_DOUBLE *pair){
+    return pair->weights0[0].d*pair->weights1[0].d;
 }
+
 
 
 #ifdef __AVX512F__
@@ -191,6 +156,11 @@ static inline AVX512_FLOATS avx512_inverse_bitwise_DOUBLE(pair_struct_DOUBLE *pa
                 }
             }
         }
+        num = pair->num_weights;
+        int numi = pair->num_integer_weights;
+        if (num > numi) weight *= pair->weights0[numi].da512[jj]*pair->weights1[numi].da512[jj]; // multiply by the first float weight
+        numi++;
+        if (num > numi) weight -= pair->weights0[numi].da512[jj]*pair->weights1[numi].da512[jj]; // subtract the second float weight
         m_weight.da512[jj] = weight;
     }
     return m_weight.a512;
@@ -233,6 +203,11 @@ static inline AVX_FLOATS avx_inverse_bitwise_DOUBLE(pair_struct_DOUBLE *pair){
                 }
             }
         }
+        num = pair->num_weights;
+        int numi = pair->num_integer_weights;
+        if (num > numi) weight *= pair->weights0[numi].da[jj]*pair->weights1[numi].da[jj]; // multiply by the first float weight
+        numi++;
+        if (num > numi) weight -= pair->weights0[numi].da[jj]*pair->weights1[numi].da[jj]; // subtract the second float weight
         m_weight.da[jj] = weight;
     }
     return m_weight.a;
@@ -277,11 +252,54 @@ static inline SSE_FLOATS sse_inverse_bitwise_DOUBLE(pair_struct_DOUBLE *pair){
                 }
             }
         }
+        num = pair->num_weights;
+        int numi = pair->num_integer_weights;
+        if (num > numi) weight *= pair->weights0[numi].ds[jj]*pair->weights1[numi].ds[jj]; // multiply by the first float weight
+        numi++;
+        if (num > numi) weight -= pair->weights0[numi].ds[jj]*pair->weights1[numi].ds[jj]; // subtract the second float weight
         m_weight.ds[jj] = weight;
     }
     return m_weight.s;
 }
 #endif
+
+
+/*
+ * The bitwise weight is a bit product of the particle weights
+ */
+static inline DOUBLE inverse_bitwise_DOUBLE(pair_struct_DOUBLE *pair){
+    int nbits = pair->noffset;
+    //printf("%d ", nbits);
+    for (int w=0;w<pair->num_integer_weights;w++) {
+        //printf("w%d %ld %ld\n", w, *((LONG *) &(pair->weights0[w].d)), *((LONG *) &(pair->weights1[w].d)));
+        nbits += POPCOUNT(*((LONG *) &(pair->weights0[w].d)) & *((LONG *) &(pair->weights1[w].d)));
+    }
+    DOUBLE weight = (nbits == 0) ? pair->default_value : 1./nbits;
+    int num = pair->pair_weight.num;
+    if (num) {
+        DOUBLE costheta = pair->costheta.d;
+        DOUBLE *pair_sep = pair->pair_weight.sep;
+        if (costheta > pair_sep[num-1] || (costheta <= pair_sep[0])) {
+            ;
+        }
+        else {
+            DOUBLE *pair_weight = pair->pair_weight.weight;
+            for (int kbin=0;kbin<num-1;kbin++) {
+                if(costheta <= pair_sep[kbin+1]) { // ]min, max], as costheta instead of theta
+                    DOUBLE frac = (costheta - pair_sep[kbin])/(pair_sep[kbin+1] - pair_sep[kbin]);
+                    weight *= (1 - frac) * pair_weight[kbin] + frac * pair_weight[kbin+1];
+                    break;
+                }
+            }
+        }
+    }
+    num = pair->num_weights;
+    int numi = pair->num_integer_weights;
+    if (num > numi) weight *= pair->weights0[numi].d*pair->weights1[numi].d; // multiply by the first float weight
+    numi++;
+    if (num > numi) weight -= pair->weights0[numi].d*pair->weights1[numi].d; // subtract the second float weight
+    return weight;
+}
 
 //////////////////////////////////
 // Utility functions
@@ -291,17 +309,6 @@ static inline SSE_FLOATS sse_inverse_bitwise_DOUBLE(pair_struct_DOUBLE *pair){
 /* Gives a pointer to the weight function for the given weighting method
  * and instruction set.
  */
-static inline weight_func_t_DOUBLE get_weight_func_by_method_DOUBLE(const weight_method_t method){
-    switch(method){
-        case PAIR_PRODUCT:
-            return &pair_product_DOUBLE;
-        case INVERSE_BITWISE:
-            return &inverse_bitwise_DOUBLE;
-        default:
-        case NONE:
-            return NULL;
-    }
-}
 
 #ifdef __AVX512F__
 static inline avx512_weight_func_t_DOUBLE get_avx512_weight_func_by_method_DOUBLE(const weight_method_t method){
@@ -345,3 +352,15 @@ static inline sse_weight_func_t_DOUBLE get_sse_weight_func_by_method_DOUBLE(cons
     }
 }
 #endif
+
+static inline weight_func_t_DOUBLE get_weight_func_by_method_DOUBLE(const weight_method_t method){
+    switch(method){
+        case PAIR_PRODUCT:
+            return &pair_product_DOUBLE;
+        case INVERSE_BITWISE:
+            return &inverse_bitwise_DOUBLE;
+        default:
+        case NONE:
+            return NULL;
+    }
+}

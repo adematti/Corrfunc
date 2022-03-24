@@ -740,8 +740,6 @@ int countpairs_mocks_s_mu_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1, D
     }
 #endif //USE_OMP
 
-    //The code does not double count for autocorrelations
-    //which means the npairs and savg values need to be doubled;
     if(autocorr == 1) {
         /* Is the min. requested separation 0.0 ?*/
         /* The comparison is '<=' rather than '==' only to silence
