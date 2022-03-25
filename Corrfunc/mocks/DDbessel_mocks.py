@@ -223,7 +223,7 @@ def DDbessel_mocks(autocorr, nthreads, binfile, ells, rmin, rmax, mumax,
     X1, Y1, Z1, X2, Y2, Z2, XP1, YP1, ZP1, XP2, YP2, ZP2 = [
                         convert_to_native_endian(arr, warn=True) for arr in
                         [X1, Y1, Z1, X2, Y2, Z2, XP1, YP1, ZP1, XP2, YP2, ZP2]]
-    XP1, YP1, ZP1, XP2, YP2, ZP2 = [xp if xp is not None else x for x, xp in
+    XP1, YP1, ZP1, XP2, YP2, ZP2 = [xp if xp is not None else x for xp, x in
                         [(XP1, X1), (YP1, Y1), (ZP1, Z1), (XP2, X2), (YP2, Y2), (ZP2, Z2)]]
 
     if weights1 is None:
@@ -257,7 +257,7 @@ def DDbessel_mocks(autocorr, nthreads, binfile, ells, rmin, rmax, mumax,
     with sys_pipes():
         extn_results = DDbessel_extn(autocorr, nthreads,
                                      binfile, ells, rmin, rmax, mumax,
-                                     X1, X1, Z1,
+                                     X1, Y1, Z1,
                                      verbose=verbose,
                                      xbin_refine_factor=xbin_refine_factor,
                                      ybin_refine_factor=ybin_refine_factor,

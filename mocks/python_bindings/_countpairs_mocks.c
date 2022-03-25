@@ -1563,7 +1563,6 @@ static PyObject *countpairs_countpairs_bessel_mocks(PyObject *self, PyObject *ar
 
     results_countpairs_mocks_bessel results;
     double c_api_time = 0.0;
-
     int status = countpairs_mocks_bessel(ND1,X1,Y1,Z1,
                                          ND2,X2,Y2,Z2,
                                          nthreads,

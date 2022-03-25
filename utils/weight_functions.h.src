@@ -136,9 +136,6 @@ static inline AVX512_FLOATS avx512_inverse_bitwise_DOUBLE(pair_struct_DOUBLE *pa
             nbits += POPCOUNT(*((LONG *) &(pair->weights0[w].da512[jj])) & *((LONG *) &(pair->weights1[w].da512[jj])));
         }
         DOUBLE weight = (nbits == 0) ? pair->default_value : 1./nbits;
-        for (int w=pair->num_integer_weights; w<pair->num_weights; w++) {
-            weight *= pair->weights0[w].da512[jj]*pair->weights1[w].da512[jj];
-        }
         int num = pair->pair_weight.num;
         if (num) {
             DOUBLE costheta = pair->costheta.da512[jj];
@@ -182,9 +179,6 @@ static inline AVX_FLOATS avx_inverse_bitwise_DOUBLE(pair_struct_DOUBLE *pair){
             nbits += POPCOUNT(*((LONG *) &(pair->weights0[w].da[jj])) & *((LONG *) &(pair->weights1[w].da[jj])));
         }
         DOUBLE weight = (nbits == 0) ? pair->default_value : 1./nbits;
-        for (int w=pair->num_integer_weights; w<pair->num_weights; w++) {
-            weight *= pair->weights0[w].da[jj]*pair->weights1[w].da[jj];
-        }
         int num = pair->pair_weight.num;
         if (num) {
             DOUBLE costheta = pair->costheta.da[jj];
@@ -231,9 +225,6 @@ static inline SSE_FLOATS sse_inverse_bitwise_DOUBLE(pair_struct_DOUBLE *pair){
             nbits += POPCOUNT(*((LONG *) &(pair->weights0[w].ds[jj])) & *((LONG *) &(pair->weights1[w].ds[jj])));
         }
         DOUBLE weight = (nbits == 0) ? pair->default_value : 1./nbits;
-        for (int w=pair->num_integer_weights; w<pair->num_weights; w++) {
-            weight *= pair->weights0[w].ds[jj]*pair->weights1[w].ds[jj];
-        }
         int num = pair->pair_weight.num;
         if (num) {
             DOUBLE costheta = pair->costheta.ds[jj];
