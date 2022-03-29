@@ -358,7 +358,7 @@ def get_edges(binfile):
 
     # For a valid bin specifier, there must be at least 1 bin.
     if len(binfile) >= 1:
-        binfile = np.array(binfile, dtype='f8')
+        binfile = np.array(binfile, order='C', dtype='f8')
         binfile.sort()
         return binfile
 
@@ -953,8 +953,7 @@ def convert_to_native_endian(array, warn=False):
             warnings.warn("One or more input array has non-native endianness!  A copy will"\
                       " be made with the correct endianness.")
         return array.byteswap().newbyteorder()
-    else:
-        return array
+    return np.array(array, order='C', copy=False)
 
 def is_native_endian(array):
     '''
