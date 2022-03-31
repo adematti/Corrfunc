@@ -205,7 +205,7 @@ def vpf(rmax, nbins, nspheres, numpN, seed,
         kwargs['boxsize'] = boxsize
 
     # Ensure all input arrays are native endian
-    X, Y, Z = [convert_to_native_endian(arr, warn=True)
+    X, Y, Z = [convert_to_native_endian(arr, warn=False)
                for arr in [X, Y, Z]]
 
     integer_isa = translate_isa_string_to_enum(isa)

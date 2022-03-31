@@ -311,7 +311,7 @@ def DDsmu_mocks(autocorr, cosmology, nthreads, binfile, mumax, nmubins,
 
     # Ensure all input arrays are native endian
     RA1, DEC1, CZ1, RA2, DEC2, CZ2 = [
-            convert_to_native_endian(arr, warn=True) for arr in
+            convert_to_native_endian(arr, warn=False) for arr in
             [RA1, DEC1, CZ1, RA2, DEC2, CZ2]]
 
 
@@ -320,13 +320,13 @@ def DDsmu_mocks(autocorr, cosmology, nthreads, binfile, mumax, nmubins,
         fix_ra_dec(RA2, DEC2)
 
     if weights1 is not None:
-        weights1 = [convert_to_native_endian(arr, warn=True) for arr in weights1]
+        weights1 = [convert_to_native_endian(arr, warn=False) for arr in weights1]
     if weights2 is not None:
-        weights2 = [convert_to_native_endian(arr, warn=True) for arr in weights2]
+        weights2 = [convert_to_native_endian(arr, warn=False) for arr in weights2]
 
     if pair_weights is not None:
-        pair_weights = convert_to_native_endian(pair_weights, warn=True)
-        sep_pair_weights = convert_to_native_endian(sep_pair_weights, warn=True)
+        pair_weights = convert_to_native_endian(pair_weights, warn=False)
+        sep_pair_weights = convert_to_native_endian(sep_pair_weights, warn=False)
 
     # Passing None parameters breaks the parsing code, so avoid this
     kwargs = {}

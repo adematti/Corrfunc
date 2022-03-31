@@ -283,7 +283,7 @@ def vpf_mocks(rmax, nbins, nspheres, numpN,
 
     # Ensure all input arrays are native endian
     RA, DEC, CZ, RAND_RA, RAND_DEC, RAND_CZ = [
-            convert_to_native_endian(arr, warn=True) for arr in
+            convert_to_native_endian(arr, warn=False) for arr in
             [RA, DEC, CZ, RAND_RA, RAND_DEC, RAND_CZ]]
 
     integer_isa = translate_isa_string_to_enum(isa)

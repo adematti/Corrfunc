@@ -222,11 +222,11 @@ def xi(boxsize, nthreads, binfile, X, Y, Z,
     weights, _ = process_weights(weights, None, X, None, weight_type, autocorr=True)
 
     # Ensure all input arrays are native endian
-    X, Y, Z = [convert_to_native_endian(arr, warn=True)
+    X, Y, Z = [convert_to_native_endian(arr, warn=False)
                         for arr in [X, Y, Z]]
 
     if weights is not None:
-        weights = [convert_to_native_endian(arr, warn=True) for arr in weights]
+        weights = [convert_to_native_endian(arr, warn=False) for arr in weights]
 
     # Passing None parameters breaks the parsing code, so avoid this
     kwargs = {}

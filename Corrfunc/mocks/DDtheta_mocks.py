@@ -322,7 +322,7 @@ def DDtheta_mocks(autocorr, nthreads, binfile,
 
     # Ensure all input arrays are native endian
     RA1, DEC1, RA2, DEC2 = [
-            convert_to_native_endian(arr, warn=True) for arr in
+            convert_to_native_endian(arr, warn=False) for arr in
             [RA1, DEC1, RA2, DEC2]]
 
     fix_ra_dec(RA1, DEC1)
@@ -330,13 +330,13 @@ def DDtheta_mocks(autocorr, nthreads, binfile,
         fix_ra_dec(RA2, DEC2)
 
     if weights1 is not None:
-        weights1 = [convert_to_native_endian(arr, warn=True) for arr in weights1]
+        weights1 = [convert_to_native_endian(arr, warn=False) for arr in weights1]
     if weights2 is not None:
-        weights2 = [convert_to_native_endian(arr, warn=True) for arr in weights2]
+        weights2 = [convert_to_native_endian(arr, warn=False) for arr in weights2]
 
     if pair_weights is not None:
-        pair_weights = convert_to_native_endian(pair_weights, warn=True)
-        sep_pair_weights = convert_to_native_endian(sep_pair_weights, warn=True)
+        pair_weights = convert_to_native_endian(pair_weights, warn=False)
+        sep_pair_weights = convert_to_native_endian(sep_pair_weights, warn=False)
 
     if link_in_ra:
         link_in_dec = True
@@ -565,7 +565,7 @@ def find_fastest_DDtheta_mocks_bin_refs(autocorr, nthreads, binfile,
 
     # Ensure all input arrays are native endian
     RA1, DEC1, weights1, RA2, DEC2, weights2 = [
-        convert_to_native_endian(arr, warn=True) for arr in
+        convert_to_native_endian(arr, warn=False) for arr in
         [RA1, DEC1, weights1, RA2, DEC2, weights2]]
 
     fix_ra_dec(RA1, DEC1)

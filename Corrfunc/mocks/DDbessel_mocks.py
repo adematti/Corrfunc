@@ -210,7 +210,7 @@ def DDbessel_mocks(autocorr, nthreads, binfile, ells, rmin, rmax, mumax,
 
     # Ensure all input arrays are native endian
     X1, Y1, Z1, X2, Y2, Z2, XP1, YP1, ZP1, XP2, YP2, ZP2 = [
-                        convert_to_native_endian(arr, warn=True) for arr in
+                        convert_to_native_endian(arr, warn=False) for arr in
                         [X1, Y1, Z1, X2, Y2, Z2, XP1, YP1, ZP1, XP2, YP2, ZP2]]
     XP1, YP1, ZP1, XP2, YP2, ZP2 = [xp if xp is not None else x for xp, x in
                         [(XP1, X1), (YP1, Y1), (ZP1, Z1), (XP2, X2), (YP2, Y2), (ZP2, Z2)]]
@@ -218,18 +218,18 @@ def DDbessel_mocks(autocorr, nthreads, binfile, ells, rmin, rmax, mumax,
     if weights1 is None:
         weights1 = []
     else:
-        weights1 = [convert_to_native_endian(arr, warn=True) for arr in weights1]
+        weights1 = [convert_to_native_endian(arr, warn=False) for arr in weights1]
     weights1 += [XP1, YP1, ZP1]
 
     if weights2 is None:
         weights2 = []
     else:
-        weights2 = [convert_to_native_endian(arr, warn=True) for arr in weights2]
+        weights2 = [convert_to_native_endian(arr, warn=False) for arr in weights2]
     weights2 += [XP2, YP2, ZP2]
 
     if pair_weights is not None:
-        pair_weights = convert_to_native_endian(pair_weights, warn=True)
-        sep_pair_weights = convert_to_native_endian(sep_pair_weights, warn=True)
+        pair_weights = convert_to_native_endian(pair_weights, warn=False)
+        sep_pair_weights = convert_to_native_endian(sep_pair_weights, warn=False)
 
     # Passing None parameters breaks the parsing code, so avoid this
     kwargs = {}

@@ -304,18 +304,18 @@ def DDrppi(autocorr, nthreads, binfile, pimax, npibins, X1, Y1, Z1, weights1=Non
 
     # Ensure all input arrays are native endian
     X1, Y1, Z1, X2, Y2, Z2 = [
-            convert_to_native_endian(arr, warn=True) for arr in
+            convert_to_native_endian(arr, warn=False) for arr in
             [X1, Y1, Z1, X2, Y2, Z2]]
 
     if weights1 is not None:
-        weights1 = [convert_to_native_endian(arr, warn=True) for arr in weights1]
+        weights1 = [convert_to_native_endian(arr, warn=False) for arr in weights1]
     if weights2 is not None:
-        weights2 = [convert_to_native_endian(arr, warn=True) for arr in weights2]
+        weights2 = [convert_to_native_endian(arr, warn=False) for arr in weights2]
 
     if pair_weights is not None:
         if periodic: raise ValueError('Cannot use pair_weights if periodic=True')
-        pair_weights = convert_to_native_endian(pair_weights, warn=True)
-        sep_pair_weights = convert_to_native_endian(sep_pair_weights, warn=True)
+        pair_weights = convert_to_native_endian(pair_weights, warn=False)
+        sep_pair_weights = convert_to_native_endian(sep_pair_weights, warn=False)
 
     # Passing None parameters breaks the parsing code, so avoid this
     kwargs = {}
