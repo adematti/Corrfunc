@@ -24,23 +24,13 @@ def DDbessel_mocks(autocorr, nthreads, binfile, ells, rmin, rmax, mumax,
                    weight_type=None, los_type='midpoint',
                    pair_weights=None, sep_pair_weights=None, attrs_pair_weights=None):
     """
-    Calculate the 2-D pair-counts corresponding to the projected correlation
-    function, :math:`\\xi(s, \\mu)`. The pairs are counted in bins of
-    radial separation and cosine of angle to the line-of-sight (LOS). The
-    input positions are expected to be on-sky co-ordinates. This module is
-    suitable for calculating correlation functions for mock catalogs.
+    Calculate the power spectrum multipoles, :math:`P_{\\ell}`.
 
-    If ``weights`` are provided, the resulting pair counts are weighted.  The
-    weighting scheme depends on ``weight_type``.
+    If ``weights`` are provided, the resulting power spectrum is weighted.
+    The weighting scheme depends on ``weight_type``.
 
-    Returns a numpy structured array containing the pair counts for the
+    Returns a numpy structured array containing the power spectrum for the
     specified bins.
-
-
-    .. note:: This module only returns pair counts and not the actual
-       correlation function :math:`\\xi(s, \\mu)`. See the
-       utilities :py:mod:`Corrfunc.utils.convert_3d_counts_to_cf`
-       for computing :math:`\\xi(s, \\mu)` from the pair counts.
 
     .. versionadded:: 2.4.0
 
@@ -55,19 +45,34 @@ def DDbessel_mocks(autocorr, nthreads, binfile, ells, rmin, rmax, mumax,
         enabled during library compilation.
 
     binfile : string or an list/array of floats
-        For string input: filename specifying the ``r`` bins for
-        ``DD``. The file should contain white-space separated values
-        of (rmin, rmax)  for each ``r`` wanted. The bins need to be
-        contiguous and sorted in increasing order (smallest bins come first).
-
-        For array-like input: A sequence of ``r`` values that provides the
-        bin-edges. For example,
+        For string input: filename specifying :math:`k` values.
+        For array-like input: A sequence of :math:`k` values that provides the
+        :math:`k`-coordinates. For example,
         ``np.logspace(np.log10(0.1), np.log10(10.0), 15)`` is a valid
-        input specifying **14** (logarithmic) bins between 0.1 and 10.0. This
-        array does not need to be sorted.
+        input specifying **14** (logarithmic) :math:`k` between 0.1 and 10.0.
+
+    ells : tuple, list
+        List of poles to compute.
+
+    rmin : float
+        Minimum separation in X1/Y1/Z1 and X2/Y2/Z2 space.
+
+    rmax : float
+        Maximum separation in X1/Y1/Z1 and X2/Y2/Z2 space.
+
+    mumax : float
+        Maximum cosine angle to the line-of-sight in XP1/YP1/ZP1 and XP2/YP2/ZP2 space.
 
     X1/Y1/Z1 : array_like, real (float/double)
         The array of X/Y/Z positions for the first set of points.
+        These are used to define the maximum distance between two particles,
+        see ``rmin`` and ``rmax``.
+        Calculations are done in the precision of the supplied arrays.
+
+    XP1/YP1/ZP1 : array_like, real (float/double)
+        The array of X/Y/Z positions for the first set of points.
+        These are used to define the distance between two particles
+        and the cosine angle to the line-of-sight (<``mumax``).
         Calculations are done in the precision of the supplied arrays.
 
     weights1 : array_like, real (float/double), optional
@@ -79,22 +84,17 @@ def DDbessel_mocks(autocorr, nthreads, binfile, ells, rmin, rmax, mumax,
 
     X2/Y2/Z2 : array-like, real (float/double)
         Array of XYZ positions for the second set of points. *Must* be the same
-        precision as the X1/Y1/Z1 arrays. Only required when ``autocorr==0``.
+        precision as the X1/Y1/Z1 arrays. Only required when ``autocorr == 0``.
+
+    XP2/YP2/ZP2 : array-like, real (float/double)
+        Array of XYZ positions for the second set of points. *Must* be the same
+        precision as the XP1/YP1/ZP1 arrays. Only required when ``autocorr == 0``.
 
     weights2 : array-like, real (float/double), optional
         Same as weights1, but for the second set of positions
 
     verbose : boolean (default false)
         Boolean flag to control output of informational messages
-
-    output_ravg : boolean (default false)
-        Boolean flag to output the average ``r`` for each bin. Code will
-        run slower if you set this flag.
-
-        Note: If you are calculating in single-precision, ``ravg`` will
-        suffer from numerical loss of precision and can not be trusted.
-        If you need accurate ``ravg`` values, then pass in double precision
-        arrays for the particle positions.
 
     (xyz)bin_refine_factor : integer, default is (2,2,1); typically within [1-3]
         Controls the refinement on the cell sizes. Can have up to a 20% impact
@@ -137,21 +137,10 @@ def DDbessel_mocks(autocorr, nthreads, binfile, ells, rmin, rmax, mumax,
     weight_type : string, optional. Default: None.
         The type of weighting to apply. One of ["pair_product", "inverse_bitwise", None].
 
-    bin_type : string, case-insensitive (default ``custom``)
-        Set to ``lin`` for speed-up in case of linearly-spaced bins.
-        In this case, the bin number for a pair separated by ``r`` is given by
-        ``(r - binfile[0])/(binfile[-1] - binfile[0])*(len(binfile) - 1)``,
-        i.e. only the first and last bins of input ``binfile`` are considered.
-        Then setting ``output_ravg`` is virtually costless.
-        For non-linear binning, set to ``custom``.
-        In the vast majority of cases, bin_type='linear' will yield identical
-        results to custom linear binning but with higher performance.
-        In a few rare cases where a pair falls on a bin boundary,
-        'linear' and custom linear may disagree on which bin the pair falls into
-        due to finite floating point precision.
-        ``auto`` will choose linear binning if input ``binfile`` is within
-        ``rtol = 1e-05`` *and* ``atol = 1e-08`` (relative and absolute tolerance)
-        of ``np.linspace(binfile[0], binfile[-1], len(binfile))``.
+    los_type : string, case-insensitive (default ``midpoint``)
+        Choice of line-of-sight :math:`d`:
+        - "midpoint": :math:`d = \hat{r_{1} + r_{2}}`
+        - "firstpoint": :math:`d = \hat{r_{1}}`
 
     pair_weights : array-like, optional. Default: None.
         Array of pair weights.

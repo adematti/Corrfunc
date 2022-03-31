@@ -130,7 +130,7 @@ int countpairs_mocks_bessel_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DO
       extra = &dummy_extra;
     }
 
-    int need_weightavg = extra->weights0.num_weights > 3;
+    int need_weightavg = (extra->weights0.num_weights > 3) || (extra->pair_weight.num);
     //int need_weightavg = extra->weight_method != NONE;
 
     options->sort_on_z = 1;
@@ -254,7 +254,7 @@ int countpairs_mocks_bessel_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DO
     }
 
     cellarray_mocks_DOUBLE *lattice2 = NULL;
-    if(autocorr==0) {
+    if (autocorr == 0) {
         int ngrid2_x=0,ngrid2_y=0,ngrid2_z=0;
         lattice2 = gridlink_mocks_DOUBLE(ND2, X2, Y2, Z2, &(extra->weights1),
                                          xmin, xmax, ymin, ymax, zmin, zmax,

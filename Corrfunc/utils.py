@@ -344,7 +344,9 @@ def get_edges(binfile):
                 binfile = []
                 for iline, line in enumerate(file):
                     lowhi = line.split()
-                    if len(lowhi) == 2:
+                    if len(lowhi) == 1:
+                        binfile.append(lowhi[0])
+                    elif len(lowhi) == 2:
                         low, hi = lowhi
                         if iline == 0:
                             binfile.append(low)
@@ -352,8 +354,7 @@ def get_edges(binfile):
                     else:
                         break
         else:
-            msg = "Could not find file = `{0}` containing the bins"\
-                    .format(binfile)
+            msg = "Could not find file = `{0}` containing the bins".format(binfile)
             raise IOError(msg)
 
     # For a valid bin specifier, there must be at least 1 bin.

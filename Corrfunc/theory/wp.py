@@ -398,7 +398,7 @@ def wp(boxsize, nthreads, binfile, pimax, X, Y, Z,
         into an ``enum`` for the instruction set defined in ``utils/defs.h``.
 
     weight_type : string, optional.  Default: None.
-        The type of weighting to apply.  One of ["pair_product", None].
+        The type of weighting to apply. One of ["pair_product", None].
 
     bin_type : string, case-insensitive (default ``custom``)
         Set to ``lin`` for speed-up in case of linearly-spaced bins.

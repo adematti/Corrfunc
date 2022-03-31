@@ -26,7 +26,7 @@ def DDsmu_mocks(autocorr, cosmology, nthreads, binfile, mumax, nmubins,
                 weight_type=None, bin_type='custom', los_type='midpoint',
                 pair_weights=None, sep_pair_weights=None, attrs_pair_weights=None):
     """
-    Calculate the 2-D pair-counts corresponding to the projected correlation
+    Calculate the 2-D pair-counts corresponding to the redshift-space correlation
     function, :math:`\\xi(s, \\mu)`. The pairs are counted in bins of
     radial separation and cosine of angle to the line-of-sight (LOS). The
     input positions are expected to be on-sky co-ordinates. This module is
@@ -220,7 +220,7 @@ def DDsmu_mocks(autocorr, cosmology, nthreads, binfile, mumax, nmubins,
        ``enum`` for the instruction set defined in ``utils/defs.h``.
 
     weight_type : string, optional (default None)
-        The type of weighting to apply.  One of ["pair_product", None].
+        The type of weighting to apply. One of ["pair_product", "inverse_bitwise", None].
 
     bin_type : string, case-insensitive (default ``custom``)
         Set to ``lin`` for speed-up in case of linearly-spaced bins.

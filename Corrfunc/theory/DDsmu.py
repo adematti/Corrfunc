@@ -163,8 +163,7 @@ def DDsmu(autocorr, nthreads, binfile, mumax, nmubins,
         into an ``enum`` for the instruction set defined in ``utils/defs.h``.
 
     weight_type : str, optional
-        The type of pair weighting to apply.
-        Options: "pair_product", None; Default: None.
+        The type of pair weighting to apply. One of ["pair_product", "inverse_bitwise", None].
 
     bin_type : string, case-insensitive (default ``custom``)
         Set to ``lin`` for speed-up in case of linearly-spaced bins.
