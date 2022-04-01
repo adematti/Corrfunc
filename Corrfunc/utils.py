@@ -435,12 +435,12 @@ def fix_ra_dec(ra, dec):
         msg = "RA or DEC must be valid arrays"
         raise ValueError(msg)
 
-    if min(ra) < 0.0:
+    if ra.size and np.min(ra) < 0.0:
         print("Warning: found negative RA values, wrapping into [0.0, 360.0] "
               " range")
         ra += 180.0
 
-    if max(dec) > 90.0:
+    if dec.size and np.max(dec) > 90.0:
         print("Warning: found DEC values more than 90.0; wrapping into "
               "[-90.0, 90.0] range")
         dec += 90.0

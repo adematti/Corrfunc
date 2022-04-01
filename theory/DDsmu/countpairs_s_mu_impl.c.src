@@ -150,6 +150,61 @@ int countpairs_s_mu_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z1
         return EXIT_FAILURE;
     }
 
+    /***********************
+     *initializing the  bins
+     ************************/
+    double *supp = bins->edges;
+    int nsbin = bins->nedges;
+    double smin=bins->edges[0], smax=bins->edges[bins->nedges-1];
+    if( ! (smin >= 0.0 && smax > 0.0 && smin < smax && nsbin > 0)) {
+        fprintf(stderr,"Error: Could not setup with s bins correctly. (rmin = %lf, rmax = %lf, with nbins = %d). Expected non-zero rmin/rmax with rmax > rmin and nbins >=1 \n",
+                smin, smax, nsbin);
+        return EXIT_FAILURE;
+    }
+    detect_bin_type(bins, &(options->bin_type), options->verbose);
+
+    if(max_mu <= 0.) {
+        fprintf(stderr,"Error: max_mu (max. value for the cosine of the angle with line of sight) must be greater than 0 and at most 1).\n"
+                "The passed value is max_mu = %lf. Please change it to be > 0 and <= 1\n", max_mu);
+        return EXIT_FAILURE;
+    }
+
+    if(nmu_bins < 1 ) {
+        fprintf(stderr,"Error: Number of mu bins = %d must be at least 1\n", nmu_bins);
+        return EXIT_FAILURE;
+    }
+
+    DOUBLE supp_sqr[nsbin];
+    const int64_t totnbins = (nmu_bins+1)*(nsbin+1);
+    for(int i=0; i < nsbin;i++) {
+        supp_sqr[i] = supp[i]*supp[i];
+    }
+
+    const DOUBLE mu_max = (DOUBLE) max_mu;
+    const DOUBLE pimax = smax*mu_max;
+
+    //Pack in the results
+    results->nsbin = nsbin;
+    results->nmu_bins = nmu_bins;
+    results->mu_max = max_mu;//NOTE max_mu which is double and not mu_max (which might be float)
+    results->mu_min = -max_mu;
+    results->npairs = my_calloc(sizeof(uint64_t), totnbins);
+    results->supp = my_malloc(sizeof(double), nsbin);
+    results->savg = my_calloc(sizeof(double), totnbins);
+    results->weightavg  = my_calloc(sizeof(double), totnbins);
+    if(results->npairs == NULL || results->supp == NULL ||
+       results->savg == NULL || results->weightavg == NULL) {
+        free_results_s_mu(results);
+        return EXIT_FAILURE;
+    }
+
+    for(int i=0;i<nsbin;i++) results->supp[i] = supp[i];
+
+    //Check inputs
+    if(ND1 == 0 || (autocorr == 0 && ND2 == 0)) {
+        return EXIT_SUCCESS;
+    }
+
     // If no extra options were passed, create dummy options
     // This allows us to pass arguments like "extra->weights0" below;
     // they'll just be NULLs, which is the correct behavior
@@ -197,39 +252,6 @@ int countpairs_s_mu_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z1
     /* setup interrupt handler -> mostly useful during the python execution.
        Let's Ctrl-C abort the extension  */
     SETUP_INTERRUPT_HANDLERS(interrupt_handler_countpairs_s_mu_DOUBLE);
-
-    /***********************
-     *initializing the  bins
-     ************************/
-    double *supp = bins->edges;
-    int nsbin = bins->nedges;
-    double smin=bins->edges[0], smax=bins->edges[bins->nedges-1];
-    if( ! (smin >= 0.0 && smax > 0.0 && smin < smax && nsbin > 0)) {
-        fprintf(stderr,"Error: Could not setup with s bins correctly. (rmin = %lf, rmax = %lf, with nbins = %d). Expected non-zero rmin/rmax with rmax > rmin and nbins >=1 \n",
-                smin, smax, nsbin);
-        return EXIT_FAILURE;
-    }
-    detect_bin_type(bins, &(options->bin_type), options->verbose);
-
-    if(max_mu <= 0.) {
-        fprintf(stderr,"Error: max_mu (max. value for the cosine of the angle with line of sight) must be greater than 0 and at most 1).\n"
-                "The passed value is max_mu = %lf. Please change it to be > 0 and <= 1\n", max_mu);
-        return EXIT_FAILURE;
-    }
-
-    if(nmu_bins < 1 ) {
-        fprintf(stderr,"Error: Number of mu bins = %d must be at least 1\n", nmu_bins);
-        return EXIT_FAILURE;
-    }
-
-    DOUBLE supp_sqr[nsbin];
-    const int64_t totnbins = (nmu_bins+1)*(nsbin+1);
-    for(int i=0; i < nsbin;i++) {
-        supp_sqr[i] = supp[i]*supp[i];
-    }
-
-    const DOUBLE mu_max = (DOUBLE) max_mu;
-    const DOUBLE pimax = smax*mu_max;
 
     //Find the min/max of the data
     DOUBLE xmin, xmax, ymin, ymax, zmin, zmax;
@@ -621,24 +643,7 @@ int countpairs_s_mu_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z1
         }
     }
 
-
-    //Pack in the results
-    results->nsbin  = nsbin;
-    results->nmu_bins = nmu_bins;
-    results->mu_max = max_mu;//NOTE max_mu which is double and not mu_max (which might be float)
-    results->mu_min = -max_mu;
-    results->npairs = my_malloc(sizeof(uint64_t), totnbins);
-    results->supp   = my_malloc(sizeof(double)  , nsbin);
-    results->savg  = my_malloc(sizeof(double)  , totnbins);
-    results->weightavg  = my_calloc(sizeof(double)  , totnbins);
-    if(results->npairs == NULL || results->supp == NULL ||
-       results->savg == NULL || results->weightavg == NULL) {
-        free_results_s_mu(results);
-        return EXIT_FAILURE;
-    }
-
     for(int i=0;i<nsbin;i++) {
-        results->supp[i] = supp[i];
         for(int j=0;j<nmu_bins;j++) {
             int index = i*((int64_t) nmu_bins+1) + j;
             if(index < 0 || index >= totnbins) {
@@ -648,8 +653,6 @@ int countpairs_s_mu_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z1
             }
 
             results->npairs[index] = npairs[index];
-            results->savg[index] = 0.0;
-            results->weightavg[index] = 0.0;
             if(options->need_avg_sep){
                 results->savg[index] = savg[index];
             }

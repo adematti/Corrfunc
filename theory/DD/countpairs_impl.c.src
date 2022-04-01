@@ -148,6 +148,39 @@ int countpairs_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z1,
         return EXIT_FAILURE;
     }
 
+    /***********************
+     *initializing the bins
+     ************************/
+    double *rupp = bins->edges;
+    int nrpbin = bins->nedges;
+    double rpmin=bins->edges[0], rpmax=bins->edges[bins->nedges-1];
+    if( ! (rpmin >= 0.0 && rpmax > 0.0 && rpmin < rpmax && nrpbin > 0)) {
+        fprintf(stderr,"Error: Could not setup with r bins correctly. (rmin = %lf, rmax = %lf, with nbins = %d). "
+                "Expected non-zero rmin/rmax with rmax > rmin and nbins >=1 \n",
+                rpmin, rpmax, nrpbin);
+        return EXIT_FAILURE;
+    }
+    detect_bin_type(bins, &(options->bin_type), options->verbose);
+
+    //Pack in the results
+    results->nbin = nrpbin;
+    results->npairs = my_calloc(sizeof(*(results->npairs)), nrpbin);
+    results->rupp = my_malloc(sizeof(*(results->rupp)), nrpbin);
+    results->rpavg = my_calloc(sizeof(*(results->rpavg)), nrpbin);
+    results->weightavg = my_calloc(sizeof(*(results->weightavg)), nrpbin);
+    if(results->npairs == NULL || results->rupp == NULL ||
+       results->rpavg == NULL || results->weightavg == NULL) {
+        free_results(results);
+        return EXIT_FAILURE;
+    }
+
+    for(int i=0;i<nrpbin;i++) results->rupp[i] = rupp[i];
+
+    //Check inputs
+    if(ND1 == 0 || (autocorr == 0 && ND2 == 0)) {
+        return EXIT_SUCCESS;
+    }
+
     // If no extra options were passed, create dummy options
     // This allows us to pass arguments like "extra->weights0" below;
     // they'll just be NULLs, which is the correct behavior
@@ -191,20 +224,6 @@ int countpairs_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z1,
     /* setup interrupt handler -> mostly useful during the python execution.
        Let's Ctrl-C abort the extension  */
     SETUP_INTERRUPT_HANDLERS(interrupt_handler_countpairs_DOUBLE);
-
-    /***********************
-     *initializing the bins
-     ************************/
-    double *rupp = bins->edges;
-    int nrpbin = bins->nedges;
-    double rpmin=bins->edges[0], rpmax=bins->edges[bins->nedges-1];
-    if( ! (rpmin >= 0.0 && rpmax > 0.0 && rpmin < rpmax && nrpbin > 0)) {
-        fprintf(stderr,"Error: Could not setup with r bins correctly. (rmin = %lf, rmax = %lf, with nbins = %d). "
-                "Expected non-zero rmin/rmax with rmax > rmin and nbins >=1 \n",
-                rpmin, rpmax, nrpbin);
-        return EXIT_FAILURE;
-    }
-    detect_bin_type(bins, &(options->bin_type), options->verbose);
 
     //Find the min/max of the data
     DOUBLE xmin, xmax, ymin, ymax, zmin, zmax;
@@ -620,23 +639,9 @@ int countpairs_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z1,
         }
     }
 
-    //Pack in the results
-    results->nbin = nrpbin;
-    results->npairs = my_malloc(sizeof(*(results->npairs)), nrpbin);
-    results->rupp   = my_malloc(sizeof(*(results->rupp)), nrpbin);
-    results->rpavg  = my_calloc(sizeof(*(results->rpavg)), nrpbin);
-    results->weightavg  = my_calloc(sizeof(*(results->weightavg)), nrpbin);
-    if(results->npairs == NULL || results->rupp == NULL ||
-       results->rpavg == NULL || results->weightavg == NULL) {
-        free_results(results);
-        return EXIT_FAILURE;
-    }
-
     for(int i=0;i<nrpbin;i++) {
         results->npairs[i] = npairs[i];
         results->rupp[i] = rupp[i];
-        results->rpavg[i] = ZERO;
-        results->weightavg[i] = ZERO;
         if(options->need_avg_sep) {
             results->rpavg[i] = rpavg[i];
         }

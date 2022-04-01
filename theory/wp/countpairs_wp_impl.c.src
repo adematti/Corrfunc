@@ -160,6 +160,35 @@ int countpairs_wp_DOUBLE(const int64_t ND, DOUBLE * restrict X, DOUBLE * restric
         return EXIT_FAILURE;
     }
 
+    /***********************
+     *initializing the  bins
+     ************************/
+    double *rupp = bins->edges;
+    int nrpbins = bins->nedges;
+    double rpmin=bins->edges[0], rpmax=bins->edges[bins->nedges-1];
+    if( ! (rpmin >=0 && rpmax > 0.0 && rpmin < rpmax && nrpbins > 0)) {
+        fprintf(stderr,"Error: Could not setup with r bins correctly. (rmin = %lf, rmax = %lf, with nbins = %d). Expected non-zero rmin/rmax with rmax > rmin and nbins >=1 \n",
+                rpmin, rpmax, nrpbins);
+        return EXIT_FAILURE;
+    }
+    detect_bin_type(bins, &(options->bin_type), options->verbose);
+
+    //Pack in the results
+    results->nbin = nrpbins;
+    results->pimax = pimax;
+    results->npairs = my_calloc(sizeof(*(results->npairs)), nrpbins);
+    results->wp = my_calloc(sizeof(*(results->wp)), nrpbins);
+    results->rupp = my_malloc(sizeof(*(results->rupp)), nrpbins);
+    results->rpavg = my_calloc(sizeof(*(results->rpavg)), nrpbins);
+    results->weightavg = my_calloc(sizeof(*(results->weightavg))  , nrpbins);
+    if(results->npairs == NULL || results->rupp == NULL ||
+       results->rpavg == NULL || results->wp == NULL || results->weightavg == NULL){
+        free_results_wp(results);
+        return EXIT_FAILURE;
+    }
+
+    for(int i=0;i<nrpbins;i++) results->rupp[i] = rupp[i];
+
     // If no extra options were passed, create dummy options
     // This allows us to pass arguments like "extra->weights0" below;
     // they'll just be NULLs, which is the correct behavior
@@ -211,19 +240,6 @@ int countpairs_wp_DOUBLE(const int64_t ND, DOUBLE * restrict X, DOUBLE * restric
     /* setup interrupt handler -> mostly useful during the python execution.
        Let's Ctrl-C abort the extension  */
     SETUP_INTERRUPT_HANDLERS(interrupt_handler_countpairs_wp_DOUBLE);
-
-    /***********************
-     *initializing the  bins
-     ************************/
-    double *rupp = bins->edges;
-    int nrpbins = bins->nedges;
-    double rpmin=bins->edges[0], rpmax=bins->edges[bins->nedges-1];
-    if( ! (rpmin >=0 && rpmax > 0.0 && rpmin < rpmax && nrpbins > 0)) {
-        fprintf(stderr,"Error: Could not setup with r bins correctly. (rmin = %lf, rmax = %lf, with nbins = %d). Expected non-zero rmin/rmax with rmax > rmin and nbins >=1 \n",
-                rpmin, rpmax, nrpbins);
-        return EXIT_FAILURE;
-    }
-    detect_bin_type(bins, &(options->bin_type), options->verbose);
 
     const DOUBLE xmin = 0.0, xmax=boxsize;
     const DOUBLE ymin = 0.0, ymax=boxsize;
@@ -587,21 +603,6 @@ int countpairs_wp_DOUBLE(const int64_t ND, DOUBLE * restrict X, DOUBLE * restric
       }
     }
 
-
-    //Pack in the results
-    results->nbin  = nrpbins;
-    results->pimax = pimax;
-    results->npairs = my_malloc(sizeof(*(results->npairs)), nrpbins);
-    results->wp = my_malloc(sizeof(*(results->wp)), nrpbins);
-    results->rupp   = my_malloc(sizeof(*(results->rupp)), nrpbins);
-    results->rpavg  = my_malloc(sizeof(*(results->rpavg)), nrpbins);
-    results->weightavg  = my_calloc(sizeof(*(results->weightavg))  , nrpbins);
-    if(results->npairs == NULL || results->rupp == NULL ||
-       results->rpavg == NULL || results->wp == NULL || results->weightavg == NULL){
-        free_results_wp(results);
-        return EXIT_FAILURE;
-    }
-
     DOUBLE weightsum = (DOUBLE) ND, weight_sqr_sum = (DOUBLE) ND;
 
     // If weights were provided and weight_method is pair_product,
@@ -625,9 +626,12 @@ int countpairs_wp_DOUBLE(const int64_t ND, DOUBLE * restrict X, DOUBLE * restric
     //The first bin contains junk
     for(int i=0;i<nrpbins;i++) {
         results->npairs[i] = npairs[i];
-        results->rupp[i] = rupp[i];
-        results->rpavg[i] = options->need_avg_sep ? rpavg[i] : ZERO;
-        results->weightavg[i] = need_weightavg ? weightavg[i] : ZERO;
+        if(options->need_avg_sep) {
+            results->rpavg[i] = rpavg[i];
+        }
+        if(need_weightavg) {
+            results->weightavg[i] = weightavg[i];
+        }
 
         /* compute xi, dividing summed weight by that expected for a random set */
         DOUBLE weight0 = (DOUBLE) results->npairs[i];

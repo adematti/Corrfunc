@@ -184,17 +184,19 @@ static inline int countpairs_theta_mocks_brute_force_DOUBLE(const int64_t N0, DO
                                                             const int64_t N1, DOUBLE *x1, DOUBLE *y1, DOUBLE *z1,
                                                             const int numthreads,
                                                             const DOUBLE thetamax, const DOUBLE thetamin, const int nthetabin,
-                                                            const double *theta_upp,
                                                             const DOUBLE *costheta_upp,
                                                             results_countpairs_theta *results,
                                                             struct config_options *options,
                                                             struct extra_options *extra)
 
 {
+
+    //prepare results
+    //Pack in the results
+
     if(N0 == 0 || N1 == 0) {
         return EXIT_SUCCESS;
     }
-
 
     // If no extra options were passed, create dummy options
     // This allows us to pass arguments like "extra->weights0" below;
@@ -304,7 +306,7 @@ static inline int countpairs_theta_mocks_brute_force_DOUBLE(const int64_t N0, DO
             }
         }
 
-#pragma omp for  schedule(dynamic)
+#pragma omp for schedule(dynamic)
 #endif
         for(int64_t i=0;i<N0;i+=block_size) {
 
@@ -420,27 +422,11 @@ static inline int countpairs_theta_mocks_brute_force_DOUBLE(const int64_t N0, DO
         }
     }
 
-    //prepare results
-    //Pack in the results
-    results->nbin = nthetabin;
-    results->npairs = my_malloc(sizeof(*(results->npairs)), nthetabin);
-    results->theta_upp = my_malloc(sizeof(*(results->theta_upp))  , nthetabin);
-    results->theta_avg = my_malloc(sizeof(*(results->theta_avg))  , nthetabin);
-    results->weightavg = my_malloc(sizeof(*(results->weightavg))  , nthetabin);
-    if(results->npairs == NULL || results->theta_upp == NULL || results->theta_avg == NULL || results->weightavg == NULL) {
-        fprintf(stderr,"Error: Could not allocate memory for %d nbins to hold the results of the pair-counting\n", nthetabin);
-        free_results_countpairs_theta(results);
-        return EXIT_FAILURE;
-    }
-
     for(int i=0;i<nthetabin;i++) {
         results->npairs[i] = npairs[i];
-        results->theta_upp[i] = theta_upp[i];
-        results->theta_avg[i] = ZERO;
         if(options->need_avg_sep) {
             results->theta_avg[i] = thetaavg[i];
         }
-        results->weightavg[i] = ZERO;
         if(need_weightavg) {
             results->weightavg[i] = weightavg[i];
         }
@@ -463,20 +449,6 @@ int countpairs_theta_mocks_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1,
                                   results_countpairs_theta *results,
                                   struct config_options *options, struct extra_options *extra)
 {
-    if(ND1 == 0 || ND2 == 0) {
-        fprintf(stderr,"Warning: Received 0 particles in at least one of the arrays. len(array1) = %"PRId64" len(array2) = %"PRId64"\n",
-                ND1, ND2);
-        //Protect the user. If results has a non-NULL pointer value
-        //then make the malloc'ed arrays NULL, free(results->npairs)
-        //can be called. Also, a good sign that value is not initialized
-        if(results != NULL) {
-            results->npairs = NULL;
-            results->theta_avg = NULL;
-            results->weightavg = NULL;
-            results->theta_upp = NULL;
-        }
-        return EXIT_SUCCESS;
-    }
 
     if(options->float_type != sizeof(DOUBLE)) {
         fprintf(stderr,"ERROR: In %s> Can only handle arrays of size=%zu. Got an array of size = %zu\n",
@@ -484,6 +456,34 @@ int countpairs_theta_mocks_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1,
         return EXIT_FAILURE;
     }
 
+    double *theta_upp = bins->edges;
+    int nthetabin = bins->nedges;
+    double thetamin=bins->edges[0], thetamax=bins->edges[bins->nedges-1];
+    if( ! (thetamin >= 0.0 && thetamax > 0.0 && thetamin < thetamax && thetamax <= 180.0 && nthetabin >= 1) ) {
+        fprintf(stderr,"Error: Could not setup with theta bins correctly. (thetamin = %lf, thetamax = %lf, with nbins = %d). Expected positive rmin/rmax with thetamax > "
+                "thetamin and nbins >=1 \n",thetamin, thetamax, nthetabin);
+        return EXIT_FAILURE;
+    }
+    detect_bin_type(bins, &(options->bin_type), options->verbose);
+
+    //prepare results
+    //Pack in the results
+    results->nbin = nthetabin;
+    results->npairs = my_calloc(sizeof(*(results->npairs)), nthetabin);
+    results->theta_upp = my_malloc(sizeof(*(results->theta_upp)), nthetabin);
+    results->theta_avg = my_calloc(sizeof(*(results->theta_avg)), nthetabin);
+    results->weightavg = my_calloc(sizeof(*(results->weightavg)), nthetabin);
+    if(results->npairs == NULL || results->theta_upp == NULL || results->theta_avg == NULL || results->weightavg == NULL) {
+        fprintf(stderr,"Error: Could not allocate memory for %d nbins to hold the results of the pair-counting\n", nthetabin);
+        free_results_countpairs_theta(results);
+        return EXIT_FAILURE;
+    }
+    for(int i=0;i<nthetabin;i++) results->theta_upp[i] = theta_upp[i];
+
+    //Check inputs
+    if(ND1 == 0 || (autocorr == 0 && ND2 == 0)) {
+        return EXIT_SUCCESS;
+    }
 
     // If no extra options were passed, create dummy options
     // This allows us to pass arguments like "extra->weights0" below;
@@ -503,7 +503,7 @@ int countpairs_theta_mocks_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1,
     }
 
     options->sort_on_z = 1;
-    options->autocorr=autocorr;
+    options->autocorr = autocorr;
 
     //check the ra-dec inputs (with braces to restrict scope of int status)
     {
@@ -529,16 +529,6 @@ int countpairs_theta_mocks_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1,
     /* setup interrupt handler -> mostly useful during the python execution.
        Let's Ctrl-C abort the extension  */
     SETUP_INTERRUPT_HANDLERS(interrupt_handler_wtheta_mocks_DOUBLE);
-
-    double *theta_upp = bins->edges;
-    int nthetabin = bins->nedges;
-    double thetamin=bins->edges[0], thetamax=bins->edges[bins->nedges-1];
-    if( ! (thetamin >= 0.0 && thetamax > 0.0 && thetamin < thetamax && thetamax <= 180.0 && nthetabin >= 1) ) {
-        fprintf(stderr,"Error: Could not setup with theta bins correctly. (thetamin = %lf, thetamax = %lf, with nbins = %d). Expected positive rmin/rmax with thetamax > "
-                "thetamin and nbins >=1 \n",thetamin, thetamax, nthetabin);
-        return EXIT_FAILURE;
-    }
-    detect_bin_type(bins, &(options->bin_type), options->verbose);
 
 
 #if defined(_OPENMP)
@@ -649,7 +639,6 @@ int countpairs_theta_mocks_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1,
                                                                ND2, X2, Y2, Z2,
                                                                numthreads,
                                                                thetamax, thetamin, nthetabin,
-                                                               theta_upp,
                                                                costheta_upp,
                                                                results,
                                                                options,
@@ -882,7 +871,6 @@ int countpairs_theta_mocks_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1,
                                                                ND2, X2, Y2, Z2,
                                                                numthreads,
                                                                thetamax, thetamin, nthetabin,
-                                                               theta_upp,
                                                                costheta_upp,
                                                                results,
                                                                options,
@@ -1173,24 +1161,8 @@ int countpairs_theta_mocks_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1,
         }
     }
 
-    //prepare results
-    //Pack in the results
-    results->nbin = nthetabin;
-    results->npairs = my_malloc(sizeof(*(results->npairs)), nthetabin);
-    results->theta_upp = my_malloc(sizeof(*(results->theta_upp))  , nthetabin);
-    results->theta_avg = my_malloc(sizeof(*(results->theta_avg))  , nthetabin);
-    results->weightavg  = my_calloc(sizeof(*(results->weightavg))  , nthetabin);
-    if(results->npairs == NULL || results->theta_upp == NULL || results->theta_avg == NULL || results->weightavg == NULL) {
-        fprintf(stderr,"Error: Could not allocate memory for %d nbins to hold the results of the pair-counting\n", nthetabin);
-        free_results_countpairs_theta(results);
-        return EXIT_FAILURE;
-    }
-
     for(int i=0;i<nthetabin;i++) {
         results->npairs[i] = npairs[i];
-        results->theta_upp[i] = theta_upp[i];
-        results->theta_avg[i] = ZERO;
-        results->weightavg[i] = ZERO;
         if(options->need_avg_sep) {
             results->theta_avg[i] = thetaavg[i];
         }

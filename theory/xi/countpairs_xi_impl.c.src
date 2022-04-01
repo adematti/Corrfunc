@@ -146,6 +146,39 @@ int countpairs_xi_DOUBLE(const int64_t ND, DOUBLE * restrict X, DOUBLE * restric
         return EXIT_FAILURE;
     }
 
+    /***********************
+     *initializing the  bins
+     ************************/
+    double *rupp = bins->edges;
+    int nbins = bins->nedges;
+    double rmin=bins->edges[0], rmax=bins->edges[bins->nedges-1];
+    if( ! (rmin >= 0.0 && rmax > 0.0 && rmin < rmax && nbins > 0)) {
+        fprintf(stderr,"Error: Could not setup with r bins correctly. (rmin = %lf, rmax = %lf, with nbins = %d). Expected non-zero rmin/rmax with rmax > rmin and nbins >=1 \n",
+                rmin, rmax, nbins);
+        return EXIT_FAILURE;
+    }
+    detect_bin_type(bins, &(options->bin_type), options->verbose);
+
+    //Pack in the results
+    results->nbin = nbins;
+    results->npairs = my_calloc(sizeof(*(results->npairs)), nbins);
+    results->xi = my_calloc(sizeof(*(results->xi))  , nbins);
+    results->rupp = my_malloc(sizeof(*(results->rupp))  , nbins);
+    results->ravg = my_calloc(sizeof(*(results->ravg))  , nbins);
+    results->weightavg = my_calloc(sizeof(*(results->weightavg))  , nbins);
+    if(results->npairs == NULL || results->rupp == NULL ||
+       results->ravg == NULL || results->xi == NULL || results->weightavg == NULL) {
+        free_results_xi(results);
+        return EXIT_FAILURE;
+    }
+
+    for(int i=0;i<nbins;i++) results->rupp[i] = rupp[i];
+
+    //Check inputs
+    if(ND == 0) {
+        return EXIT_SUCCESS;
+    }
+
     struct timeval t0;
     if(options->c_api_timer) {
         gettimeofday(&t0, NULL);
@@ -196,19 +229,6 @@ int countpairs_xi_DOUBLE(const int64_t ND, DOUBLE * restrict X, DOUBLE * restric
     /* setup interrupt handler -> mostly useful during the python execution.
        Let's Ctrl-C abort the extension  */
     SETUP_INTERRUPT_HANDLERS(interrupt_handler_countpairs_xi_DOUBLE);
-
-    /***********************
-     *initializing the  bins
-     ************************/
-    double *rupp = bins->edges;
-    int nbins = bins->nedges;
-    double rmin=bins->edges[0], rmax=bins->edges[bins->nedges-1];
-    if( ! (rmin >= 0.0 && rmax > 0.0 && rmin < rmax && nbins > 0)) {
-        fprintf(stderr,"Error: Could not setup with r bins correctly. (rmin = %lf, rmax = %lf, with nbins = %d). Expected non-zero rmin/rmax with rmax > rmin and nbins >=1 \n",
-                rmin, rmax, nbins);
-        return EXIT_FAILURE;
-    }
-    detect_bin_type(bins, &(options->bin_type), options->verbose);
 
     if(get_bin_refine_scheme(options) == BINNING_DFL) {
         if(rmax < 0.05*boxsize) {
@@ -554,19 +574,6 @@ int countpairs_xi_DOUBLE(const int64_t ND, DOUBLE * restrict X, DOUBLE * restric
         }
       }
 
-    //Pack in the results
-    results->nbin = nbins;
-    results->npairs = my_malloc(sizeof(*(results->npairs)), nbins);
-    results->xi     = my_malloc(sizeof(*(results->xi))  , nbins);
-    results->rupp   = my_malloc(sizeof(*(results->rupp))  , nbins);
-    results->ravg   = my_malloc(sizeof(*(results->ravg))  , nbins);
-    results->weightavg = my_calloc(sizeof(*(results->weightavg))  , nbins);
-    if(results->npairs == NULL || results->rupp == NULL ||
-       results->ravg == NULL || results->xi == NULL || results->weightavg == NULL) {
-        free_results_xi(results);
-        return EXIT_FAILURE;
-    }
-
     DOUBLE weightsum = (DOUBLE) ND, weight_sqr_sum = (DOUBLE) ND;
 
     // If weights were provided and weight_method is pair_product,
@@ -588,9 +595,6 @@ int countpairs_xi_DOUBLE(const int64_t ND, DOUBLE * restrict X, DOUBLE * restric
     //The first bin contains junk
     for(int i=0;i<nbins;i++) {
         results->npairs[i] = npairs[i];
-        results->rupp[i]   = rupp[i];
-        results->ravg[i] = ZERO;
-        results->weightavg[i] = ZERO;
         if(options->need_avg_sep) {
             results->ravg[i] = ravg[i];
         }
@@ -599,7 +603,7 @@ int countpairs_xi_DOUBLE(const int64_t ND, DOUBLE * restrict X, DOUBLE * restric
         }
 
         DOUBLE weight0 = (DOUBLE) results->npairs[i];
-        if(need_weightavg  && extra->weight_method == PAIR_PRODUCT){
+        if(need_weightavg && extra->weight_method == PAIR_PRODUCT){
             weight0 *= results->weightavg[i];
         }
         const DOUBLE vol=4.0/3.0*M_PI*(rupp[i]*rupp[i]*rupp[i]-rlow*rlow*rlow);

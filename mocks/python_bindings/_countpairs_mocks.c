@@ -1563,6 +1563,7 @@ static PyObject *countpairs_countpairs_bessel_mocks(PyObject *self, PyObject *ar
 
     results_countpairs_mocks_bessel results;
     double c_api_time = 0.0;
+
     int status = countpairs_mocks_bessel(ND1,X1,Y1,Z1,
                                          ND2,X2,Y2,Z2,
                                          nthreads,
@@ -1579,15 +1580,6 @@ static PyObject *countpairs_countpairs_bessel_mocks(PyObject *self, PyObject *ar
     }
     NPY_END_THREADS;
 
-    /*
-    results.nells = bins.nells;
-    results.nmodes = bins.nedges;
-    const int nbins2 = results.nmodes * results.nells;
-    results.ells = my_malloc(sizeof(*(results.ells)), nbins2);
-    results.modes = my_malloc(sizeof(*(results.modes)), nbins2);
-    results.poles = my_malloc(sizeof(*(results.poles)), nbins2);
-    */
-
     /* Clean up. */
     Py_DECREF(x1_array);Py_DECREF(y1_array);Py_DECREF(z1_array);//x1 should absolutely not be NULL
     Py_XDECREF(x2_array);Py_XDECREF(y2_array);Py_XDECREF(z2_array);//x2 might be NULL depending on value of autocorr
@@ -1598,21 +1590,24 @@ static PyObject *countpairs_countpairs_bessel_mocks(PyObject *self, PyObject *ar
     }
 
     /* Build the output list */
-    PyObject *ret = PyList_New(0);//create an empty list
+    PyObject *ret = PyList_New(0); //create an empty list
 
-    const int nbins = results.nmodes * results.nells;
-    for(int i=0;i<nbins;i++) {
-        const int ell = results.ells[i];
-        const double mode = results.modes[i];
-        const double pole = results.poles[i];
-        PyObject *item = Py_BuildValue("(idd)", ell, mode, pole);
-        PyList_Append(ret, item);
-        Py_XDECREF(item);
+    for(int imode=0;imode<bins.nedges;imode++) {
+        for(int ill=0;ill<bins.nells;ill++) {
+            int ii = imode * bins.nells + ill;
+            const int ell = results.ells[ill];
+            const double mode = results.modes[imode];
+            const double pole = results.poles[ii];
+            PyObject *item = Py_BuildValue("(idd)", ell, mode, pole);
+            PyList_Append(ret, item);
+            Py_XDECREF(item);
+
+        }
     }
     free_results_mocks_bessel(&results);
 
     PyObject *rettuple = Py_BuildValue("(Od)", ret, c_api_time);
-    Py_DECREF(ret);  // transfer reference ownership to the tuple
+    Py_DECREF(ret); // transfer reference ownership to the tuple
     return rettuple;
 }
 
@@ -1921,7 +1916,7 @@ static PyObject *countpairs_countpairs_rp_pi_mocks(PyObject *self, PyObject *arg
             const int bin_index = i*(results.npibin + 1) + j;
             const double rpavg = results.rpavg[bin_index];
             const double weight_avg = results.weightavg[bin_index];
-            PyObject *item = Py_BuildValue("(ddddkd)", rlow,results.rupp[i],rpavg,(j+1)*dpi,results.npairs[bin_index], weight_avg);
+            PyObject *item = Py_BuildValue("(ddddkd)",rlow,results.rupp[i],rpavg,(j+1)*dpi,results.npairs[bin_index], weight_avg);
             PyList_Append(ret, item);
             Py_XDECREF(item);
         }

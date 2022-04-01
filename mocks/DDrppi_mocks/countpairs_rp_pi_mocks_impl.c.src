@@ -218,6 +218,41 @@ int countpairs_mocks_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1, DOUBLE
         return EXIT_FAILURE;
     }
 
+    /***********************
+     *initializing the  bins
+     ************************/
+    double *rupp = bins->edges;
+    int nrpbin = bins->nedges;
+    double rpmin=bins->edges[0], rpmax=bins->edges[bins->nedges-1];
+    if( ! (rpmin >= 0.0 && rpmax > 0.0 && rpmin < rpmax && nrpbin > 0)) {
+        fprintf(stderr,"Error: Could not setup with r bins correctly. (rmin = %lf, rmax = %lf, with nbins = %d). Expected positive rmin/rmax with rmax > rmin and nbins >=1 \n",
+                rpmin, rpmax, nrpbin);
+        return EXIT_FAILURE;
+    }
+    detect_bin_type(bins, &(options->bin_type), options->verbose);
+    const int totnbins = (nrpbin+1)*(npibin+1);
+
+    const DOUBLE sqr_max_sep = rpmax*rpmax + pimax*pimax;
+    const DOUBLE max_sep = SQRT(sqr_max_sep);
+
+    results->nbin = nrpbin;
+    results->npibin = npibin;
+    results->pimax = pimax;
+    results->npairs = my_calloc(sizeof(*(results->npairs)), totnbins);
+    results->rupp = my_malloc(sizeof(*(results->rupp)), nrpbin);
+    results->rpavg = my_calloc(sizeof(*(results->rpavg)), totnbins);
+    results->weightavg = my_calloc(sizeof(double), totnbins);
+    if(results->npairs == NULL || results->rupp == NULL || results->rpavg == NULL || results->weightavg == NULL) {
+        free_results_mocks(results);
+        return EXIT_FAILURE;
+    }
+    for(int i=0;i<nrpbin;i++) results->rupp[i] = rupp[i];
+
+    //Check inputs
+    if(ND1 == 0 || (autocorr == 0 && ND2 == 0)) {
+        return EXIT_SUCCESS;
+    }
+
     // If no extra options were passed, create dummy options
     // This allows us to pass arguments like "extra->weights0" below;
     // they'll just be NULLs, which is the correct behavior
@@ -240,11 +275,6 @@ int countpairs_mocks_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1, DOUBLE
                 " Switching to a standard divide"ANSI_COLOR_RESET"\n",
                 options->fast_divide_and_NR_steps, MAX_FAST_DIVIDE_NR_STEPS);
         options->fast_divide_and_NR_steps = 0;
-    }
-
-    //Check inputs
-    if(ND1 == 0 || (autocorr == 0 && ND2 == 0)) {
-        return EXIT_SUCCESS;
     }
 
     //Check inputs
@@ -290,22 +320,6 @@ int countpairs_mocks_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1, DOUBLE
             return status;
         }
     }
-
-    /***********************
-     *initializing the  bins
-     ************************/
-    double *rupp = bins->edges;
-    int nrpbin = bins->nedges;
-    double rpmin=bins->edges[0], rpmax=bins->edges[bins->nedges-1];
-    if( ! (rpmin >= 0.0 && rpmax > 0.0 && rpmin < rpmax && nrpbin > 0)) {
-        fprintf(stderr,"Error: Could not setup with r bins correctly. (rmin = %lf, rmax = %lf, with nbins = %d). Expected positive rmin/rmax with rmax > rmin and nbins >=1 \n",
-                rpmin, rpmax, nrpbin);
-        return EXIT_FAILURE;
-    }
-    detect_bin_type(bins, &(options->bin_type), options->verbose);
-
-    const DOUBLE sqr_max_sep = rpmax*rpmax + pimax*pimax;
-    const DOUBLE max_sep = SQRT(sqr_max_sep);
 
     //Change cz into co-moving distance
     DOUBLE *D1 = NULL, *D2 = NULL;
@@ -538,7 +552,6 @@ int countpairs_mocks_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1, DOUBLE
     }
 
     /*---Gridlink-variables----------------*/
-    const int totnbins = (nrpbin+1)*(npibin+1);
 #if defined(_OPENMP)
     uint64_t **all_npairs = (uint64_t **) matrix_calloc(sizeof(uint64_t), numthreads, totnbins);
     DOUBLE **all_rpavg = NULL;
@@ -791,20 +804,7 @@ int countpairs_mocks_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1, DOUBLE
         }
     }
 
-    results->nbin   = nrpbin;
-    results->npibin = npibin;
-    results->pimax  = pimax;
-    results->npairs = my_malloc(sizeof(*(results->npairs)), totnbins);
-    results->rupp   = my_malloc(sizeof(*(results->rupp))  , nrpbin);
-    results->rpavg  = my_malloc(sizeof(*(results->rpavg)) , totnbins);
-    results->weightavg = my_calloc(sizeof(double)  , totnbins);
-    if(results->npairs == NULL || results->rupp == NULL || results->rpavg == NULL || results->weightavg == NULL) {
-        free_results_mocks(results);
-        return EXIT_FAILURE;
-    }
-
     for(int i=0;i<nrpbin;i++) {
-        results->rupp[i] = rupp[i];
         for(int j=0;j<npibin;j++) {
             const int index = i*(npibin+1) + j;
             if( index >= totnbins ) {
@@ -813,8 +813,6 @@ int countpairs_mocks_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1, DOUBLE
                 return EXIT_FAILURE;
             }
             results->npairs[index] = npairs[index];
-            results->rpavg[index] = ZERO;
-            results->weightavg[index] = ZERO;
             if(options->need_avg_sep) {
                 results->rpavg[index] = rpavg[index];
             }

@@ -222,8 +222,8 @@ int countspheres_mocks_DOUBLE(const int64_t Ngal, DOUBLE *RA, DOUBLE *DEC, DOUBL
 
     //Input validation
     XRETURN(rmax > 0.0, EXIT_FAILURE, "rmax=%lf has to be positive", rmax);
-    XRETURN(nbin >=1, EXIT_FAILURE,"Number of bins=%d has to be at least 1", nbin);
-    XRETURN(nc >=1,EXIT_FAILURE,"Number of spheres=%d has to be at least 1", nc);
+    XRETURN(nbin >= 1, EXIT_FAILURE,"Number of bins=%d has to be at least 1", nbin);
+    XRETURN(nc >= 1, EXIT_FAILURE,"Number of spheres=%d has to be at least 1", nc);
     XRETURN(num_pN >= 1, EXIT_FAILURE,"Number of pN's=%d requested must be at least 1", num_pN);
 
 

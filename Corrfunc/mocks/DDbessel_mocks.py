@@ -243,6 +243,7 @@ def DDbessel_mocks(autocorr, nthreads, binfile, ells, rmin, rmax, mumax,
     integer_isa = translate_isa_string_to_enum(isa)
     integer_los_type = {'midpoint':0, 'firstpoint':1}[los_type.lower()]
     binfile = get_edges(binfile)
+
     with sys_pipes():
         extn_results = DDbessel_extn(autocorr, nthreads,
                                      binfile, ells, rmin, rmax, mumax,
@@ -258,6 +259,7 @@ def DDbessel_mocks(autocorr, nthreads, binfile, ells, rmin, rmax, mumax,
                                      isa=integer_isa,
                                      los_type=integer_los_type,
                                      **kwargs)
+
     if extn_results is None:
         msg = "RuntimeError occurred"
         raise RuntimeError(msg)

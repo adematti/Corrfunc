@@ -120,6 +120,35 @@ int countpairs_mocks_bessel_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DO
     }
     const DOUBLE rmin = drmin, rmax = drmax, mumax = dmumax;
 
+    /***********************
+     *initializing the  bins
+     ************************/
+     if( ! (rmin >= 0.0 && rmax > 0.0 && rmin < rmax) ) {
+         fprintf(stderr,"Error: Could not setup with r bins correctly. (rmin = %lf, rmax = %lf). "
+                 "Expected non-zero rmin/rmax with rmax > rmin\n", rmin, rmax);
+         return EXIT_FAILURE;
+     }
+     int nbins = bins->nedges * bins->nells;
+
+     //Pack in the results
+     results->nells = bins->nells;
+     results->nmodes = bins->nedges;
+     results->ells = my_malloc(sizeof(*(results->ells)), bins->nells);
+     results->modes = my_malloc(sizeof(*(results->modes)), bins->nedges);
+     results->poles = my_calloc(sizeof(*(results->poles)), nbins);
+     if(results->ells == NULL || results->modes == NULL || results->poles == NULL) {
+         free_results_mocks_bessel(results);
+         return EXIT_FAILURE;
+     }
+
+     for(int imode=0;imode<bins->nedges;imode++) results->modes[imode] = bins->edges[imode];
+     for(int ill=0;ill<bins->nells;ill++) results->ells[ill] = bins->ells[ill];
+
+     //Check inputs
+     if(ND1 == 0 || (autocorr == 0 && ND2 == 0)) {
+         return EXIT_SUCCESS;
+     }
+
     // If no extra options were passed, create dummy options
     // This allows us to pass arguments like "extra->weights0" below;
     // they'll just be NULLs, which is the correct behavior
@@ -137,11 +166,6 @@ int countpairs_mocks_bessel_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DO
     struct timeval t0;
     if(options->c_api_timer) {
         gettimeofday(&t0, NULL);
-    }
-
-    //Check inputs
-    if(ND1 == 0 || (autocorr == 0 && ND2 == 0)) {
-        return EXIT_SUCCESS;
     }
 
 #if defined(_OPENMP)
@@ -166,16 +190,6 @@ int countpairs_mocks_bessel_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DO
     /* setup interrupt handler -> mostly useful during the python execution.
        Let's Ctrl-C abort the extension  */
     SETUP_INTERRUPT_HANDLERS(interrupt_handler_countpairs_bessel_DOUBLE);
-
-    /***********************
-     *initializing the  bins
-     ************************/
-     if( ! (rmin >= 0.0 && rmax > 0.0 && rmin < rmax) ) {
-         fprintf(stderr,"Error: Could not setup with r bins correctly. (rmin = %lf, rmax = %lf). "
-                 "Expected non-zero rmin/rmax with rmax > rmin\n", rmin, rmax);
-         return EXIT_FAILURE;
-     }
-     int nbins = bins->nedges * bins->nells;
 
     DOUBLE xmin, xmax, ymin, ymax, zmin, zmax;
     xmin = ymin = zmin = MAX_POSITIVE_FLOAT;
@@ -462,24 +476,8 @@ int countpairs_mocks_bessel_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DO
         }
     }
 
-    //Pack in the results
-    results->nells = bins->nells;
-    results->nmodes = bins->nedges;
-    results->ells = my_malloc(sizeof(*(results->ells)), nbins);
-    results->modes = my_malloc(sizeof(*(results->modes)), nbins);
-    results->poles = my_malloc(sizeof(*(results->poles)), nbins);
-    if(results->ells == NULL || results->modes == NULL || results->poles == NULL) {
-        free_results_mocks_bessel(results);
-        return EXIT_FAILURE;
-    }
-
-    for(int imode=0;imode<bins->nedges;imode++) {
-        for(int ill=0;ill<bins->nells;ill++) {
-            int ii = imode * bins->nells + ill;
-            results->ells[ii] = bins->ells[ill];
-            results->modes[ii] = bins->edges[imode];
-            results->poles[ii] = poles[ii];
-        }
+    for(int ii=0;ii<nbins;ii++) {
+        results->poles[ii] = poles[ii];
     }
 
     /* reset interrupt handlers to default */
