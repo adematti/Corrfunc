@@ -29,8 +29,8 @@ static inline int countpairs_rp_pi_avx512_intrinsics_DOUBLE(const int64_t N0, DO
                                                             const DOUBLE off_xwrap, const DOUBLE off_ywrap, const DOUBLE off_zwrap,
                                                             const DOUBLE min_xdiff, const DOUBLE min_ydiff, const DOUBLE min_zdiff,
                                                             const DOUBLE closest_icell_xpos, const DOUBLE closest_icell_ypos, const DOUBLE closest_icell_zpos,
-                                                            DOUBLE *src_rpavg, uint64_t *src_npairs,
-                                                            DOUBLE *src_weightavg, const weight_method_t weight_method, const pair_weight_struct pair_weight,
+                                                            DOUBLE *rpavg, uint64_t *npairs,
+                                                            DOUBLE *weightavg, const weight_method_t weight_method, const pair_weight_struct pair_weight,
                                                             const bin_type_t bin_type)
 {
 
@@ -38,12 +38,12 @@ static inline int countpairs_rp_pi_avx512_intrinsics_DOUBLE(const int64_t N0, DO
         return EXIT_SUCCESS;
     }
 
-    if(src_npairs == NULL) {
+    if(npairs == NULL) {
         return EXIT_FAILURE;
     }
 
-    const int32_t need_rpavg = src_rpavg != NULL;
-    const int32_t need_weightavg = src_weightavg != NULL;
+    const int32_t need_rpavg = rpavg != NULL;
+    const int32_t need_weightavg = weightavg != NULL;
     int32_t need_costheta = need_weightavg;
     const DOUBLE sqr_rpmax=rpmax*rpmax;
     AVX512_FLOATS m_inv_rpstep = AVX512_SETZERO_FLOAT();
@@ -53,19 +53,6 @@ static inline int countpairs_rp_pi_avx512_intrinsics_DOUBLE(const int64_t N0, DO
         const DOUBLE rpmin_invstep = 1 - rpmin*inv_rpstep; //trick to avoid adding one to (r - rmin)/rstep
         m_inv_rpstep = AVX512_SET_FLOAT(inv_rpstep);
         m_rpmin_invstep = AVX512_SET_FLOAT(rpmin_invstep);
-    }
-
-    const int64_t totnbins = (npibin+1)*(nbin+1);
-    uint64_t npairs[totnbins];
-    DOUBLE rpavg[totnbins], weightavg[totnbins];
-    for(int64_t i=0;i<totnbins;i++) {
-        npairs[i] = 0;
-        if(need_rpavg) {
-            rpavg[i] = ZERO;
-        }
-        if(need_weightavg){
-            weightavg[i] = ZERO;
-        }
     }
 
     AVX512_FLOATS m_rupp_sqr[nbin];
@@ -311,15 +298,6 @@ static inline int countpairs_rp_pi_avx512_intrinsics_DOUBLE(const int64_t N0, DO
 
     if (need_costheta) free(norm1);
 
-    for(int i=0;i<totnbins;i++) {
-        src_npairs[i] += npairs[i];
-        if(need_rpavg) {
-            src_rpavg[i] += rpavg[i];
-        }
-        if(need_weightavg) {
-            src_weightavg[i] += weightavg[i];
-        }
-    }
     return EXIT_SUCCESS;
 }
 #endif //__AVX512__
@@ -336,20 +314,20 @@ static inline int countpairs_rp_pi_avx_intrinsics_DOUBLE(const int64_t N0, DOUBL
                                                          const DOUBLE off_xwrap, const DOUBLE off_ywrap, const DOUBLE off_zwrap,
                                                          const DOUBLE min_xdiff, const DOUBLE min_ydiff, const DOUBLE min_zdiff,
                                                          const DOUBLE closest_icell_xpos, const DOUBLE closest_icell_ypos, const DOUBLE closest_icell_zpos,
-                                                         DOUBLE *src_rpavg, uint64_t *src_npairs,
-                                                         DOUBLE *src_weightavg, const weight_method_t weight_method, const pair_weight_struct pair_weight,
+                                                         DOUBLE *rpavg, uint64_t *npairs,
+                                                         DOUBLE *weightavg, const weight_method_t weight_method, const pair_weight_struct pair_weight,
                                                          const bin_type_t bin_type)
 {
     if(N0 == 0 || N1 == 0) {
         return EXIT_SUCCESS;
     }
 
-    if(src_npairs == NULL) {
+    if(npairs == NULL) {
         return EXIT_FAILURE;
     }
 
-    const int32_t need_rpavg = src_rpavg != NULL;
-    const int32_t need_weightavg = src_weightavg != NULL;
+    const int32_t need_rpavg = rpavg != NULL;
+    const int32_t need_weightavg = weightavg != NULL;
     int32_t need_costheta = need_weightavg;
     const DOUBLE sqr_rpmin=rpmin*rpmin, sqr_rpmax=rpmax*rpmax;
     DOUBLE inv_rpstep=0., rpmin_invstep=0.;
@@ -362,20 +340,6 @@ static inline int countpairs_rp_pi_avx_intrinsics_DOUBLE(const int64_t N0, DOUBL
         m_inv_rpstep = AVX_SET_FLOAT(inv_rpstep);
         m_rpmin_invstep = AVX_SET_FLOAT(rpmin_invstep);
     }
-
-    const int64_t totnbins = (npibin+1)*(nbin+1);
-    uint64_t npairs[totnbins];
-    DOUBLE rpavg[totnbins], weightavg[totnbins];
-    for(int64_t i=0;i<totnbins;i++) {
-        npairs[i] = 0;
-        if(need_rpavg) {
-            rpavg[i] = ZERO;
-        }
-        if(need_weightavg){
-            weightavg[i] = ZERO;
-        }
-    }
-
 
     AVX_FLOATS m_rupp_sqr[nbin];
     AVX_FLOATS m_kbin[nbin];
@@ -698,16 +662,6 @@ static inline int countpairs_rp_pi_avx_intrinsics_DOUBLE(const int64_t N0, DOUBL
 
   if (need_costheta) free(norm1);
 
-	for(int i=0;i<totnbins;i++) {
-		src_npairs[i] += npairs[i];
-        if(need_rpavg) {
-            src_rpavg[i] += rpavg[i];
-        }
-        if(need_weightavg) {
-            src_weightavg[i] += weightavg[i];
-        }
-    }
-
     return EXIT_SUCCESS;
 }
 #endif //__AVX__
@@ -725,20 +679,20 @@ static inline int countpairs_rp_pi_sse_intrinsics_DOUBLE(const int64_t N0, DOUBL
                                                          const DOUBLE off_xwrap, const DOUBLE off_ywrap, const DOUBLE off_zwrap,
                                                          const DOUBLE min_xdiff, const DOUBLE min_ydiff, const DOUBLE min_zdiff,
                                                          const DOUBLE closest_icell_xpos, const DOUBLE closest_icell_ypos, const DOUBLE closest_icell_zpos,
-                                                         DOUBLE *src_rpavg, uint64_t *src_npairs,
-                                                         DOUBLE *src_weightavg, const weight_method_t weight_method, const pair_weight_struct pair_weight,
+                                                         DOUBLE *rpavg, uint64_t *npairs,
+                                                         DOUBLE *weightavg, const weight_method_t weight_method, const pair_weight_struct pair_weight,
                                                          const bin_type_t bin_type)
 {
     if(N0 == 0 || N1 == 0) {
         return EXIT_SUCCESS;
     }
 
-    if(src_npairs == NULL) {
+    if(npairs == NULL) {
         return EXIT_FAILURE;
     }
 
-    const int32_t need_rpavg = src_rpavg != NULL;
-    const int32_t need_weightavg = src_weightavg != NULL;
+    const int32_t need_rpavg = rpavg != NULL;
+    const int32_t need_weightavg = weightavg != NULL;
     int32_t need_costheta = need_weightavg;
     const DOUBLE sqr_rpmin=rpmin*rpmin, sqr_rpmax=rpmax*rpmax;
     DOUBLE inv_rpstep=0., rpmin_invstep=0.;
@@ -749,19 +703,6 @@ static inline int countpairs_rp_pi_sse_intrinsics_DOUBLE(const int64_t N0, DOUBL
         rpmin_invstep = 1 - rpmin*inv_rpstep; //trick to avoid adding one to (r - rmin)/rstep
         m_inv_rpstep = SSE_SET_FLOAT(inv_rpstep);
         m_rpmin_invstep = SSE_SET_FLOAT(rpmin_invstep);
-    }
-
-    const int64_t totnbins = (npibin+1) * (nbin+1);
-    uint64_t npairs[totnbins];
-    DOUBLE rpavg[totnbins], weightavg[totnbins];
-    for(int64_t i=0;i<totnbins;i++) {
-        npairs[i] = 0;
-        if (need_rpavg) {
-            rpavg[i] = ZERO;
-        }
-        if(need_weightavg){
-            weightavg[i] = ZERO;
-        }
     }
 
     SSE_FLOATS m_rupp_sqr[nbin];
@@ -1090,16 +1031,6 @@ static inline int countpairs_rp_pi_sse_intrinsics_DOUBLE(const int64_t N0, DOUBL
 
     if (need_costheta) free(norm1);
 
-    for(int i=0;i<totnbins;i++) {
-        src_npairs[i] += npairs[i];
-        if(need_rpavg) {
-            src_rpavg[i] += rpavg[i];
-        }
-        if(need_weightavg) {
-            src_weightavg[i] += weightavg[i];
-        }
-    }
-
     return EXIT_SUCCESS;
 }
 #endif //__SSE4_2__
@@ -1113,8 +1044,8 @@ static inline int countpairs_rp_pi_fallback_DOUBLE(const int64_t N0, DOUBLE *x0,
                                                    const DOUBLE off_xwrap, const DOUBLE off_ywrap, const DOUBLE off_zwrap,
                                                    const DOUBLE min_xdiff, const DOUBLE min_ydiff, const DOUBLE min_zdiff,
                                                    const DOUBLE closest_icell_xpos, const DOUBLE closest_icell_ypos, const DOUBLE closest_icell_zpos,
-                                                   DOUBLE *src_rpavg, uint64_t *src_npairs,
-                                                   DOUBLE *src_weightavg, const weight_method_t weight_method, const pair_weight_struct pair_weight,
+                                                   DOUBLE *rpavg, uint64_t *npairs,
+                                                   DOUBLE *weightavg, const weight_method_t weight_method, const pair_weight_struct pair_weight,
                                                    const bin_type_t bin_type)
 {
 
@@ -1122,32 +1053,19 @@ static inline int countpairs_rp_pi_fallback_DOUBLE(const int64_t N0, DOUBLE *x0,
         return EXIT_SUCCESS;
     }
 
-    if(src_npairs == NULL) {
+    if(npairs == NULL) {
         return EXIT_FAILURE;
     }
 
     /*----------------- FALLBACK CODE --------------------*/
-    const int32_t need_rpavg = src_rpavg != NULL;
-    const int32_t need_weightavg = src_weightavg != NULL;
+    const int32_t need_rpavg = rpavg != NULL;
+    const int32_t need_weightavg = weightavg != NULL;
     int32_t need_costheta = need_weightavg;
     const DOUBLE sqr_rpmin=rpmin*rpmin, sqr_rpmax=rpmax*rpmax;
     DOUBLE inv_rpstep=0., rpmin_invstep=0.;
     if (bin_type == BIN_LIN) {
         inv_rpstep = (nbin - 1)/(rpmax - rpmin);
         rpmin_invstep = 1 - rpmin*inv_rpstep; //trick to avoid adding one to (r - rmin)/rstep
-    }
-
-    const int64_t totnbins = (npibin+1)*(nbin+1);
-    uint64_t npairs[totnbins];
-    DOUBLE rpavg[totnbins], weightavg[totnbins];
-    for(int i=0;i<totnbins;i++) {
-        npairs[i] = 0;
-        if(need_rpavg) {
-            rpavg[i]=ZERO;
-        }
-        if(need_weightavg){
-            weightavg[i]=ZERO;
-        }
     }
 
     // A copy whose pointers we can advance
@@ -1321,15 +1239,6 @@ static inline int countpairs_rp_pi_fallback_DOUBLE(const int64_t N0, DOUBLE *x0,
 
     if (need_costheta) free(norm1);
 
-    for(int i=0;i<totnbins;i++) {
-        src_npairs[i] += npairs[i];
-        if(need_rpavg) {
-            src_rpavg[i] += rpavg[i];
-        }
-        if(need_weightavg){
-            src_weightavg[i] += weightavg[i];
-        }
-    }
    /*----------------- FALLBACK CODE --------------------*/
     return EXIT_SUCCESS;
 }

@@ -139,8 +139,8 @@ def DDbessel_mocks(autocorr, nthreads, binfile, ells, rmin, rmax, mumax,
 
     los_type : string, case-insensitive (default ``midpoint``)
         Choice of line-of-sight :math:`d`:
-        - "midpoint": :math:`d = \hat{r_{1} + r_{2}}`
-        - "firstpoint": :math:`d = \hat{r_{1}}`
+        - "midpoint": :math:`d = \\hat{r_{1} + r_{2}}`
+        - "firstpoint": :math:`d = \\hat{r_{1}}`
 
     pair_weights : array-like, optional. Default: None.
         Array of pair weights.
@@ -172,12 +172,12 @@ def DDbessel_mocks(autocorr, nthreads, binfile, ells, rmin, rmax, mumax,
     try:
         from Corrfunc._countpairs_mocks import countpairs_bessel_mocks as DDbessel_extn
     except ImportError as exc:
-        msg = "Could not import the C extension for bessel"\
+        msg = "Could not import the C extension for bessel "\
               "pair counter."
         raise ImportError(msg) from exc
 
     import numpy as np
-    from Corrfunc.utils import translate_isa_string_to_enum, translate_bin_type_string_to_enum,\
+    from Corrfunc.utils import translate_isa_string_to_enum,\
                                get_edges, convert_to_native_endian,\
                                sys_pipes, process_weights
     from future.utils import bytes_to_native_str

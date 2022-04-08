@@ -538,8 +538,6 @@ int countpairs_mocks_s_mu_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1, D
         }
     }
 
-
-
     const int64_t totncells = (int64_t) nmesh_x * (int64_t) nmesh_y * (int64_t) nmesh_z;
 
     int64_t num_cell_pairs = 0;
@@ -560,7 +558,15 @@ int countpairs_mocks_s_mu_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1, D
         return EXIT_FAILURE;
     }
 
-
+    uint64_t *npairs = (uint64_t *) my_calloc(sizeof(uint64_t), totnbins);
+    DOUBLE *savg = NULL;
+    if(options->need_avg_sep){
+        savg = (DOUBLE *) my_calloc(sizeof(DOUBLE), totnbins);
+    }
+    DOUBLE *weightavg = NULL;
+    if(need_weightavg) {
+        weightavg = (DOUBLE *) my_calloc(sizeof(DOUBLE), totnbins);
+    }
     /*---Gridlink-variables----------------*/
 #if defined(_OPENMP)
     uint64_t **all_npairs = (uint64_t **) matrix_calloc(sizeof(uint64_t), numthreads, totnbins);
@@ -571,20 +577,6 @@ int countpairs_mocks_s_mu_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1, D
     DOUBLE **all_weightavg = NULL;
     if(need_weightavg) {
       all_weightavg = (DOUBLE **) matrix_calloc(sizeof(DOUBLE),numthreads,totnbins);
-    }
-
-#else //USE_OMP
-    uint64_t npairs[totnbins];
-    DOUBLE savg[totnbins], weightavg[totnbins];
-
-    for(int i=0; i <totnbins;i++) {
-        npairs[i] = 0;
-        if(options->need_avg_sep) {
-            savg[i] = ZERO;
-        }
-        if(need_weightavg) {
-            weightavg[i] = ZERO;
-        }
     }
 #endif //USE_OMP
 
@@ -604,19 +596,21 @@ int countpairs_mocks_s_mu_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1, D
 #pragma omp parallel shared(numdone, abort_status, interrupt_status_DDsmu_mocks_DOUBLE)
     {
         const int tid = omp_get_thread_num();
-        uint64_t npairs[totnbins];
-        DOUBLE savg[totnbins], weightavg[totnbins];
-        for(int i=0;i<totnbins;i++) {
-            npairs[i] = 0;
-            if(options->need_avg_sep) {
-                savg[i] = ZERO;
-            }
-            if(need_weightavg) {
-                weightavg[i] = ZERO;
-            }
+        uint64_t *this_npairs = all_npairs[tid];
+        DOUBLE *this_savg = NULL;
+        if(options->need_avg_sep) {
+            this_savg = all_savg[tid];
+        }
+        DOUBLE *this_weightavg = NULL;
+        if(need_weightavg) {
+            this_weightavg = all_weightavg[tid];
         }
 
-#pragma omp for  schedule(dynamic)
+#pragma omp for schedule(dynamic)
+#else
+        uint64_t *this_npairs = npairs;
+        DOUBLE *this_savg = savg;
+        DOUBLE *this_weightavg = weightavg;
 #endif//USE_OMP
 
         /*---Loop-over-all-cell-pairs--------------------*/
@@ -641,8 +635,6 @@ int countpairs_mocks_s_mu_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1, D
                 }
 
                 struct cell_pair_DOUBLE *this_cell_pair = &all_cell_pairs[icellpair];
-                DOUBLE *this_savg = options->need_avg_sep ? &(savg[0]):NULL;
-                DOUBLE *this_weightavg = need_weightavg ? weightavg:NULL;
 
                 const int64_t icell = this_cell_pair->cellindex1;
                 const int64_t icell2 = this_cell_pair->cellindex2;
@@ -656,7 +648,7 @@ int countpairs_mocks_s_mu_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1, D
                                                                          smax, smin, nsbin, nmu_bins, supp_sqr, mu_max,
                                                                          this_cell_pair->min_dx, this_cell_pair->min_dy, this_cell_pair->min_dz,
                                                                          this_cell_pair->closest_x1, this_cell_pair->closest_y1, this_cell_pair->closest_z1,
-                                                                         this_savg, npairs,
+                                                                         this_savg, this_npairs,
                                                                          this_weightavg, extra->weight_method, extra->pair_weight, options->bin_type, options->los_type, autocorr);
 
                 /* This actually causes a race condition under OpenMP - but mostly
@@ -668,15 +660,6 @@ int countpairs_mocks_s_mu_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1, D
         }//icellpair loop over num_cell_pairs
 
 #if defined(_OPENMP)
-        for(int i=0;i<totnbins;i++) {
-            all_npairs[tid][i] = npairs[i];
-            if(options->need_avg_sep) {
-                all_savg[tid][i] = savg[i];
-            }
-            if(need_weightavg) {
-                all_weightavg[tid][i] = weightavg[i];
-            }
-        }
     }//close the omp parallel region
 #endif//USE_OMP
     free(all_cell_pairs);
@@ -721,21 +704,7 @@ int countpairs_mocks_s_mu_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1, D
         finish_myprogressbar(&interrupted);
     }
 
-
-
 #if defined(_OPENMP)
-    uint64_t npairs[totnbins];
-    DOUBLE savg[totnbins], weightavg[totnbins];
-    for(int i=0;i<totnbins;i++) {
-        npairs[i] = 0;
-        if(options->need_avg_sep) {
-            savg[i] = ZERO;
-        }
-        if(need_weightavg) {
-            weightavg[i] = ZERO;
-        }
-    }
-
     for(int i=0;i<numthreads;i++) {
         for(int j=0;j<totnbins;j++) {
             npairs[j] += all_npairs[i][j];
@@ -766,8 +735,8 @@ int countpairs_mocks_s_mu_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1, D
                produces the same result as the auto-correlation  */
             npairs[nmu_bins+nmu_bins/2+1] += ND1; //npairs[1] contains the first valid bin.
 
-            // Increasing npairs affects rpavg and weightavg.
-            // We don't need to add anything to rpavg; all the self-pairs have 0 separation!
+            // Increasing npairs affects savg and weightavg.
+            // We don't need to add anything to savg; all the self-pairs have 0 separation!
             // The self-pairs have non-zero weight, though.  So, fix that here.
             if(need_weightavg){
                 // Keep in mind this is an autocorrelation (i.e. only one particle set to consider)
@@ -813,6 +782,7 @@ int countpairs_mocks_s_mu_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1, D
             }
         }
     }
+    free(npairs); free(savg), free(weightavg);
 
     /* reset interrupt handlers to default */
     RESET_INTERRUPT_HANDLERS();

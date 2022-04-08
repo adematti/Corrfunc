@@ -310,6 +310,16 @@ int countpairs_mocks_bessel_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DO
         return EXIT_FAILURE;
     }
 
+    DOUBLE *poles = (DOUBLE *) my_calloc(sizeof(DOUBLE), nbins);
+    if(poles == NULL) {
+        free_cellarray_mocks_DOUBLE(lattice1, totncells);
+        if(autocorr == 0) {
+            free_cellarray_mocks_DOUBLE(lattice2, totncells);
+        }
+        free(poles);
+        return EXIT_FAILURE;
+    }
+
     /*---Gridlink-variables----------------*/
 #if defined(_OPENMP)
     DOUBLE **all_poles = (DOUBLE **) matrix_calloc(sizeof(DOUBLE), numthreads, nbins);
@@ -322,10 +332,6 @@ int countpairs_mocks_bessel_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DO
         matrix_free((void **)all_poles, numthreads);
         return EXIT_FAILURE;
     }
-
-#else //USE_OMP
-    DOUBLE poles[nbins];
-    for(int i=0;i<nbins;i++) poles[i] = 0.0;
 #endif //USE_OMP
 
     /* runtime dispatch - get the function pointer */
@@ -347,11 +353,10 @@ int countpairs_mocks_bessel_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DO
 #pragma omp parallel shared(numdone, abort_status, interrupt_status_bessel_mocks_DOUBLE)
     {
         const int tid = omp_get_thread_num();
-        DOUBLE poles[nbins]; //thread-level, stored on stack
-
-        for(int i=0;i<nbins;i++) poles[i] = 0.0;
-
-#pragma omp for  schedule(dynamic)
+        DOUBLE *this_poles = all_poles[tid];
+#pragma omp for schedule(dynamic)
+#else
+        DOUBLE *this_poles = poles;
 #endif//USE_OMP
 
         /*---Loop-over-all-cell-pairs--------------------*/
@@ -387,7 +392,7 @@ int countpairs_mocks_bessel_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DO
                                                                            bins, rmin, rmax, mumax,
                                                                            this_cell_pair->min_dx, this_cell_pair->min_dy, this_cell_pair->min_dz,
                                                                            this_cell_pair->closest_x1, this_cell_pair->closest_y1, this_cell_pair->closest_z1,
-                                                                           poles, extra->weight_method, extra->pair_weight, options->los_type, autocorr);
+                                                                           this_poles, extra->weight_method, extra->pair_weight, options->los_type, autocorr);
 
                 /* This actually causes a race condition under OpenMP - but mostly
                    I care that an error occurred - rather than the exact value of
@@ -398,7 +403,6 @@ int countpairs_mocks_bessel_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DO
         }//icellpair loop over num_cell_pairs
 
 #if defined(_OPENMP)
-        for(int j=0;j<nbins;j++) all_poles[tid][j] = poles[j];
     }//close the omp parallel region
 #endif//USE_OMP
     free(all_cell_pairs);
@@ -437,9 +441,6 @@ int countpairs_mocks_bessel_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DO
 
 #if defined(_OPENMP)
 
-    DOUBLE poles[nbins];
-    for(int i=0;i<nbins;i++) poles[i] = 0.0;
-
     for(int i=0;i<numthreads;i++) {
         for(int j=0;j<nbins;j++) {
             poles[j] += all_poles[i][j];
@@ -475,10 +476,8 @@ int countpairs_mocks_bessel_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DO
             }
         }
     }
-
-    for(int ii=0;ii<nbins;ii++) {
-        results->poles[ii] = poles[ii];
-    }
+    for(int j=0;j<nbins;j++) results->poles[j] = poles[j];
+    free(poles);
 
     /* reset interrupt handlers to default */
     RESET_INTERRUPT_HANDLERS();

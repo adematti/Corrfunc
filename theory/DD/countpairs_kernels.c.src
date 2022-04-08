@@ -29,8 +29,8 @@ static inline int countpairs_avx512_intrinsics_DOUBLE(const int64_t N0, DOUBLE *
                                                       const DOUBLE off_xwrap, const DOUBLE off_ywrap, const DOUBLE off_zwrap,
                                                       const DOUBLE min_xdiff, const DOUBLE min_ydiff, const DOUBLE min_zdiff,
                                                       const DOUBLE closest_icell_xpos, const DOUBLE closest_icell_ypos, const DOUBLE closest_icell_zpos,
-                                                      DOUBLE *src_rpavg, uint64_t *src_npairs,
-                                                      DOUBLE *src_weightavg, const weight_method_t weight_method, const pair_weight_struct pair_weight,
+                                                      DOUBLE *rpavg, uint64_t *npairs,
+                                                      DOUBLE *weightavg, const weight_method_t weight_method, const pair_weight_struct pair_weight,
                                                       const bin_type_t bin_type)
 {
 
@@ -40,16 +40,12 @@ static inline int countpairs_avx512_intrinsics_DOUBLE(const int64_t N0, DOUBLE *
     uint64_t serial_npairs = 0, vectorized_npairs=0;
 #endif
 
-    uint64_t npairs[nbin];
-    for(int i=0;i<nbin;i++) {
-        npairs[i] = 0;
-    }
     AVX512_FLOATS m_rupp_sqr[nbin];
     for(int i=0;i<nbin;i++) {
         m_rupp_sqr[i] = AVX512_SET_FLOAT(rupp_sqr[i]);
     }
-    const int32_t need_rpavg = src_rpavg != NULL;
-    const int32_t need_weightavg = src_weightavg != NULL;
+    const int32_t need_rpavg = rpavg != NULL;
+    const int32_t need_weightavg = weightavg != NULL;
     int32_t need_costheta = need_weightavg;
     const DOUBLE sqr_rpmax=rpmax*rpmax;
     AVX512_FLOATS m_inv_rpstep = AVX512_SETZERO_FLOAT();
@@ -59,15 +55,6 @@ static inline int countpairs_avx512_intrinsics_DOUBLE(const int64_t N0, DOUBLE *
         const DOUBLE rpmin_invstep = 1 - rpmin*inv_rpstep; //trick to avoid adding one to (r - rmin)/rstep
         m_inv_rpstep = AVX512_SET_FLOAT(inv_rpstep);
         m_rpmin_invstep = AVX512_SET_FLOAT(rpmin_invstep);
-    }
-
-    /* variables required for rpavg and weightavg*/
-    DOUBLE rpavg[nbin], weightavg[nbin];
-    if(need_rpavg || need_weightavg){
-        for(int i=0;i<nbin;i++) {
-            rpavg[i] = ZERO;
-            weightavg[i] = ZERO;
-        }
     }
 
     // A copy whose pointers we can advance
@@ -293,25 +280,6 @@ static inline int countpairs_avx512_intrinsics_DOUBLE(const int64_t N0, DOUBLE *
 
     if (need_costheta) free(norm1);
 
-    uint64_t npairs_found = 0;
-    for(int i=0;i<nbin;i++) {
-        npairs_found += npairs[i];
-        src_npairs[i] += npairs[i];
-        if(need_rpavg) {
-            src_rpavg[i]  += rpavg[i];
-        }
-        if(need_weightavg) {
-            src_weightavg[i] += weightavg[i];
-        }
-    }
-
-#ifdef COUNT_VECTORIZED
-    struct timespec tcell_end;
-    current_utc_time(&tcell_end);
-    int64_t dt = (int64_t) REALTIME_ELAPSED_NS(tcell_start,tcell_end);
-    fprintf(stderr,"%5"PRId64" %5"PRId64" %12"PRId64" %12"PRIu64" %12"PRIu64" %12"PRIu64" %2d\n", N0, N1, dt, vectorized_npairs, serial_npairs, npairs_found, same_cell);
-#endif
-
     return EXIT_SUCCESS;
 }
 #endif //__AVX512F__
@@ -326,12 +294,12 @@ static inline int countpairs_avx_intrinsics_DOUBLE(const int64_t N0, DOUBLE *x0,
                                                    const DOUBLE off_xwrap, const DOUBLE off_ywrap, const DOUBLE off_zwrap,
                                                    const DOUBLE min_xdiff, const DOUBLE min_ydiff, const DOUBLE min_zdiff,
                                                    const DOUBLE closest_icell_xpos, const DOUBLE closest_icell_ypos, const DOUBLE closest_icell_zpos,
-                                                   DOUBLE *src_rpavg, uint64_t *src_npairs,
-                                                   DOUBLE *src_weightavg, const weight_method_t weight_method, const pair_weight_struct pair_weight,
+                                                   DOUBLE *rpavg, uint64_t *npairs,
+                                                   DOUBLE *weightavg, const weight_method_t weight_method, const pair_weight_struct pair_weight,
                                                    const bin_type_t bin_type)
 {
-    const int32_t need_rpavg = src_rpavg != NULL;
-    const int32_t need_weightavg = src_weightavg != NULL;
+    const int32_t need_rpavg = rpavg != NULL;
+    const int32_t need_weightavg = weightavg != NULL;
     int32_t need_costheta = need_weightavg;
     const DOUBLE sqr_rpmin=rpmin*rpmin, sqr_rpmax=rpmax*rpmax;
     DOUBLE inv_rpstep=0., rpmin_invstep=0.;
@@ -345,11 +313,6 @@ static inline int countpairs_avx_intrinsics_DOUBLE(const int64_t N0, DOUBLE *x0,
         m_rpmin_invstep = AVX_SET_FLOAT(rpmin_invstep);
     }
 
-    uint64_t npairs[nbin];
-    for(int i=0;i<nbin;i++) {
-        npairs[i] = 0;
-    }
-
     AVX_FLOATS m_rupp_sqr[nbin];
     for(int i=0;i<nbin;i++) {
         m_rupp_sqr[i] = AVX_SET_FLOAT(rupp_sqr[i]);
@@ -357,16 +320,9 @@ static inline int countpairs_avx_intrinsics_DOUBLE(const int64_t N0, DOUBLE *x0,
 
     /* variables required for rpavg and weightavg*/
     AVX_FLOATS m_kbin[nbin];
-    DOUBLE rpavg[nbin], weightavg[nbin];
     if(need_rpavg || need_weightavg){
         for(int i=0;i<nbin;i++) {
             m_kbin[i] = AVX_SET_FLOAT((DOUBLE) i);
-            if(need_rpavg){
-                rpavg[i] = ZERO;
-            }
-            if(need_weightavg){
-                weightavg[i] = ZERO;
-            }
         }
     }
 
@@ -665,17 +621,7 @@ static inline int countpairs_avx_intrinsics_DOUBLE(const int64_t N0, DOUBLE *x0,
 
   if (need_costheta) free(norm1);
 
-	for(int i=0;i<nbin;i++) {
-		src_npairs[i] += npairs[i];
-        if(need_rpavg) {
-            src_rpavg[i] += rpavg[i];
-        }
-        if(need_weightavg) {
-            src_weightavg[i] += weightavg[i];
-        }
-    }
-
-    return EXIT_SUCCESS;
+  return EXIT_SUCCESS;
 }
 
 #endif //__AVX__
@@ -692,22 +638,17 @@ static inline int countpairs_sse_intrinsics_DOUBLE(const int64_t N0, DOUBLE *x0,
                                                    const DOUBLE off_xwrap, const DOUBLE off_ywrap, const DOUBLE off_zwrap,
                                                    const DOUBLE min_xdiff, const DOUBLE min_ydiff, const DOUBLE min_zdiff,
                                                    const DOUBLE closest_icell_xpos, const DOUBLE closest_icell_ypos, const DOUBLE closest_icell_zpos,
-                                                   DOUBLE *src_rpavg, uint64_t *src_npairs,
-                                                   DOUBLE *src_weightavg, const weight_method_t weight_method, const pair_weight_struct pair_weight,
+                                                   DOUBLE *rpavg, uint64_t *npairs,
+                                                   DOUBLE *weightavg, const weight_method_t weight_method, const pair_weight_struct pair_weight,
                                                    const bin_type_t bin_type)
 {
-  uint64_t npairs[nbin];
-  for(int i=0;i<nbin;i++) {
-    npairs[i] = 0;
-  }
-
   SSE_FLOATS m_rupp_sqr[nbin];
   for(int i=0;i<nbin;i++) {
     m_rupp_sqr[i] = SSE_SET_FLOAT(rupp_sqr[i]);
   }
 
-  const int32_t need_rpavg = src_rpavg != NULL;
-  const int32_t need_weightavg = src_weightavg != NULL;
+  const int32_t need_rpavg = rpavg != NULL;
+  const int32_t need_weightavg = weightavg != NULL;
   int32_t need_costheta = need_weightavg;
   const DOUBLE sqr_rpmin=rpmin*rpmin, sqr_rpmax=rpmax*rpmax;
   DOUBLE inv_rpstep=0., rpmin_invstep=0.;
@@ -722,17 +663,10 @@ static inline int countpairs_sse_intrinsics_DOUBLE(const int64_t N0, DOUBLE *x0,
   }
 
   SSE_FLOATS m_kbin[nbin];
-  DOUBLE rpavg[nbin], weightavg[nbin];
   if(need_rpavg || need_weightavg){
-    for(int i=0;i<nbin;i++) {
-        m_kbin[i] = SSE_SET_FLOAT((DOUBLE) i);
-        if(need_rpavg) {
-            rpavg[i] = ZERO;
-        }
-        if(need_weightavg){
-            weightavg[i] = ZERO;
-        }
-    }
+      for(int i=0;i<nbin;i++) {
+          m_kbin[i] = SSE_SET_FLOAT((DOUBLE) i);
+      }
   }
 
   // A copy whose pointers we can advance
@@ -1001,16 +935,6 @@ static inline int countpairs_sse_intrinsics_DOUBLE(const int64_t N0, DOUBLE *x0,
 
   if (need_costheta) free(norm1);
 
-  for(int i=0;i<nbin;i++) {
-      src_npairs[i] += npairs[i];
-      if(need_rpavg) {
-          src_rpavg[i] += rpavg[i];
-      }
-      if(need_weightavg) {
-          src_weightavg[i] += weightavg[i];
-      }
-  }
-
   return EXIT_SUCCESS;
 }
 #endif //__SSE4_2__
@@ -1023,34 +947,20 @@ static inline int countpairs_fallback_DOUBLE(const int64_t N0, DOUBLE *x0, DOUBL
                                              const DOUBLE off_xwrap, const DOUBLE off_ywrap, const DOUBLE off_zwrap,
                                              const DOUBLE min_xdiff, const DOUBLE min_ydiff, const DOUBLE min_zdiff,
                                              const DOUBLE closest_icell_xpos, const DOUBLE closest_icell_ypos, const DOUBLE closest_icell_zpos,
-                                             DOUBLE *src_rpavg, uint64_t *src_npairs,
-                                             DOUBLE *src_weightavg, const weight_method_t weight_method, const pair_weight_struct pair_weight,
+                                             DOUBLE *rpavg, uint64_t *npairs,
+                                             DOUBLE *weightavg, const weight_method_t weight_method, const pair_weight_struct pair_weight,
                                              const bin_type_t bin_type)
 {
     /*----------------- FALLBACK CODE --------------------*/
     /* implementation that is guaranteed to compile */
-    const int32_t need_rpavg = src_rpavg != NULL;
-    const int32_t need_weightavg = src_weightavg != NULL;
+    const int32_t need_rpavg = rpavg != NULL;
+    const int32_t need_weightavg = weightavg != NULL;
     int32_t need_costheta = need_weightavg;
     const DOUBLE sqr_rpmin=rpmin*rpmin, sqr_rpmax=rpmax*rpmax;
     DOUBLE inv_rpstep=0., rpmin_invstep=0.;
     if (bin_type == BIN_LIN) {
         inv_rpstep = (nbin - 1)/(rpmax - rpmin);
         rpmin_invstep = 1 - rpmin*inv_rpstep; //trick to avoid adding one to (r - rmin)/rstep
-    }
-
-    uint64_t npairs[nbin];
-    for(int i=0;i<nbin;i++) {
-        npairs[i]=0;
-    }
-    DOUBLE rpavg[nbin], weightavg[nbin];
-    for(int i=0;i<nbin;i++) {
-        if(need_rpavg) {
-            rpavg[i]=0.;
-        }
-        if(need_weightavg){
-            weightavg[i]=0.;
-        }
     }
 
     // A copy whose pointers we can advance
@@ -1202,15 +1112,6 @@ static inline int countpairs_fallback_DOUBLE(const int64_t N0, DOUBLE *x0, DOUBL
 
     if (need_costheta) free(norm1);
 
-    for(int i=0;i<nbin;i++) {
-        src_npairs[i] += npairs[i];
-        if(need_rpavg) {
-            src_rpavg[i] += rpavg[i];
-        }
-        if(need_weightavg){
-            src_weightavg[i] += weightavg[i];
-        }
-    }
     /*----------------- FALLBACK CODE --------------------*/
 
     return EXIT_SUCCESS;

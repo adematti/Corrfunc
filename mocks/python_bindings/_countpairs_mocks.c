@@ -1407,7 +1407,7 @@ static PyObject *countpairs_countpairs_bessel_mocks(PyObject *self, PyObject *ar
         fprintf(stdout, "\n");
 
         char msg[1024];
-        int len=snprintf(msg, 1024,"ArgumentError: In DDsmu_mocks> Could not parse the arguments. Input parameters are: \n");
+        int len=snprintf(msg, 1024,"ArgumentError: In DDbessel_mocks> Could not parse the arguments. Input parameters are: \n");
 
         /* How many keywords do we have? Subtract 1 because of the last NULL */
         const size_t nitems = sizeof(kwlist)/sizeof(*kwlist) - 1;

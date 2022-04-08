@@ -367,6 +367,15 @@ int countpairs_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z1,
         return EXIT_FAILURE;
     }
 
+    uint64_t *npairs = (uint64_t *) my_calloc(sizeof(uint64_t), nrpbin);
+    DOUBLE *rpavg = NULL;
+    if(options->need_avg_sep){
+        rpavg = (DOUBLE *) my_calloc(sizeof(DOUBLE), nrpbin);
+    }
+    DOUBLE *weightavg = NULL;
+    if(need_weightavg) {
+        weightavg = (DOUBLE *) my_calloc(sizeof(DOUBLE), nrpbin);
+    }
 
 #if defined(_OPENMP)
     uint64_t **all_npairs = (uint64_t **) matrix_calloc(sizeof(uint64_t), numthreads, nrpbin);
@@ -397,20 +406,6 @@ int countpairs_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z1,
         }
         return EXIT_FAILURE;
     }
-#else
-    uint64_t npairs[nrpbin];
-    DOUBLE rpavg[nrpbin];
-    DOUBLE weightavg[nrpbin];
-
-    for(int i=0;i<nrpbin;i++) {
-        npairs[i] = 0;
-        if(options->need_avg_sep) {
-            rpavg[i] = 0.0;
-        }
-        if(need_weightavg) {
-            weightavg[i] = 0.0;
-        }
-    }
 #endif
 
     DOUBLE rupp_sqr[nrpbin];
@@ -429,24 +424,22 @@ int countpairs_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z1,
 #if defined(_OPENMP)
 #pragma omp parallel shared(numdone, abort_status, interrupt_status_DOUBLE)
     {
-        int tid = omp_get_thread_num();
-        uint64_t npairs[nrpbin];
-        DOUBLE rpavg[nrpbin]; //thread-level, stored on stack
-        DOUBLE weightavg[nrpbin];
-
-        for(int i=0;i<nrpbin;i++) {
-            npairs[i] = 0;
-            if(options->need_avg_sep) {
-                rpavg[i] = 0.0;
-            }
-            if(need_weightavg) {
-                weightavg[i] = 0.0;
-            }
-        }
-
-
-#pragma omp for  schedule(dynamic) nowait
-#endif//openmp
+      const int tid = omp_get_thread_num();
+      uint64_t *this_npairs = all_npairs[tid];
+      DOUBLE *this_rpavg = NULL;
+      if(options->need_avg_sep) {
+          this_rpavg = all_rpavg[tid];
+      }
+      DOUBLE *this_weightavg = NULL;
+      if(need_weightavg) {
+          this_weightavg = all_weightavg[tid];
+      }
+#pragma omp for schedule(dynamic)
+#else
+      uint64_t *this_npairs = npairs;
+      DOUBLE *this_rpavg = rpavg;
+      DOUBLE *this_weightavg = weightavg;
+#endif//USE_OMP
         for(int64_t icellpair=0;icellpair<num_cell_pairs;icellpair++) {
 
 #if defined(_OPENMP)
@@ -469,8 +462,6 @@ int countpairs_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z1,
                 }
 
                 struct cell_pair_DOUBLE *this_cell_pair = &all_cell_pairs[icellpair];
-                DOUBLE *this_rpavg = options->need_avg_sep ? rpavg:NULL;
-                DOUBLE *this_weightavg = need_weightavg ? weightavg:NULL;
 
                 const int64_t icell = this_cell_pair->cellindex1;
                 const int64_t icell2 = this_cell_pair->cellindex2;
@@ -484,7 +475,7 @@ int countpairs_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z1,
                                                               this_cell_pair->xwrap, this_cell_pair->ywrap, this_cell_pair->zwrap,
                                                               this_cell_pair->min_dx, this_cell_pair->min_dy, this_cell_pair->min_dz,
                                                               this_cell_pair->closest_x1, this_cell_pair->closest_y1, this_cell_pair->closest_z1,
-                                                              this_rpavg, npairs,
+                                                              this_rpavg, this_npairs,
                                                               this_weightavg, extra->weight_method, extra->pair_weight, options->bin_type);
                 /* This actually causes a race condition under OpenMP - but mostly
                    I care that an error occurred - rather than the exact value of
@@ -495,15 +486,6 @@ int countpairs_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z1,
         }//icellpair loop over num_cell_pairs
 
 #if defined(_OPENMP)
-        for(int j=0;j<nrpbin;j++) {
-            all_npairs[tid][j] = npairs[j];
-            if(options->need_avg_sep) {
-                all_rpavg[tid][j] = rpavg[j];
-            }
-            if(need_weightavg) {
-                all_weightavg[tid][j] = weightavg[j];
-            }
-        }
     }//close the omp parallel region
 #endif
 
@@ -548,19 +530,6 @@ int countpairs_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z1,
     }
 
 #if defined(_OPENMP)
-    uint64_t npairs[nrpbin];
-    DOUBLE rpavg[nrpbin];
-    DOUBLE weightavg[nrpbin];
-
-    for(int i=0;i<nrpbin;i++) {
-        npairs[i] = 0;
-        if(options->need_avg_sep) {
-            rpavg[i] = 0.0;
-        }
-        if(need_weightavg) {
-            weightavg[i] = 0.0;
-        }
-    }
 
     for(int i=0;i<numthreads;i++) {
         for(int j=0;j<nrpbin;j++) {
@@ -649,6 +618,8 @@ int countpairs_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z1,
             results->weightavg[i] = weightavg[i];
         }
     }
+
+    free(npairs); free(rpavg), free(weightavg);
 
     /* reset interrupt handlers to default */
     RESET_INTERRUPT_HANDLERS();

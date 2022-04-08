@@ -39,20 +39,20 @@ static inline int countpairs_rp_pi_mocks_avx512_intrinsics_DOUBLE(const int64_t 
                                                                   const DOUBLE min_xdiff, const DOUBLE min_ydiff, const DOUBLE min_zdiff,
                                                                   const DOUBLE closest_icell_xpos, const DOUBLE closest_icell_ypos,
                                                                   const DOUBLE closest_icell_zpos,
-                                                                  DOUBLE *src_rpavg,
-                                                                  uint64_t *src_npairs, DOUBLE *src_weightavg, const weight_method_t weight_method, const pair_weight_struct pair_weight,
+                                                                  DOUBLE *rpavg,
+                                                                  uint64_t *npairs, DOUBLE *weightavg, const weight_method_t weight_method, const pair_weight_struct pair_weight,
                                                                   const bin_type_t bin_type)
 {
     if(N0 == 0 || N1 == 0) {
         return EXIT_SUCCESS;
     }
 
-    if(src_npairs == NULL) {
+    if(npairs == NULL) {
         return EXIT_FAILURE;
     }
 
-    const int32_t need_rpavg = src_rpavg != NULL;
-    const int32_t need_weightavg = src_weightavg != NULL;
+    const int32_t need_rpavg = rpavg != NULL;
+    const int32_t need_weightavg = weightavg != NULL;
     int32_t need_costheta = need_weightavg;
     const DOUBLE sqr_rpmin=rpmin*rpmin, sqr_rpmax=rpmax*rpmax;
     AVX512_FLOATS m_inv_rpstep = AVX512_SETZERO_FLOAT();
@@ -64,7 +64,6 @@ static inline int countpairs_rp_pi_mocks_avx512_intrinsics_DOUBLE(const int64_t 
         m_rpmin_invstep = AVX512_SET_FLOAT(rpmin_invstep);
     }
 
-    const int64_t totnbins = (npibin+1)*(nbin+1);
     const DOUBLE sqr_max_sep = sqr_rpmax + pimax*pimax;
     const DOUBLE sqr_pimax = pimax*pimax;
 
@@ -73,19 +72,8 @@ static inline int countpairs_rp_pi_mocks_avx512_intrinsics_DOUBLE(const int64_t 
         m_rupp_sqr[i] = AVX512_SET_FLOAT(rupp_sqr[i]);
     }
 
-    uint64_t npairs[totnbins];
     const DOUBLE dpi = pimax/npibin;
     const DOUBLE inv_dpi = 1.0/dpi;
-    DOUBLE rpavg[totnbins], weightavg[totnbins];
-    for(int i=0;i<totnbins;i++) {
-        npairs[i] = 0;
-        if(need_rpavg) {
-            rpavg[i] = ZERO;
-        }
-        if(need_weightavg){
-            weightavg[i] = ZERO;
-        }
-    }
 
     // A copy whose pointers we can advance
     weight_struct_DOUBLE local_w0 = {.weights={NULL}, .num_weights=0}, local_w1 = {.weights={NULL}, .num_weights=0};
@@ -373,15 +361,6 @@ static inline int countpairs_rp_pi_mocks_avx512_intrinsics_DOUBLE(const int64_t 
 
     if (need_costheta) free(norm1);
 
-    for(int i=0;i<totnbins;i++) {
-        src_npairs[i] += npairs[i];
-        if(need_rpavg) {
-            src_rpavg[i] += rpavg[i];
-        }
-        if(need_weightavg) {
-            src_weightavg[i] += weightavg[i];
-        }
-    }
     return EXIT_SUCCESS;
 }
 #endif //AVX512F defined
@@ -400,20 +379,20 @@ static inline int countpairs_rp_pi_mocks_avx_intrinsics_DOUBLE(const int64_t N0,
                                                                const DOUBLE min_xdiff, const DOUBLE min_ydiff, const DOUBLE min_zdiff,
                                                                const DOUBLE closest_icell_xpos, const DOUBLE closest_icell_ypos,
                                                                const DOUBLE closest_icell_zpos,
-                                                               DOUBLE *src_rpavg,
-                                                               uint64_t *src_npairs, DOUBLE *src_weightavg, const weight_method_t weight_method, const pair_weight_struct pair_weight,
+                                                               DOUBLE *rpavg,
+                                                               uint64_t *npairs, DOUBLE *weightavg, const weight_method_t weight_method, const pair_weight_struct pair_weight,
                                                                const bin_type_t bin_type)
 {
     if(N0 == 0 || N1 == 0) {
         return EXIT_SUCCESS;
     }
 
-    if(src_npairs == NULL) {
+    if(npairs == NULL) {
         return EXIT_FAILURE;
     }
 
-    const int32_t need_rpavg = src_rpavg != NULL;
-    const int32_t need_weightavg = src_weightavg != NULL;
+    const int32_t need_rpavg = rpavg != NULL;
+    const int32_t need_weightavg = weightavg != NULL;
     int32_t need_costheta = need_weightavg;
     const DOUBLE sqr_rpmin=rpmin*rpmin, sqr_rpmax=rpmax*rpmax;
     DOUBLE inv_rpstep=0., rpmin_invstep=0.;
@@ -426,7 +405,6 @@ static inline int countpairs_rp_pi_mocks_avx_intrinsics_DOUBLE(const int64_t N0,
         m_rpmin_invstep = AVX_SET_FLOAT(rpmin_invstep);
     }
 
-    const int64_t totnbins = (npibin+1)*(nbin+1);
     const DOUBLE sqr_max_sep = sqr_rpmax + pimax*pimax;
     const DOUBLE sqr_pimax = pimax*pimax;
 
@@ -437,19 +415,8 @@ static inline int countpairs_rp_pi_mocks_avx_intrinsics_DOUBLE(const int64_t N0,
         m_kbin[i] = AVX_SET_FLOAT((DOUBLE) i);
     }
 
-    uint64_t npairs[totnbins];
     const DOUBLE dpi = pimax/npibin;
     const DOUBLE inv_dpi = 1.0/dpi;
-    DOUBLE rpavg[totnbins], weightavg[totnbins];
-    for(int i=0;i<totnbins;i++) {
-        npairs[i] = 0;
-        if(need_rpavg) {
-            rpavg[i] = ZERO;
-        }
-        if(need_weightavg){
-            weightavg[i] = ZERO;
-        }
-    }
 
     // A copy whose pointers we can advance
     weight_struct_DOUBLE local_w0 = {.weights={NULL}, .num_weights=0}, local_w1 = {.weights={NULL}, .num_weights=0};
@@ -468,7 +435,7 @@ static inline int countpairs_rp_pi_mocks_avx_intrinsics_DOUBLE(const int64_t N0,
     }
     DOUBLE *norm1 = NULL;
     if (need_costheta) {
-        norm1 = (DOUBLE *) my_malloc(N1,sizeof(DOUBLE));
+        norm1 = (DOUBLE *) my_malloc(N1, sizeof(DOUBLE));
         for(int64_t i=0;i<N1;i++) {
             norm1[i] = SQRT(x1[i]*x1[i] + y1[i]*y1[i] + z1[i]*z1[i]);
         }
@@ -815,15 +782,6 @@ static inline int countpairs_rp_pi_mocks_avx_intrinsics_DOUBLE(const int64_t N0,
 
     if (need_costheta) free(norm1);
 
-    for(int i=0;i<totnbins;i++) {
-        src_npairs[i] += npairs[i];
-        if(need_rpavg) {
-            src_rpavg[i] += rpavg[i];
-        }
-        if(need_weightavg) {
-            src_weightavg[i] += weightavg[i];
-        }
-    }
     return EXIT_SUCCESS;
 }
 #endif //AVX defined
@@ -845,20 +803,20 @@ static inline int countpairs_rp_pi_mocks_sse_intrinsics_DOUBLE(const int64_t N0,
                                                                const DOUBLE min_xdiff, const DOUBLE min_ydiff, const DOUBLE min_zdiff,
                                                                const DOUBLE closest_icell_xpos, const DOUBLE closest_icell_ypos,
                                                                const DOUBLE closest_icell_zpos,
-                                                               DOUBLE *src_rpavg,
-                                                               uint64_t *src_npairs,
-                                                               DOUBLE *src_weightavg, const weight_method_t weight_method, const pair_weight_struct pair_weight,
+                                                               DOUBLE *rpavg,
+                                                               uint64_t *npairs,
+                                                               DOUBLE *weightavg, const weight_method_t weight_method, const pair_weight_struct pair_weight,
                                                                const bin_type_t bin_type)
 {
     if(N0 == 0 || N1 == 0) {
         return EXIT_SUCCESS;
     }
-    if(src_npairs == NULL) {
+    if(npairs == NULL) {
         return EXIT_FAILURE;
     }
 
-    const int32_t need_rpavg = src_rpavg != NULL;
-    const int32_t need_weightavg = src_weightavg != NULL;
+    const int32_t need_rpavg = rpavg != NULL;
+    const int32_t need_weightavg = weightavg != NULL;
     int32_t need_costheta = need_weightavg;
     const DOUBLE sqr_rpmin=rpmin*rpmin, sqr_rpmax=rpmax*rpmax;
     DOUBLE inv_rpstep=0., rpmin_invstep=0.;
@@ -882,23 +840,11 @@ static inline int countpairs_rp_pi_mocks_sse_intrinsics_DOUBLE(const int64_t N0,
         m_kbin[i] = SSE_SET_FLOAT((DOUBLE) i);
     }
 
-    const int64_t totnbins = (npibin+1)*(nbin+1);
     const DOUBLE sqr_max_sep = sqr_rpmax + pimax*pimax;
     const DOUBLE sqr_pimax = pimax*pimax;
 
-    uint64_t npairs[totnbins];
     const DOUBLE dpi = pimax/npibin;
     const DOUBLE inv_dpi = 1.0/dpi;
-    DOUBLE rpavg[totnbins], weightavg[totnbins];
-    for(int64_t i=0;i<totnbins;i++) {
-        npairs[i] = 0;
-        if (need_rpavg) {
-            rpavg[i] = ZERO;
-        }
-        if(need_weightavg){
-            weightavg[i] = ZERO;
-        }
-    }
 
     // A copy whose pointers we can advance
     weight_struct_DOUBLE local_w0 = {.weights={NULL}, .num_weights=0}, local_w1 = {.weights={NULL}, .num_weights=0};
@@ -1239,16 +1185,6 @@ static inline int countpairs_rp_pi_mocks_sse_intrinsics_DOUBLE(const int64_t N0,
 
     if (need_costheta) free(norm1);
 
-    for(int i=0;i<totnbins;i++) {
-        src_npairs[i] += npairs[i];
-        if(need_rpavg) {
-            src_rpavg[i] += rpavg[i];
-        }
-        if(need_weightavg) {
-            src_weightavg[i] += weightavg[i];
-        }
-    }
-
     return EXIT_SUCCESS;
 }
 #endif //SSE4.2 defined
@@ -1263,20 +1199,20 @@ static inline int countpairs_rp_pi_mocks_fallback_DOUBLE(const int64_t N0, DOUBL
                                                          const DOUBLE min_xdiff, const DOUBLE min_ydiff, const DOUBLE min_zdiff,
                                                          const DOUBLE closest_icell_xpos, const DOUBLE closest_icell_ypos,
                                                          const DOUBLE closest_icell_zpos,
-                                                         DOUBLE *src_rpavg, uint64_t *src_npairs,
-                                                         DOUBLE *src_weightavg, const weight_method_t weight_method, const pair_weight_struct pair_weight,
+                                                         DOUBLE *rpavg, uint64_t *npairs,
+                                                         DOUBLE *weightavg, const weight_method_t weight_method, const pair_weight_struct pair_weight,
                                                          const bin_type_t bin_type)
 {
     if(N0 == 0 || N1 == 0) {
         return EXIT_SUCCESS;
     }
 
-    if(src_npairs == NULL) {
+    if(npairs == NULL) {
         return EXIT_FAILURE;
     }
 
-    const int32_t need_rpavg = src_rpavg != NULL;
-    const int32_t need_weightavg = src_weightavg != NULL;
+    const int32_t need_rpavg = rpavg != NULL;
+    const int32_t need_weightavg = weightavg != NULL;
     int32_t need_costheta = need_weightavg;
     const DOUBLE sqr_rpmin=rpmin*rpmin, sqr_rpmax=rpmax*rpmax;
     DOUBLE inv_rpstep=0., rpmin_invstep=0.;
@@ -1288,21 +1224,8 @@ static inline int countpairs_rp_pi_mocks_fallback_DOUBLE(const int64_t N0, DOUBL
     (void) fast_divide_and_NR_steps;//unused parameter but required to keep the same function signature amongst the kernels
 
     /*----------------- FALLBACK CODE --------------------*/
-    const int64_t totnbins = (npibin+1)*(nbin+1);
     const DOUBLE sqr_pimax = pimax*pimax;
     const DOUBLE sqr_max_sep = sqr_rpmax + sqr_pimax;
-
-    uint64_t npairs[totnbins];
-    DOUBLE rpavg[totnbins], weightavg[totnbins];
-    for(int i=0;i<totnbins;i++) {
-        npairs[i] = 0;
-        if(need_rpavg) {
-            rpavg[i]=ZERO;
-        }
-        if(need_weightavg){
-            weightavg[i]=ZERO;
-        }
-    }
 
     // A copy whose pointers we can advance
     weight_struct_DOUBLE local_w0 = {.weights={NULL}, .num_weights=0}, local_w1 = {.weights={NULL}, .num_weights=0};
@@ -1484,16 +1407,6 @@ static inline int countpairs_rp_pi_mocks_fallback_DOUBLE(const int64_t N0, DOUBL
     }//i loop over first set of particles
 
     if (need_costheta) free(norm1);
-
-    for(int i=0;i<totnbins;i++) {
-        src_npairs[i] += npairs[i];
-        if(need_rpavg) {
-            src_rpavg[i] += rpavg[i];
-        }
-        if(need_weightavg){
-            src_weightavg[i] += weightavg[i];
-        }
-    }
 
     return EXIT_SUCCESS;
 }//end of fallback code

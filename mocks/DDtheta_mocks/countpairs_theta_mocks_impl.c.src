@@ -920,6 +920,15 @@ int countpairs_theta_mocks_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1,
         return EXIT_FAILURE;
     }
 
+    uint64_t *npairs = (uint64_t *) my_calloc(sizeof(uint64_t), nthetabin);
+    DOUBLE *thetaavg = NULL;
+    if(options->need_avg_sep){
+        thetaavg = (DOUBLE *) my_calloc(sizeof(DOUBLE), nthetabin);
+    }
+    DOUBLE *weightavg = NULL;
+    if(need_weightavg) {
+        weightavg = (DOUBLE *) my_calloc(sizeof(DOUBLE), nthetabin);
+    }
 
 #if defined(_OPENMP)
     uint64_t **all_npairs = (uint64_t **) matrix_calloc(sizeof(uint64_t), numthreads, nthetabin);
@@ -930,18 +939,6 @@ int countpairs_theta_mocks_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1,
     DOUBLE **all_weightavg = NULL;
     if(need_weightavg) {
       all_weightavg = (DOUBLE **) matrix_calloc(sizeof(DOUBLE),numthreads,nthetabin);
-    }
-#else
-    uint64_t npairs[nthetabin];
-    DOUBLE thetaavg[nthetabin], weightavg[nthetabin];
-    for(int i=0; i <nthetabin;i++) {
-        npairs[i] = 0;
-        if(options->need_avg_sep) {
-            thetaavg[i] = ZERO;
-        }
-        if(need_weightavg) {
-            weightavg[i] = ZERO;
-        }
     }
 #endif
 
@@ -954,21 +951,23 @@ int countpairs_theta_mocks_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1,
 #if defined(_OPENMP)
 #pragma omp parallel shared(numdone, abort_status, interrupt_status_wtheta_mocks_DOUBLE)
     {
-        int tid = omp_get_thread_num();
-        uint64_t npairs[nthetabin];
-        DOUBLE thetaavg[nthetabin], weightavg[nthetabin];
-        for(int i=0;i<nthetabin;i++) {
-            npairs[i] = 0;
-            if(options->need_avg_sep) {
-                thetaavg[i] = ZERO;
-            }
-            if(need_weightavg) {
-                weightavg[i] = ZERO;
-            }
+        const int tid = omp_get_thread_num();
+        uint64_t *this_npairs = all_npairs[tid];
+        DOUBLE *this_thetaavg = NULL;
+        if(options->need_avg_sep) {
+            this_thetaavg = all_thetaavg[tid];
+        }
+        DOUBLE *this_weightavg = NULL;
+        if(need_weightavg) {
+            this_weightavg = all_weightavg[tid];
         }
 
-#pragma omp for  schedule(dynamic)
-#endif
+#pragma omp for schedule(dynamic)
+#else
+        uint64_t *this_npairs = npairs;
+        DOUBLE *this_thetaavg = thetaavg;
+        DOUBLE *this_weightavg = weightavg;
+#endif//USE_OMP
         /*---Loop-over-all-cell-pairs--------------------*/
         for(int64_t icellpair=0;icellpair<num_cell_pairs;icellpair++) {
 
@@ -993,8 +992,6 @@ int countpairs_theta_mocks_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1,
                 }
 
                 struct cell_pair_DOUBLE *this_cell_pair = &all_cell_pairs[icellpair];
-                DOUBLE *this_thetaavg = options->need_avg_sep ? thetaavg:NULL;
-                DOUBLE *this_weightavg = need_weightavg ? weightavg:NULL;
 
                 const int64_t icell = this_cell_pair->cellindex1;
                 const int64_t icell2 = this_cell_pair->cellindex2;
@@ -1009,7 +1006,7 @@ int countpairs_theta_mocks_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1,
                                                                           costheta_upp,
                                                                           this_cell_pair->min_dx, this_cell_pair->min_dy, this_cell_pair->min_dz,
                                                                           this_cell_pair->closest_x1, this_cell_pair->closest_y1, this_cell_pair->closest_z1,
-                                                                          this_thetaavg, npairs,
+                                                                          this_thetaavg, this_npairs,
                                                                           this_weightavg, extra->weight_method, extra->pair_weight, options->bin_type);
 
                 /* This actually causes a race condition under OpenMP - but mostly
@@ -1021,15 +1018,6 @@ int countpairs_theta_mocks_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1,
         }//icellpair loop over num_cell_pairs
 
 #if defined(_OPENMP)
-        for(int j=0;j<nthetabin;j++) {
-            all_npairs[tid][j] = npairs[j];
-            if(options->need_avg_sep) {
-                all_thetaavg[tid][j] = thetaavg[j];
-            }
-            if(need_weightavg) {
-                all_weightavg[tid][j] = weightavg[j];
-            }
-        }
     }//close the omp parallel region
 #endif
     free(all_cell_pairs);
@@ -1076,17 +1064,6 @@ int countpairs_theta_mocks_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1,
 
 
 #if defined(_OPENMP)
-    uint64_t npairs[nthetabin];
-    DOUBLE thetaavg[nthetabin], weightavg[nthetabin];
-    for(int i=0;i<nthetabin;i++) {
-        npairs[i] = 0;
-        if(options->need_avg_sep) {
-            thetaavg[i] = ZERO;
-        }
-        if(need_weightavg) {
-            weightavg[i] = ZERO;
-        }
-    }
     for(int i=0;i<numthreads;i++) {
         for(int j=0;j<nthetabin;j++) {
             npairs[j] += all_npairs[i][j];
@@ -1108,7 +1085,7 @@ int countpairs_theta_mocks_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1,
 #endif//USE_OMP
 
     //The code does not double count for autocorrelations
-    //which means the npairs and rpavg values need to be doubled;
+    //which means the npairs and thetaavg values need to be doubled;
     if(autocorr == 1) {
         const uint64_t int_fac = 2;
         const DOUBLE dbl_fac = (DOUBLE) 2.0;
@@ -1131,8 +1108,8 @@ int countpairs_theta_mocks_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1,
                produces the same result as the auto-correlation  */
             npairs[1] += ND1; //npairs[1] contains the first valid bin.
 
-            // Increasing npairs affects rpavg and weightavg.
-            // We don't need to add anything to rpavg; all the self-pairs have 0 separation!
+            // Increasing npairs affects thetaavg and weightavg.
+            // We don't need to add anything to thetaavg; all the self-pairs have 0 separation!
             // The self-pairs have non-zero weight, though.  So, fix that here.
             if(need_weightavg){
                 // Keep in mind this is an autocorrelation (i.e. only one particle set to consider)
@@ -1170,6 +1147,7 @@ int countpairs_theta_mocks_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1,
             results->weightavg[i] = weightavg[i];
         }
     }
+    free(npairs); free(thetaavg), free(weightavg);
 
     /* reset interrupt handlers to default */
     RESET_INTERRUPT_HANDLERS();
