@@ -361,11 +361,7 @@ static inline int countpairs_s_mu_mocks_avx512_intrinsics_DOUBLE(const int64_t N
         }//AVX512 j loop
     }//loop over first set of particles
 
-    if (need_costheta) {
-        free(xhat1);
-        free(yhat1);
-        free(zhat1);
-    }
+    free(xhat1); free(yhat1); free(zhat1);
 
     return EXIT_SUCCESS;
 }
@@ -812,11 +808,7 @@ static inline int countpairs_s_mu_mocks_avx_intrinsics_DOUBLE(const int64_t N0, 
         }//remainder jloop
     }//i-loop
 
-    if (need_costheta) {
-        free(xhat1);
-        free(yhat1);
-        free(zhat1);
-    }
+    free(xhat1); free(yhat1); free(zhat1);
 
     return EXIT_SUCCESS;
 }
@@ -1261,11 +1253,7 @@ static inline int countpairs_s_mu_mocks_sse_intrinsics_DOUBLE(const int64_t N0, 
         }//remainder jloop
     }//i-loop
 
-    if (need_costheta) {
-        free(xhat1);
-        free(yhat1);
-        free(zhat1);
-    }
+    free(xhat1); free(yhat1); free(zhat1);
 
     return EXIT_SUCCESS;
 }
@@ -1520,11 +1508,7 @@ static inline int countpairs_s_mu_mocks_fallback_DOUBLE(const int64_t N0, DOUBLE
         }//j loop over second set of particles
     }//i loop over first set of particles
 
-    if (need_costheta) {
-        free(xhat1);
-        free(yhat1);
-        free(zhat1);
-    }
+    free(xhat1); free(yhat1); free(zhat1);
 
     return EXIT_SUCCESS;
 }//end of fallback code

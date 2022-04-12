@@ -278,7 +278,7 @@ static inline int countpairs_avx512_intrinsics_DOUBLE(const int64_t N0, DOUBLE *
         }//end of j-loop
     }//loop over first set of particles
 
-    if (need_costheta) free(norm1);
+    free(norm1);
 
     return EXIT_SUCCESS;
 }
@@ -619,7 +619,7 @@ static inline int countpairs_avx_intrinsics_DOUBLE(const int64_t N0, DOUBLE *x0,
       }//remainder loop over second set of particles
   }//loop over first set of particles
 
-  if (need_costheta) free(norm1);
+  free(norm1);
 
   return EXIT_SUCCESS;
 }
@@ -933,7 +933,7 @@ static inline int countpairs_sse_intrinsics_DOUBLE(const int64_t N0, DOUBLE *x0,
       }//loop over remnant second set of particles
   }//loop over first set of particles
 
-  if (need_costheta) free(norm1);
+  free(norm1);
 
   return EXIT_SUCCESS;
 }
@@ -1110,7 +1110,7 @@ static inline int countpairs_fallback_DOUBLE(const int64_t N0, DOUBLE *x0, DOUBL
         }
     }
 
-    if (need_costheta) free(norm1);
+    free(norm1);
 
     /*----------------- FALLBACK CODE --------------------*/
 
