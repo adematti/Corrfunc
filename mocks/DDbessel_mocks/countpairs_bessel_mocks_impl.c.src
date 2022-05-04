@@ -354,10 +354,15 @@ int countpairs_mocks_bessel_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DO
     {
         const int tid = omp_get_thread_num();
         DOUBLE *this_poles = all_poles[tid];
-#pragma omp for schedule(dynamic)
 #else
         DOUBLE *this_poles = poles;
 #endif//USE_OMP
+
+        DOUBLE *tmp_poles = (DOUBLE *) malloc(sizeof(DOUBLE)*nbins);
+
+#if defined(_OPENMP)
+#pragma omp for schedule(dynamic)
+#endif
 
         /*---Loop-over-all-cell-pairs--------------------*/
         for(int64_t icellpair=0;icellpair<num_cell_pairs;icellpair++) {
@@ -386,22 +391,27 @@ int countpairs_mocks_bessel_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DO
                 const int64_t icell2 = this_cell_pair->cellindex2;
                 const cellarray_mocks_DOUBLE *first = &lattice1[icell];
                 const cellarray_mocks_DOUBLE *second = &lattice2[icell2];
+
+                for(int j=0;j<nbins;j++) tmp_poles[j] = 0.;
+
                 const int status = countpairs_bessel_mocks_function_DOUBLE(first->nelements, first->x, first->y, first->z, &(first->weights),
                                                                            second->nelements, second->x, second->y, second->z, &(second->weights),
                                                                            this_cell_pair->same_cell,
                                                                            bins, rmin, rmax, mumax,
                                                                            this_cell_pair->min_dx, this_cell_pair->min_dy, this_cell_pair->min_dz,
                                                                            this_cell_pair->closest_x1, this_cell_pair->closest_y1, this_cell_pair->closest_z1,
-                                                                           this_poles, extra->weight_method, extra->pair_weight, options->los_type, autocorr);
+                                                                           tmp_poles, extra->weight_method, extra->pair_weight, options->los_type, autocorr);
 
                 /* This actually causes a race condition under OpenMP - but mostly
                    I care that an error occurred - rather than the exact value of
                    the error status */
                 abort_status |= status;
 
+                for(int j=0;j<nbins;j++) this_poles[j] += tmp_poles[j];
+
             }//abort-status
         }//icellpair loop over num_cell_pairs
-
+        free(tmp_poles);
 #if defined(_OPENMP)
     }//close the omp parallel region
 #endif//USE_OMP

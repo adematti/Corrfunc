@@ -450,11 +450,18 @@ int countpairs_s_mu_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z1
     if(need_weightavg) {
         this_weightavg = all_weightavg[tid];
     }
-#pragma omp for schedule(dynamic)
 #else
     uint64_t *this_npairs = npairs;
     DOUBLE *this_savg = savg;
     DOUBLE *this_weightavg = weightavg;
+#endif
+
+    DOUBLE *tmp_savg = NULL, *tmp_weightavg = NULL;
+    if(options->need_avg_sep) tmp_savg = (DOUBLE *) malloc(sizeof(DOUBLE)*totnbins);
+    if(need_weightavg) tmp_weightavg = (DOUBLE *) malloc(sizeof(DOUBLE)*totnbins);
+
+#if defined(_OPENMP)
+#pragma omp for schedule(dynamic)
 #endif
         /*---Loop-over-cell-pairs--------------------*/
         for(int64_t icellpair=0;icellpair<num_cell_pairs;icellpair++) {
@@ -487,6 +494,13 @@ int countpairs_s_mu_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z1
                 const cellarray_DOUBLE *first = &lattice1[icell];
                 const cellarray_DOUBLE *second = &lattice2[icell2];
 
+                if(options->need_avg_sep) {
+                    for(int j=0;j<totnbins;j++) tmp_savg[j] = 0.;
+                }
+                if(need_weightavg) {
+                    for(int j=0;j<totnbins;j++) tmp_weightavg[j] = 0.;
+                }
+
                 const int status = countpairs_s_mu_function_DOUBLE(first->nelements, first->x, first->y, first->z, &(first->weights),
                                                                    second->nelements, second->x, second->y, second->z, &(second->weights),
                                                                    this_cell_pair->same_cell,
@@ -495,17 +509,25 @@ int countpairs_s_mu_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z1
                                                                    this_cell_pair->xwrap, this_cell_pair->ywrap, this_cell_pair->zwrap,
                                                                    this_cell_pair->min_dx, this_cell_pair->min_dy, this_cell_pair->min_dz,
                                                                    this_cell_pair->closest_x1, this_cell_pair->closest_y1, this_cell_pair->closest_z1,
-                                                                   this_savg, this_npairs,
-                                                                   this_weightavg, extra->weight_method, extra->pair_weight, options->bin_type, autocorr);
+                                                                   tmp_savg, this_npairs,
+                                                                   tmp_weightavg, extra->weight_method, extra->pair_weight, options->bin_type, autocorr);
 
                 /* This actually causes a race condition under OpenMP - but mostly
                    I care that an error occurred - rather than the exact value of
                    the error status */
                 abort_status |= status;
 
+                if(options->need_avg_sep) {
+                    for(int j=0;j<totnbins;j++) this_savg[j] += tmp_savg[j];
+                }
+                if(need_weightavg) {
+                    for(int j=0;j<totnbins;j++) this_weightavg[j] += tmp_weightavg[j];
+                }
+
             }//error occurred somewhere in the called functions: abort_status is set
         }//loop over cell-pairs
-
+    free(tmp_savg);
+    free(tmp_weightavg);
 #if defined(_OPENMP)
     }//close the omp parallel region
 #endif

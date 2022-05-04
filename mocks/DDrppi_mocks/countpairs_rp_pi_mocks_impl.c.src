@@ -582,7 +582,6 @@ int countpairs_mocks_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1, DOUBLE
         init_my_progressbar(num_cell_pairs, &interrupted);
     }
 
-
 #if defined(_OPENMP)
 #pragma omp parallel shared(numdone, abort_status, interrupt_status_DDrppi_mocks_DOUBLE)
     {
@@ -596,13 +595,19 @@ int countpairs_mocks_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1, DOUBLE
         if(need_weightavg) {
             this_weightavg = all_weightavg[tid];
         }
-#pragma omp for schedule(dynamic)
 #else
         uint64_t *this_npairs = npairs;
         DOUBLE *this_rpavg = rpavg;
         DOUBLE *this_weightavg = weightavg;
 #endif//USE_OMP
 
+        DOUBLE *tmp_rpavg = NULL, *tmp_weightavg = NULL;
+        if(options->need_avg_sep) tmp_rpavg = (DOUBLE *) malloc(sizeof(DOUBLE)*totnbins);
+        if(need_weightavg) tmp_weightavg = (DOUBLE *) malloc(sizeof(DOUBLE)*totnbins);
+
+#if defined(_OPENMP)
+#pragma omp for schedule(dynamic)
+#endif
         /*---Loop-over-all-cell-pairs--------------------*/
         for(int64_t icellpair=0;icellpair<num_cell_pairs;icellpair++) {
 
@@ -632,6 +637,13 @@ int countpairs_mocks_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1, DOUBLE
                 const cellarray_mocks_DOUBLE *first = &lattice1[icell];
                 const cellarray_mocks_DOUBLE *second = &lattice2[icell2];
 
+                if(options->need_avg_sep) {
+                    for(int j=0;j<totnbins;j++) tmp_rpavg[j] = 0.;
+                }
+                if(need_weightavg) {
+                    for(int j=0;j<totnbins;j++) tmp_weightavg[j] = 0.;
+                }
+
                 const int status = countpairs_rp_pi_mocks_function_DOUBLE(first->nelements, first->x, first->y, first->z, &(first->weights),
                                                                           second->nelements, second->x, second->y, second->z, &(second->weights),
                                                                           this_cell_pair->same_cell,
@@ -639,16 +651,24 @@ int countpairs_mocks_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1, DOUBLE
                                                                           rpmax, rpmin, nrpbin, npibin, rupp_sqr, pimax,
                                                                           this_cell_pair->min_dx, this_cell_pair->min_dy, this_cell_pair->min_dz,
                                                                           this_cell_pair->closest_x1, this_cell_pair->closest_y1, this_cell_pair->closest_z1,
-                                                                          this_rpavg, this_npairs, this_weightavg, extra->weight_method, extra->pair_weight, options->bin_type);
+                                                                          tmp_rpavg, this_npairs, tmp_weightavg, extra->weight_method, extra->pair_weight, options->bin_type);
 
                 /* This actually causes a race condition under OpenMP - but mostly
                    I care that an error occurred - rather than the exact value of
                    the error status */
                 abort_status |= status;
 
+                if(options->need_avg_sep) {
+                    for(int j=0;j<totnbins;j++) this_rpavg[j] += tmp_rpavg[j];
+                }
+                if(need_weightavg) {
+                    for(int j=0;j<totnbins;j++) this_weightavg[j] += tmp_weightavg[j];
+                }
+
             }//abort-status
         }//icellpair loop over num_cell_pairs
-
+    free(tmp_rpavg);
+    free(tmp_weightavg);
 #if defined(_OPENMP)
     }//close the omp parallel region
 #endif//USE_OMP
