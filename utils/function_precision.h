@@ -99,14 +99,14 @@ extern "C" {
 #if defined(__GNUC__) || defined(__GNUG__)
 #define POPCOUNT(X) __builtin_popcountll(X)
 #else
-#define POPCOUNT(X) _popcnt32(X)
+#define POPCOUNT(X) _popcnt64(X)
 #endif
 #else
 #define LONG   uint32_t
 #if defined(__GNUC__) || defined(__GNUG__)
 #define POPCOUNT(X) __builtin_popcount(X)
 #else
-#define POPCOUNT(X) _popcnt64(X)
+#define POPCOUNT(X) _popcnt32(X)
 #endif
 #endif
 
