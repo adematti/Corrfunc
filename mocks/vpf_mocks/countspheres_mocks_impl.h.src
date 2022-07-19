@@ -14,13 +14,13 @@ extern "C" {
 #endif
 
 #include "defs.h" //for definition of struct config_options
-#include "countspheres_mocks.h"//for definition of struct results_countspheres_mocks 
-    
+#include "countspheres_mocks.h"//for definition of struct results_countspheres_mocks
+
     extern void interrupt_handler_vpf_mocks_DOUBLE(int signo);
-    
+
     typedef int (*vpf_mocks_func_ptr_DOUBLE)(const int64_t np, DOUBLE * restrict X, DOUBLE * restrict Y, DOUBLE * restrict Z,
                                              const DOUBLE xc, const DOUBLE yc, const DOUBLE zc,
-                                             const DOUBLE rmax, const int nbin, 
+                                             const DOUBLE rmax, const int nbin,
                                              uint64_t *counts_src_pN);
 
     extern vpf_mocks_func_ptr_DOUBLE vpf_mocks_driver_DOUBLE(const struct config_options *options) __attribute__((warn_unused_result));
@@ -32,10 +32,9 @@ extern "C" {
                                          const DOUBLE rmax, const int nbin, const int nc,
                                          const int num_pN,
                                          const char *centers_file,
-                                         const int cosmology,
                                          results_countspheres_mocks *results,
                                          struct config_options *options, struct extra_options *extra);
-    
+
 #ifdef __cplusplus
 }
 #endif

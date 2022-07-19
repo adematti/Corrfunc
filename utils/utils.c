@@ -42,9 +42,19 @@
 #endif
 
 
+double wrap_range(double val, double min, double max)
+{
+    if ((val >= min)&&(val <= max)) return val;
+    double range = max - min;
+    val = fmod(val - min, range);
+    if (val < 0) val += range;
+    return val + min;
+}
+
+
 void get_max_float(const int64_t ND1, const float *cz1, float *czmax)
 {
-    float max=*czmax;
+    float max = *czmax;
     for(int64_t i=0;i<ND1;i++) {
         if(cz1[i] > max) max = cz1[i];
     }

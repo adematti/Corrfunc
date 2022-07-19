@@ -15,14 +15,14 @@ extern "C" {
 
 #include "defs.h"
 #include <inttypes.h>
-    
+
 #include "countspheres.h" //for definition of DOUBLE
 
     extern void interrupt_handler_vpf_DOUBLE(int signo);
-    
+
     typedef int (*vpf_func_ptr_DOUBLE)(const int64_t np, DOUBLE * restrict X, DOUBLE * restrict Y, DOUBLE * restrict Z,
                                        const DOUBLE xc, const DOUBLE yc, const DOUBLE zc,
-                                       const DOUBLE rmax, const int nbin, 
+                                       const DOUBLE rmax, const int nbin,
                                        int *counts_src_pN);
 
     extern vpf_func_ptr_DOUBLE vpf_driver_DOUBLE(const struct config_options *options) __attribute__((warn_unused_result));

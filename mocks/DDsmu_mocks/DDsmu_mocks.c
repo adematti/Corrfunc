@@ -8,7 +8,7 @@
 
 /* PROGRAM DDsmu
 
---- DDsmu file1 format1 file2 format2 sbinfile Nmu cosmology numthreads [weight_method weights_file1 weights_format1 [weights_file2 weights_format2]] > DDfile
+--- DDsmu file1 format1 file2 format2 sbinfile Nmu numthreads [weight_method weights_file1 weights_format1 [weights_file2 weights_format2]] > DDfile
 --- Measure the cross-correlation function xi(rp,pi) for two different
    data files (or autocorrelation if data1=data2).
  * file1         = name of first data file
@@ -18,7 +18,6 @@
  * sbinfile       = name of ascii file containing the r-bins (rmin rmax for each bin)
  * mu_max        = maximum mu value (>0 and <= 1.0)
  * nmu_bins      = number of mu bins
- * cosmology     = flag to pick-up the cosmology combination to use (set as an array of combinations in ../utils/cosmology_params.c)
  * numthreads    = number of threads to use
 --- OPTIONAL ARGS:
  * weight_method = the type of pair weighting to apply.  Options are: 'pair_product', 'none'.  Default: 'none'.
@@ -72,16 +71,14 @@ int main(int argc, char *argv[])
 
     /*---Corrfunc-variables----------------*/
 #if defined(_OPENMP)
-    const char argnames[][30]={"file1","format1","file2","format2","sbinfile","mu_max","nmu_bins","cosmology flag","numthreads"};
+    const char argnames[][30]={"file1","format1","file2","format2","sbinfile","mu_max","nmu_bins","numthreads"};
 #else
-    const char argnames[][30]={"file1","format1","file2","format2","sbinfile","mu_max","nmu_bins","cosmology flag"};
+    const char argnames[][30]={"file1","format1","file2","format2","sbinfile","mu_max","nmu_bins"};
 #endif
     const char optargnames[][30]={"weight_method", "weights_file1","weights_format1","weights_file2","weights_format2"};
 
     int nargs=sizeof(argnames)/(sizeof(char)*30);
     int noptargs=sizeof(optargnames)/(sizeof(char)*30);
-
-    int cosmology=1;
 
     /*---Read-arguments-----------------------------------*/
     if(argc< (nargs+1)) {
@@ -124,13 +121,12 @@ int main(int argc, char *argv[])
     sbinfile=argv[5];
 
     mu_max=1.0;
-    sscanf(argv[6],"%"REAL_FORMAT,&mu_max) ;
+    sscanf(argv[6],"%"REAL_FORMAT,&mu_max);
     nmu_bins=-10;
-    sscanf(argv[7],"%d",&nmu_bins) ;
-    cosmology = atoi(argv[8]);
+    sscanf(argv[7],"%d",&nmu_bins);
 
 #if defined(USE_OMP) && defined(_OPENMP)
-    nthreads=atoi(argv[9]);
+    nthreads=atoi(argv[8]);
     assert(nthreads >= 1 && "Number of threads must be at least 1");
 #endif
 
@@ -239,7 +235,6 @@ int main(int argc, char *argv[])
                                   &bins,
                                   mu_max,
                                   nmu_bins,
-                                  cosmology,
                                   &results,
                                   &options,
                                   &extra);
@@ -281,9 +276,9 @@ void Printhelp(void)
 {
     fprintf(stderr,"=========================================================================\n") ;
 #if defined(USE_OMP) && defined(_OPENMP)
-    fprintf(stderr,"   --- DDsmu file1 format1 file2 format2 sbinfile nmu_bins mu_max cosmology numthreads [weight_method weights_file1 weights_format1 [weights_file2 weights_format2]] > DDfile\n") ;
+    fprintf(stderr,"   --- DDsmu file1 format1 file2 format2 sbinfile nmu_bins mu_max numthreads [weight_method weights_file1 weights_format1 [weights_file2 weights_format2]] > DDfile\n") ;
 #else
-    fprintf(stderr,"   --- DDsmu file1 format1 file2 format2 sbinfile nmu_bins mu_max cosmology [weight_method weights_file1 weights_format1 [weights_file2 weights_format2]] > DDfile\n") ;
+    fprintf(stderr,"   --- DDsmu file1 format1 file2 format2 sbinfile nmu_bins mu_max [weight_method weights_file1 weights_format1 [weights_file2 weights_format2]] > DDfile\n") ;
 #endif
     fprintf(stderr,"   --- Measure the cross-correlation function xi(rp,pi) for two different\n") ;
     fprintf(stderr,"       data files (or autocorrelation if data1=data2).\n") ;
@@ -294,7 +289,6 @@ void Printhelp(void)
     fprintf(stderr,"     * sbinfile      = name of ascii file containing the r-bins (rmin rmax for each bin)\n") ;
     fprintf(stderr,"     * nmu_bins      = number of mu bins\n") ;
     fprintf(stderr,"     * mu_max        = maximum mu value (>0 and <= 1.0)\n") ;
-    fprintf(stderr,"     * cosmology     = flag to pick-up the cosmology combination to use (set as an array of combinations in ../utils/cosmology_params.c)\n") ;
 #if defined(USE_OMP) && defined(_OPENMP)
     fprintf(stderr,"     * numthreads    = number of threads to use\n");
 #endif

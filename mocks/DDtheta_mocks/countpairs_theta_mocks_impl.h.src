@@ -45,8 +45,6 @@ extern int countpairs_theta_mocks_DOUBLE(const int64_t ND1, DOUBLE *phi1, DOUBLE
                                          results_countpairs_theta *results,
                                          struct config_options *options, struct extra_options *extra);
 
-extern int check_ra_dec_DOUBLE(const int64_t N, DOUBLE *phi, DOUBLE *theta);
-
 #ifdef __cplusplus
 }
 #endif

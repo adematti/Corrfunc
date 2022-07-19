@@ -19,17 +19,16 @@ VPF_mocks_LIB := countspheres_mocks
 include $(ROOT_DIR)/mocks.options $(ROOT_DIR)/common.mk
 
 TARGET := run_correlations_mocks
-TARGETSRC   := $(TARGET).c $(IO_DIR)/ftread.c $(IO_DIR)/io.c  $(UTILS_DIR)/utils.c $(UTILS_DIR)/progressbar.c \
-               $(UTILS_DIR)/cosmology_params.c 
+TARGETSRC   := $(TARGET).c $(IO_DIR)/ftread.c $(IO_DIR)/io.c  $(UTILS_DIR)/utils.c $(UTILS_DIR)/progressbar.c
 TARGETOBJS  := $(TARGETSRC:.c=.o)
 C_LIBRARIES := $(DDrppi_mocks_DIR)/lib$(DDrppi_mocks_LIB).a $(DDsmu_mocks_DIR)/lib$(DDsmu_mocks_LIB).a \
-               $(DDTHETA_mocks_DIR)/lib$(DDTHETA_mocks_LIB).a $(VPF_mocks_DIR)/lib$(VPF_mocks_LIB).a 
+               $(DDTHETA_mocks_DIR)/lib$(DDTHETA_mocks_LIB).a $(VPF_mocks_DIR)/lib$(VPF_mocks_LIB).a
 INCL :=	$(DDrppi_mocks_DIR)/$(DDrppi_mocks_LIB).h $(DDsmu_mocks_DIR)/$(DDsmu_mocks_LIB).h \
         $(DDTHETA_mocks_DIR)/$(DDTHETA_mocks_LIB).h $(VPF_mocks_DIR)/$(VPF_mocks_LIB).h \
         $(UTILS_DIR)/defs.h $(IO_DIR)/io.h $(IO_DIR)/ftread.h \
         $(UTILS_DIR)/utils.h $(UTILS_DIR)/gridlink_mocks_impl_double.h $(UTILS_DIR)/gridlink_mocks_impl_float.h \
 	$(UTILS_DIR)/function_precision.h $(UTILS_DIR)/cellarray_mocks_double.h $(UTILS_DIR)/cellarray_mocks_float.h \
-        $(UTILS_DIR)/progressbar.h $(UTILS_DIR)/cosmology_params.h 
+        $(UTILS_DIR)/progressbar.h
 
 LIBRARY_INCL := -I$(DDrppi_mocks_DIR) -I$(DDsmu_mocks_DIR) -I$(DDTHETA_mocks_DIR) -I$(VPF_mocks_DIR)
 

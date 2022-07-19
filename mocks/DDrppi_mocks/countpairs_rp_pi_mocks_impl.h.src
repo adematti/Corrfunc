@@ -42,11 +42,8 @@ extern "C" {
                                        binarray *bins,
                                        const DOUBLE pimax,
                                        const int npibins,
-                                       const int cosmology,
                                        results_countpairs_mocks *results,
                                        struct config_options *options, struct extra_options *extra);
-
-    extern int check_ra_dec_cz_DOUBLE(const int64_t N, DOUBLE *phi, DOUBLE *theta, DOUBLE *cz);
 
 #ifdef __cplusplus
 }

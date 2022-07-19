@@ -12,15 +12,11 @@
 #include <math.h>
 #include <signal.h>
 #include <unistd.h>
-#include <gsl/gsl_interp.h>
 
 #include "defs.h"
 #include "cpu_features.h"
 #include "utils.h" //all of the utilities
 #include "progressbar.h" //for the progressbar
-
-#include "set_cosmo_dist.h"//cosmological distance calculations
-#include "cosmology_params.h"//init_cosmology
 
 #include "gridlink_utils_DOUBLE.h"
 #include "gridlink_impl_DOUBLE.h"//function proto-type for gridlink (NOTE we are getting the theory gridlink)
@@ -211,7 +207,6 @@ int countspheres_mocks_DOUBLE(const int64_t Ngal, DOUBLE *RA, DOUBLE *DEC, DOUBL
                               const DOUBLE rmax, const int nbin, const int nc,
                               const int num_pN,
                               const char *centers_file,
-                              const int cosmology,
                               results_countspheres_mocks *results,
                               struct config_options *options, struct extra_options *extra)
 
@@ -237,14 +232,6 @@ int countspheres_mocks_DOUBLE(const int64_t Ngal, DOUBLE *RA, DOUBLE *DEC, DOUBL
         extra = &dummy_extra;
     }
 
-    /* Start cosmology */
-    {
-        // Declared in separate scope so I can call the variable status;
-        int status = init_cosmology(cosmology);
-        if(status != EXIT_SUCCESS) {
-            return status;
-        }
-    }
     options->periodic = 0;
     struct timeval t0;
     if(options->c_api_timer) {
@@ -286,37 +273,6 @@ int countspheres_mocks_DOUBLE(const int64_t Ngal, DOUBLE *RA, DOUBLE *DEC, DOUBL
     }
 
     DOUBLE rcube=0.0;
-    double *redshifts=NULL,*comoving_distance=NULL;
-    gsl_interp *interpolation=NULL;
-    gsl_interp_accel *accelerator=NULL;
-    const DOUBLE inv_speed_of_light=1.0/SPEED_OF_LIGHT;
-    if(options->is_comoving_dist == 0) {
-        DOUBLE czmax = 0.0;
-        get_max_DOUBLE(Ngal, CZ, &czmax);
-        if(need_randoms == 1) {
-            get_max_DOUBLE(Nran, RAND_CZ, &czmax);
-        }
-        const double zmax = czmax * inv_speed_of_light + 0.01;
-
-        //set up the interpolation for comoving distances
-        const int workspace_size = 10000;
-        redshifts=my_malloc(sizeof(*redshifts),workspace_size);
-        comoving_distance=my_malloc(sizeof(*comoving_distance),workspace_size);
-        if(redshifts == NULL || comoving_distance == NULL) {
-            free(comoving_distance);free(redshifts);
-            return EXIT_FAILURE;
-        }
-
-        int Nzdc = set_cosmo_dist(zmax, workspace_size, redshifts, comoving_distance, cosmology);
-        if(Nzdc < 0) {
-            free(comoving_distance);free(redshifts);
-            return EXIT_FAILURE;
-        }
-
-        interpolation = gsl_interp_alloc (gsl_interp_linear,Nzdc);
-        accelerator =  gsl_interp_accel_alloc();
-        gsl_interp_init(interpolation, redshifts, comoving_distance, Nzdc);
-    }
 
     DOUBLE *xgal = my_malloc(sizeof(*xgal), Ngal);
     DOUBLE *ygal = my_malloc(sizeof(*ygal), Ngal);
@@ -326,14 +282,10 @@ int countspheres_mocks_DOUBLE(const int64_t Ngal, DOUBLE *RA, DOUBLE *DEC, DOUBL
     }
     for(int64_t i=0;i<Ngal;i++) {
         DOUBLE dc = CZ[i];
-        if(options->is_comoving_dist == 0) {
-            dc = gsl_interp_eval(interpolation, redshifts, comoving_distance, CZ[i]*inv_speed_of_light, accelerator);
-        }
         if(dc>rcube) rcube = dc;
-
-        xgal[i] = dc*COSD(DEC[i])*COSD(RA[i]) ;
-        ygal[i] = dc*COSD(DEC[i])*SIND(RA[i]) ;
-        zgal[i] = dc*SIND(DEC[i]) ;
+        xgal[i] = dc*COSD(DEC[i])*COSD(RA[i]);
+        ygal[i] = dc*COSD(DEC[i])*SIND(RA[i]);
+        zgal[i] = dc*SIND(DEC[i]);
     }
 
     DOUBLE *xran = NULL;
@@ -349,21 +301,12 @@ int countspheres_mocks_DOUBLE(const int64_t Ngal, DOUBLE *RA, DOUBLE *DEC, DOUBL
         }
         for(int64_t i=0;i<Nran;i++) {
             DOUBLE dc = RAND_CZ[i];
-            if(options->is_comoving_dist == 0) {
-                dc = gsl_interp_eval(interpolation, redshifts, comoving_distance, RAND_CZ[i]*inv_speed_of_light, accelerator);
-            }
             if(dc>rcube) rcube = dc;
 
             xran[i] = dc*COSD(RAND_DEC[i])*COSD(RAND_RA[i]) ;
             yran[i] = dc*COSD(RAND_DEC[i])*SIND(RAND_RA[i]) ;
             zran[i] = dc*SIND(RAND_DEC[i]);
         }
-    }
-
-    if(options->is_comoving_dist == 0) {
-        free(redshifts);free(comoving_distance);
-        gsl_interp_free(interpolation);
-        gsl_interp_accel_free(accelerator);
     }
 
     /*---Shift-coordinates--------------------------------*/
@@ -387,7 +330,7 @@ int countspheres_mocks_DOUBLE(const int64_t Ngal, DOUBLE *RA, DOUBLE *DEC, DOUBL
             zran[i] += rcube ;
         }
     }
-    rcube = 2.0*rcube ;
+    rcube = 2.0*rcube;
     const DOUBLE inv_rcube = 1.0/rcube;
 
     if(options->verbose) {

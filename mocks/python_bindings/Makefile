@@ -31,7 +31,7 @@ INCL :=	$(DDbessel_mocks_DIR)/$(DDbessel_mocks_LIB).h $(DDrppi_mocks_DIR)/$(DDrp
         $(UTILS_DIR)/defs.h $(IO_DIR)/io.h $(IO_DIR)/ftread.h \
         $(UTILS_DIR)/utils.h \
 				$(UTILS_DIR)/function_precision.h \
-        $(UTILS_DIR)/progressbar.h $(UTILS_DIR)/cosmology_params.h \
+        $(UTILS_DIR)/progressbar.h \
         $(UTILS_DIR)/cpu_features.h $(UTILS_DIR)/macros.h \
 				$(DDsmu_mocks_DIR)/$(DDsmu_mocks_LIB).h
 
@@ -47,7 +47,6 @@ $(PROJECT).o: $(PROJECT).c $(ROOT_DIR)/mocks.options $(ROOT_DIR)/common.mk Makef
 	$(CC) $(CFLAGS) $(LIB_INCLUDE) $(PYTHON_CFLAGS)  $(INCLUDE) $< -c -o $@
 
 tests: sharedlib $(ROOT_DIR)/mocks.options $(ROOT_DIR)/common.mk Makefile $(C_LIBRARIES) $(OBJECTS) | $(ROOT_DIR)/lib
-	$(PYTHON) call_correlation_functions_mocks.py
 
 $(PYTHON_EXTN): $(OBJECTS) $(C_LIBRARIES) $(ROOT_DIR)/mocks.options $(ROOT_DIR)/common.mk Makefile
 	$(CC) $(OBJECTS) $(C_LIBRARIES) $(CLINK) $(GSL_LINK) $(PYTHON_LINK) -shared -o $@

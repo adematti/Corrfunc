@@ -304,8 +304,7 @@ def DDtheta_mocks(autocorr, nthreads, binfile,
 
     import numpy as np
     from Corrfunc.utils import translate_isa_string_to_enum, translate_bin_type_string_to_enum,\
-        fix_ra_dec, get_edges, convert_to_native_endian,\
-        sys_pipes, process_weights
+                               get_edges, convert_to_native_endian, sys_pipes, process_weights
     from future.utils import bytes_to_native_str
 
     if autocorr == 0:
@@ -324,10 +323,6 @@ def DDtheta_mocks(autocorr, nthreads, binfile,
     RA1, DEC1, RA2, DEC2 = [
             convert_to_native_endian(arr, warn=False) for arr in
             [RA1, DEC1, RA2, DEC2]]
-
-    fix_ra_dec(RA1, DEC1)
-    if autocorr == 0:
-        fix_ra_dec(RA2, DEC2)
 
     if weights1 is not None:
         weights1 = [convert_to_native_endian(arr, warn=False) for arr in weights1]
@@ -554,8 +549,8 @@ def find_fastest_DDtheta_mocks_bin_refs(autocorr, nthreads, binfile,
         raise ImportError(msg)
 
     import numpy as np
-    from Corrfunc.utils import translate_isa_string_to_enum, fix_ra_dec,\
-        get_edges, convert_to_native_endian, process_weights
+    from Corrfunc.utils import translate_isa_string_to_enum,\
+                               get_edges, convert_to_native_endian, process_weights
     from future.utils import bytes_to_native_str
     import itertools
     import time
@@ -567,10 +562,6 @@ def find_fastest_DDtheta_mocks_bin_refs(autocorr, nthreads, binfile,
     RA1, DEC1, weights1, RA2, DEC2, weights2 = [
         convert_to_native_endian(arr, warn=False) for arr in
         [RA1, DEC1, weights1, RA2, DEC2, weights2]]
-
-    fix_ra_dec(RA1, DEC1)
-    if autocorr == 0:
-        fix_ra_dec(RA2, DEC2)
 
     # Passing None parameters breaks the parsing code, so avoid this
     kwargs = {}

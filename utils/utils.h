@@ -30,6 +30,7 @@ extern size_t my_fread(void *ptr, size_t size, size_t nmemb, FILE *stream);
 extern int my_fseek(FILE *stream, long offset, int whence);
 
 //general utilities
+extern double wrap_range(double val, double min, double max);
 extern void get_max_float(const int64_t ND1, const float *cz1, float *czmax);
 extern void get_max_double(const int64_t ND1, const double *cz1, double *czmax);
 extern char *int2bin(int a, char *buffer, int buf_size) ;

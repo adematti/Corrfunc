@@ -73,10 +73,9 @@ static PyObject *countpairs_mocks_error_out(PyObject *module, const char *msg);
 static PyMethodDef module_methods[] = {
     {"countpairs_bessel_mocks"      ,(PyCFunction)(void(*)(void)) countpairs_countpairs_bessel_mocks ,METH_VARARGS | METH_KEYWORDS, ""},
     {"countpairs_rp_pi_mocks"       ,(PyCFunction)(void(*)(void)) countpairs_countpairs_rp_pi_mocks ,METH_VARARGS | METH_KEYWORDS,
-     "countpairs_rp_pi_mocks(autocorr, cosmology, nthreads, pimax, binfile,\n"
+     "countpairs_rp_pi_mocks(autocorr, nthreads, pimax, binfile,\n"
      "                       RA1, DEC1, CZ1, weights1=None, weight_type=None,\n"
      "                       RA2=None, DEC2=None, CZ2=None, weights2=None,\n"
-     "                       is_comoving_dist=False,\n"
      "                       verbose=False, output_rpavg=False,\n"
      "                       fast_divide_and_NR_steps=0, xbin_refine_factor=2, \n"
      "                       ybin_refine_factor=2, zbin_refine_factor=1, \n"
@@ -102,13 +101,6 @@ static PyMethodDef module_methods[] = {
      "autocorr: boolean\n"
      "    Flag for auto/cross-correlation. If autocorr is not 0, the RA2/DEC2/CZ2 arrays\n"
      "    are not used (but must still be passed, as RA1/DEC1/CZ1).\n\n"
-
-     "cosmology: integer\n"
-     "    Integer to select cosmology. Pre-set values for (1,2) \n"
-     "    1 -> LasDamas cosmology. Om=0.25,  Ol=0.75  (other values are not used)\n"
-     "    2 -> Planck   cosmology. Om=0.302, Ol=0.698 \n"
-     "    To setup a new cosmology, add an entry to the function, `init_cosmology` in \n"
-     "    `ROOT/utils/cosmology_params.c` and recompile the package.\n\n"
 
      "nthreads: integer\n"
      "    The number of OpenMP threads to use. Has no effect if OpenMP was not used\n"
@@ -159,11 +151,6 @@ static PyMethodDef module_methods[] = {
 
      "weights2\n : array-like, real (float/double), shape (n_weights_per_particle,n_particles), optional\n"
      "    Weights for computing a weighted pair count.\n\n"
-
-     "is_comoving_dist: boolean (default false)\n"
-     "    Boolean flag to indicate that ``cz`` values have already been\n"
-     "    converted into co-moving distances. This flag allows arbitrary\n"
-     "    cosmologies to be used in ``Corrfunc``.\n\n"
 
      "verbose : boolean (default false)\n"
      "    Boolean flag to control output of informational messages\n\n"
@@ -242,21 +229,19 @@ static PyMethodDef module_methods[] = {
      ">>> import numpy as np\n"
      ">>> from Corrfunc._countpairs_mocks import countpairs_rp_pi_mocks\n"
      ">>> ra,dec,cz = np.genfromtxt('../mocks/tests/data/Mr19_mock_northonly.rdcz.dat',dtype=np.float,unpack=True)\n"
-     ">>> cosmology=1\n"
      ">>> autocorr=1\n"
      ">>> nthreads=4\n"
      ">>> binfile='../mocks/tests/bins'\n"
      ">>> pimax=40.0\n"
-     ">>> (DDrppi, time) = countpairs_rp_pi_mocks(autocorr, cosmology, nthreads, pimax, binfile,\n"
-     "                                            ra,dec,cz,ra,dec,cz,\n"
+     ">>> (DDrppi, time) = countpairs_rp_pi_mocks(autocorr, nthreads, pimax, binfile,\n"
+     "                                            ra, dec, cz, ra, dec, cz,\n"
      "                                            verbose=True)\n"
      "\n"
     },
     {"countpairs_s_mu_mocks"       ,(PyCFunction)(void(*)(void)) countpairs_countpairs_s_mu_mocks ,METH_VARARGS | METH_KEYWORDS,
-     "countpairs_s_mu_mocks(autocorr, cosmology, nthreads, mu_max, nmu_bins, binfile,\n"
+     "countpairs_s_mu_mocks(autocorr, nthreads, mu_max, nmu_bins, binfile,\n"
      "                       RA1, DEC1, CZ1, weights1=None, weight_type=None,\n"
      "                       RA2=None, DEC2=None, CZ2=None, weights2=None,\n"
-     "                       is_comoving_dist=False,\n"
      "                       verbose=False, output_savg=False,\n"
      "                       fast_divide_and_NR_steps=0, xbin_refine_factor=2, \n"
      "                       ybin_refine_factor=2, zbin_refine_factor=1, \n"
@@ -277,13 +262,6 @@ static PyMethodDef module_methods[] = {
      "autocorr: boolean\n"
      "    Flag for auto/cross-correlation. If autocorr is not 0, the RA2/DEC2/CZ2 arrays\n"
      "    are not used (but must still be passed, as RA1/DEC1/CZ1).\n\n"
-
-     "cosmology: integer\n"
-     "    Integer to select cosmology. Pre-set values for (1,2) \n"
-     "    1 -> LasDamas cosmology. Om=0.25,  Ol=0.75  (other values are not used)\n"
-     "    2 -> Planck   cosmology. Om=0.302, Ol=0.698 \n"
-     "    To setup a new cosmology, add an entry to the function, `init_cosmology` in \n"
-     "    `ROOT/utils/cosmology_params.c` and recompile the package.\n\n"
 
      "nthreads: integer\n"
      "    The number of OpenMP threads to use. Has no effect if OpenMP was not used\n"
@@ -336,11 +314,6 @@ static PyMethodDef module_methods[] = {
 
      "weights2\n : array-like, real (float/double), shape (n_weights_per_particle,n_particles), optional\n"
      "    Weights for computing a weighted pair count.\n\n"
-
-     "is_comoving_dist: boolean (default false)\n"
-     "    Boolean flag to indicate that ``cz`` values have already been\n"
-     "    converted into co-moving distances. This flag allows arbitrary\n"
-     "    cosmologies to be used in ``Corrfunc``.\n\n"
 
      "verbose : boolean (default false)\n"
      "    Boolean flag to control output of informational messages\n\n"
@@ -415,13 +388,12 @@ static PyMethodDef module_methods[] = {
      ">>> import numpy as np\n"
      ">>> from Corrfunc._countpairs_mocks import countpairs_s_mu_mocks\n"
      ">>> ra,dec,cz = np.genfromtxt('../mocks/tests/data/Mr19_mock_northonly.rdcz.dat',dtype=np.float,unpack=True)\n"
-     ">>> cosmology=1\n"
      ">>> autocorr=1\n"
      ">>> nthreads=4\n"
      ">>> binfile='../mocks/tests/bins'\n"
      ">>> nmu_bins=10\n"
      ">>> mu_max=1.0\n"
-     ">>> (DDsmu, time) = countpairs_s_mu_mocks(autocorr, cosmology, nthreads, mu_max, nmu_bins, binfile,\n"
+     ">>> (DDsmu, time) = countpairs_s_mu_mocks(autocorr, nthreads, mu_max, nmu_bins, binfile,\n"
      "                                            ra,dec,cz,ra,dec,cz,\n"
      "                                            verbose=True)\n"
      "\n"
@@ -574,21 +546,20 @@ static PyMethodDef module_methods[] = {
      ">>> import numpy as np\n"
      ">>> from Corrfunc._countpairs_mocks import countpairs_theta_mocks\n"
      ">>> ra, dec, _ = np.genfromtxt('../mocks/tests/data/Mr19_mock_northonly.rdcz.dat',dtype=np.float,unpack=True)\n"
-     ">>> cosmology=1\n"
      ">>> autocorr=1\n"
      ">>> nthreads=4\n"
      ">>> binfile='../mocks/tests/angular_bins'\n"
-     ">>> DD=countpairs_theta_mocks(autocorr, cosmology, nthreads, binfile, \n"
+     ">>> DD=countpairs_theta_mocks(autocorr, nthreads, binfile, \n"
      "                              ra,dec,ra,dec,\n"
      "                              verbose=True)\n"
      "\n"
     },
     {"countspheres_vpf_mocks"       ,(PyCFunction)(void(*)(void)) countpairs_countspheres_vpf_mocks ,METH_VARARGS | METH_KEYWORDS,
      "countspheres_vpf_mocks(rmax, nbins, nspheres, numpN,\n"
-     "                       threshold_ngb, centers_file, cosmology,\n"
+     "                       threshold_ngb, centers_file,\n"
      "                       RA, DEC, CZ,\n"
      "                       RAND_RA, RAND_DEC, RAND_CZ,\n"
-     "                       verbose=False, is_comoving_dist=False,\n"
+     "                       verbose=False,\n"
      "                       xbin_refine_factor=2, ybin_refine_factor=2, \n"
      "                       zbin_refine_factor=1, max_cells_per_dim=100, \n"
      "                       copy_particles=1, c_api_timer=False, isa=-1)\n"
@@ -643,20 +614,6 @@ static PyMethodDef module_methods[] = {
      "    significantly longer to finish. However, subsequent runs can re-use\n"
      "    that centers file and will be faster.\n\n"
 
-     "cosmology: integer, required\n"
-     "    Integer choice for setting cosmology. Valid values are 1->LasDamas\n"
-     "    cosmology and 2->Planck cosmology. If you need arbitrary cosmology,\n"
-     "    easiest way is to convert the ``CZ`` values into co-moving distance,\n"
-     "    based on your preferred cosmology. Set ``is_comoving_dist=True``, to\n"
-     "    indicate that the co-moving distance conversion has already been done.\n"
-     "\n"
-     "    Choices: 1 -> LasDamas cosmology. Om=0.25,  Ol=0.75\n"
-     "             2 -> Planck   cosmology. Om=0.302, Ol=0.698\n"
-     "\n"
-     "    To setup a new cosmology, add an entry to the function,\n"
-     "    ``init_cosmology`` in ``ROOT/utils/cosmology_params.c`` and re-install\n"
-     "    the entire package.\n\n"
-
      "RA: array-like, real (float/double)\n"
      "    The array of Right Ascensions for the first set of points. RA's\n"
      "    are expected to be in [0.0, 360.0], but the code will try to fix cases\n"
@@ -678,8 +635,6 @@ static PyMethodDef module_methods[] = {
      "    points. Code will try to detect cases where ``redshifts`` have been\n"
      "    passed and multiply the entire array with the ``speed of light``.\n"
      "\n"
-     "    If ``is_comoving_dist`` is set, then ``CZ`` is interpreted as the\n"
-     "    co-moving distance, rather than (Speed Of Light * Redshift).\n\n"
 
      "RAND_RA: array-like, real (float/double)\n"
      "    The array of Right Ascensions for the randoms. RA's are expected to be\n"
@@ -702,17 +657,9 @@ static PyMethodDef module_methods[] = {
      "    will try to detect cases where ``redshifts`` have been\n"
      "    passed and multiply the entire array with the ``speed of light``.\n"
      "\n"
-     "    If ``is_comoving_dist`` is set, then ``CZ2`` is interpreted as the\n"
-     "    co-moving distance, rather than ``(Speed Of Light * Redshift)``.\n"
-     "\n"
      "    **Note** RAND_RA, RAND_DEC and RAND_CZ are only used when the\n"
      "      ``centers_file``  needs to be written out. In that case, the\n"
      "      RAND_RA, RAND_DEC, and RAND_CZ are used as random centers.\n\n"
-
-     "is_comoving_dist: boolean (default false)\n"
-     "    Boolean flag to indicate that ``cz`` values have already been\n"
-     "    converted into co-moving distances. This flag allows arbitrary\n"
-     "    cosmologies to be used in ``Corrfunc``.\n\n"
 
      "verbose : boolean (default false)\n"
      "    Boolean flag to control output of informational messages\n\n"
@@ -776,7 +723,6 @@ static PyMethodDef module_methods[] = {
     ">>> nspheres = 10000\n"
     ">>> numpN = 6\n"
     ">>> threshold_ngb = 1  # does not matter since we have the centers\n"
-    ">>> cosmology = 1  # LasDamas cosmology\n"
     ">>> centers_file = pjoin(dirname(abspath(Corrfunc.__file__)),\n"
     "                         '../mocks/tests/data/',\n"
     "                         'Mr19_centers_xyz_forVPF_rmax_10Mpc.txt')\n"
@@ -793,11 +739,10 @@ static PyMethodDef module_methods[] = {
     ">>> DEC = 90.0 - np.arccos(Z)*180.0/math.pi\n"
     ">>> RA = (np.arctan2(Y, X)*180.0/math.pi) + 180.0\n"
     ">>> results = vpf_mocks(rmax, nbins, nspheres, numpN,\n"
-    "                        threshold_ngb, centers_file, cosmology,\n"
+    "                        threshold_ngb, centers_file,\n"
     "                        RA, DEC, CZ,\n"
     "                        RA, DEC, CZ,\n"
-    "                        verbose=True,\n"
-    "                        is_comoving_dist=True)\n"
+    "                        verbose=True)\n"
     "\n"
     },
     {NULL, NULL, 0, NULL}
@@ -1322,7 +1267,6 @@ static PyObject *countpairs_countpairs_bessel_mocks(PyObject *self, PyObject *ar
     PyObject *weights1_obj=NULL, *weights2_obj=NULL;
 
     struct config_options options = get_config_options();
-    options.is_comoving_dist = 0;
     options.verbose = 0;
     options.instruction_set = -1;
     options.periodic = 0;
@@ -1631,7 +1575,6 @@ static PyObject *countpairs_countpairs_rp_pi_mocks(PyObject *self, PyObject *arg
     PyObject *weights1_obj=NULL, *weights2_obj=NULL;
 
     struct config_options options = get_config_options();
-    options.is_comoving_dist = 0;
     options.verbose = 0;
     options.instruction_set = -1;
     options.periodic = 0;
@@ -1646,7 +1589,6 @@ static PyObject *countpairs_countpairs_rp_pi_mocks(PyObject *self, PyObject *arg
 
     int autocorr=1;
     int nthreads=4;
-    int cosmology=1;
     double pimax;
     int npibins;
     char *weighting_method_str = NULL;
@@ -1654,7 +1596,6 @@ static PyObject *countpairs_countpairs_rp_pi_mocks(PyObject *self, PyObject *arg
 
     static char *kwlist[] = {
         "autocorr",
-        "cosmology",
         "nthreads",
         "binfile",
         "pimax",
@@ -1667,7 +1608,6 @@ static PyObject *countpairs_countpairs_rp_pi_mocks(PyObject *self, PyObject *arg
         "DEC2",
         "CZ2",
         "weights2",
-        "is_comoving_dist",
         "verbose", /* keyword verbose -> print extra info at runtime + progressbar */
         "output_rpavg",
         "fast_divide_and_NR_steps",
@@ -1687,8 +1627,8 @@ static PyObject *countpairs_countpairs_rp_pi_mocks(PyObject *self, PyObject *arg
         NULL
     };
 
-    if ( ! PyArg_ParseTupleAndKeywords(args, kwargs, "iiiO!diO!O!O!|OO!O!O!ObbbbbbbhbbbisO!O!OI", kwlist,
-                                       &autocorr,&cosmology,&nthreads,
+    if ( ! PyArg_ParseTupleAndKeywords(args, kwargs, "iiO!diO!O!O!|OO!O!O!ObbbbbbhbbbisO!O!OI", kwlist,
+                                       &autocorr,&nthreads,
                                        &PyArray_Type,&bins_obj,
                                        &pimax,&npibins,
                                        &PyArray_Type,&x1_obj,
@@ -1699,7 +1639,6 @@ static PyObject *countpairs_countpairs_rp_pi_mocks(PyObject *self, PyObject *arg
                                        &PyArray_Type,&y2_obj,
                                        &PyArray_Type,&z2_obj,
                                        &weights2_obj,
-                                       &(options.is_comoving_dist),
                                        &(options.verbose),
                                        &(options.need_avg_sep),
                                        &(options.fast_divide_and_NR_steps),
@@ -1875,7 +1814,6 @@ static PyObject *countpairs_countpairs_rp_pi_mocks(PyObject *self, PyObject *arg
                                   &bins,
                                   pimax,
                                   npibins,
-                                  cosmology,
                                   &results,
                                   &options,
                                   &extra);
@@ -1949,7 +1887,6 @@ static PyObject *countpairs_countpairs_s_mu_mocks(PyObject *self, PyObject *args
     PyObject *weights1_obj=NULL, *weights2_obj=NULL;
 
     struct config_options options = get_config_options();
-    options.is_comoving_dist = 0;
     options.verbose = 0;
     options.instruction_set = -1;
     options.periodic = 0;
@@ -1963,7 +1900,6 @@ static PyObject *countpairs_countpairs_s_mu_mocks(PyObject *self, PyObject *args
 
     int autocorr=1;
     int nthreads=4;
-    int cosmology=1;
     int nmu_bins=10;
     double mu_max=1.0;
     char *weighting_method_str = NULL;
@@ -1971,7 +1907,6 @@ static PyObject *countpairs_countpairs_s_mu_mocks(PyObject *self, PyObject *args
 
     static char *kwlist[] = {
         "autocorr",
-        "cosmology",
         "nthreads",
         "binfile",
         "mu_max",
@@ -1984,7 +1919,6 @@ static PyObject *countpairs_countpairs_s_mu_mocks(PyObject *self, PyObject *args
         "DEC2",
         "CZ2",
         "weights2",
-        "is_comoving_dist",
         "verbose", /* keyword verbose -> print extra info at runtime + progressbar */
         "output_savg",
         "fast_divide_and_NR_steps",
@@ -2005,8 +1939,8 @@ static PyObject *countpairs_countpairs_s_mu_mocks(PyObject *self, PyObject *args
         NULL
     };
 
-    if ( ! PyArg_ParseTupleAndKeywords(args, kwargs, "iiiO!diO!O!O!|OO!O!O!ObbbbbbbhbbbisO!O!OII", kwlist,
-                                       &autocorr,&cosmology,&nthreads,
+    if ( ! PyArg_ParseTupleAndKeywords(args, kwargs, "iiO!diO!O!O!|OO!O!O!ObbbbbbhbbbisO!O!OII", kwlist,
+                                       &autocorr,&nthreads,
                                        &PyArray_Type,&bins_obj,
                                        &mu_max,&nmu_bins,
                                        &PyArray_Type,&x1_obj,
@@ -2017,7 +1951,6 @@ static PyObject *countpairs_countpairs_s_mu_mocks(PyObject *self, PyObject *args
                                        &PyArray_Type,&y2_obj,
                                        &PyArray_Type,&z2_obj,
                                        &weights2_obj,
-                                       &(options.is_comoving_dist),
                                        &(options.verbose),
                                        &(options.need_avg_sep),
                                        &(options.fast_divide_and_NR_steps),
@@ -2194,7 +2127,6 @@ static PyObject *countpairs_countpairs_s_mu_mocks(PyObject *self, PyObject *args
                                        &bins,
                                        mu_max,
                                        nmu_bins,
-                                       cosmology,
                                        &results,
                                        &options,
                                        &extra);
@@ -2544,13 +2476,11 @@ static PyObject *countpairs_countspheres_vpf_mocks(PyObject *self, PyObject *arg
     //x1->ra (phi), y1-> declination (theta1), z1->cz (cz1)
     //x2->ra (ph2), y2-> declination (theta2), z2->cz (cz2)
     PyArrayObject *x1_obj=NULL, *y1_obj=NULL, *z1_obj=NULL, *x2_obj=NULL,*y2_obj=NULL,*z2_obj=NULL;
-    int cosmology=1;
     double rmax;
     int nbin,num_spheres, num_pN;
     char *centers_file;
     int threshold_neighbors;
     struct config_options options = get_config_options();
-    options.is_comoving_dist = 0;
     options.verbose=0;
     options.instruction_set=-1;
     options.copy_particles=1;
@@ -2571,14 +2501,12 @@ static PyObject *countpairs_countspheres_vpf_mocks(PyObject *self, PyObject *arg
         "numpN",
         "threshold",
         "centers_file",
-        "cosmology",
         "X1",
         "Y1",
         "Z1",
         "X2",
         "Y2",
         "Z2",
-        "is_comoving_dist",
         "verbose", /* keyword verbose -> print extra info at runtime + progressbar */
         "xbin_refine_factor",
         "ybin_refine_factor",
@@ -2591,15 +2519,14 @@ static PyObject *countpairs_countspheres_vpf_mocks(PyObject *self, PyObject *arg
     };
 
 
-    if ( ! PyArg_ParseTupleAndKeywords(args, kwargs, "diiiisiO!O!O!O!O!O!|bbbbbhbbi", kwlist,
-                                       &rmax,&nbin,&num_spheres,&num_pN,&threshold_neighbors,&centers_file,&cosmology,
+    if ( ! PyArg_ParseTupleAndKeywords(args, kwargs, "diiiisO!O!O!O!O!O!|bbbbhbbi", kwlist,
+                                       &rmax,&nbin,&num_spheres,&num_pN,&threshold_neighbors,&centers_file,
                                        &PyArray_Type,&x1_obj,
                                        &PyArray_Type,&y1_obj,
                                        &PyArray_Type,&z1_obj,
                                        &PyArray_Type,&x2_obj,
                                        &PyArray_Type,&y2_obj,
                                        &PyArray_Type,&z2_obj,
-                                       &(options.is_comoving_dist),
                                        &(options.verbose),
                                        &xbin_ref, &ybin_ref, &zbin_ref,
                                        &(options.max_cells_per_dim),
@@ -2710,7 +2637,6 @@ static PyObject *countpairs_countspheres_vpf_mocks(PyObject *self, PyObject *arg
                                     rmax, nbin, num_spheres,
                                     num_pN,
                                     centers_file,
-                                    cosmology,
                                     &results,
                                     &options, NULL);
     if(options.c_api_timer) {

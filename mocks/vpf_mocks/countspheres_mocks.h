@@ -31,10 +31,9 @@ extern "C" {
                                   const double rmax, const int nbin, const int nc,
                                   const int num_pN,
                                   const char *centers_file,
-                                  const int cosmology,
                                   results_countspheres_mocks *results,
                                   struct config_options *options, struct extra_options *extra);
-    
+
     extern void free_results_countspheres_mocks(results_countspheres_mocks *results);
 
 #ifdef __cplusplus

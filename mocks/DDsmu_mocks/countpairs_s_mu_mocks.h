@@ -34,7 +34,6 @@ extern "C" {
                               binarray *bins,
                               const double mu_max,
                               const int nmu_bins,
-                              const int cosmology,
                               results_countpairs_mocks_s_mu *results,
                               struct config_options *options,
                               struct extra_options *extra);

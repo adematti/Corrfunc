@@ -42,15 +42,14 @@ Pre-requisites
 
 1. ``make >= 3.80``
 2. OpenMP capable compiler like ``icc``, ``gcc>=4.6`` or ``clang >= 3.7``. If
-   not available, please disable ``USE_OMP`` option option in
+   not available, please disable ``USE_OMP`` option in
    ``theory.options`` and ``mocks.options``. You might need to ask your
    sys-admin for system-wide installs of the compiler; if you prefer to
    install your own then ``conda install gcc`` (MAC/linux) or
    ``(sudo) port install gcc5`` (on MAC) should work.
-3. ``gsl >= 2.4``. Use either
-   ``conda install -c conda-forge gsl``
-   (MAC/linux) or ``(sudo) port install gsl`` (MAC) to install ``gsl``
-   if necessary.
+3. ``gsl >= 2.4``. If not available, please disable ``USE_GSL`` option in
+   ``theory.options`` and ``mocks.options``. ``conda install -c conda-forge gsl``
+   (MAC/linux) or ``(sudo) port install gsl`` (MAC) should work to install ``gsl``.
 4. ``python >= 2.7`` or ``python>=3.4`` for compiling the C extensions.
 5. ``numpy>=1.7`` for compiling the C extensions.
 

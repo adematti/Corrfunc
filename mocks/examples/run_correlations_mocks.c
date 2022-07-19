@@ -22,7 +22,6 @@
 #include "io.h"
 #include "defs.h"
 #include "utils.h"
-#include "cosmology_params.h"
 
 /* Library proto-types + struct definitions in the ../..//include directory */
 #include "countpairs_rp_pi_mocks.h"
@@ -45,7 +44,6 @@ void Printhelp(void)
     fprintf(stderr,"     * format       = format of data file  (a=ascii, f=fast-food)\n") ;
     fprintf(stderr,"     * binfile      = name of ascii file containing the r-bins (rmin rmax for each bin)\n") ;
     fprintf(stderr,"     * pimax        = pimax   (in same units as X/Y/Z of the data)\n");
-    fprintf(stderr,"     * cosmology    = flag to pick-up the cosmology combination to use (set as an array of combinations in ../utils/cosmology_params.c)\n");
     fprintf(stderr,"     * mu_max       = Max. value of the cosine of the angle to the LOS (must be within [0.0, 1.0])\n");
     fprintf(stderr,"     * nmu_bins     = Number of linear bins to create (the bins themselves range from [0.0, mu_max]\n");
 #if defined(USE_OMP) && defined(_OPENMP)
@@ -62,7 +60,6 @@ int main(int argc, char **argv)
     DOUBLE *ra1=NULL,*dec1=NULL,*cz1=NULL;
     struct timeval t0,t1;
     DOUBLE pimax;
-    int cosmology=1;
     int nthreads=4;
     int nmu_bins;
     DOUBLE mu_max;
@@ -74,9 +71,9 @@ int main(int argc, char **argv)
     options.float_type = sizeof(*ra1);
 
 #if defined(_OPENMP)
-    const char argnames[][30]={"file","format","binfile","pimax","cosmology","mu_max", "nmu_bins", "Nthreads"};
+    const char argnames[][30]={"file", "format", "binfile", "pimax", "mu_max", "nmu_bins", "Nthreads"};
 #else
-    const char argnames[][30]={"file","format","binfile","pimax","cosmology", "mu_max", "nmu_bins"};
+    const char argnames[][30]={"file", "format", "binfile", "pimax", "mu_max", "nmu_bins"};
 #endif
     int nargs=sizeof(argnames)/(sizeof(char)*30);
 
@@ -92,19 +89,17 @@ int main(int argc, char **argv)
             my_snprintf(fileformat,MAXLEN, "%s",argv[2]);
             my_snprintf(binfile,MAXLEN,"%s",argv[3]);
             pimax=atof(argv[4]);
-            cosmology=atoi(argv[5]);
-            mu_max=atof(argv[6]);
-            nmu_bins=atoi(argv[7]);
+            mu_max=atof(argv[5]);
+            nmu_bins=atoi(argv[6]);
 #if defined(_OPENMP)
-            nthreads = atoi(argv[8]);
+            nthreads = atoi(argv[7]);
 #endif
         }
     } else {
-        my_snprintf(file, MAXLEN, "%s", "../tests/data/Mr19_mock_northonly.rdcz.dat");
+        my_snprintf(file, MAXLEN, "%s", "../tests/data/Mr19_mock_northonly.rdcz.txt");
         my_snprintf(fileformat, MAXLEN, "%s","a");
         my_snprintf(binfile, MAXLEN,"%s","../tests/bins");
         pimax=40.0;
-        cosmology=1;
         mu_max=1.0;
         nmu_bins=10;
     }
@@ -115,20 +110,13 @@ int main(int argc, char **argv)
     fprintf(stderr,"\t\t %-10s = %s \n",argnames[1],fileformat);
     fprintf(stderr,"\t\t %-10s = %s \n",argnames[2],binfile);
     fprintf(stderr,"\t\t %-10s = %10.4lf\n",argnames[3],pimax);
-    fprintf(stderr,"\t\t %-10s = %d\n",argnames[4],cosmology);
-    fprintf(stderr,"\t\t %-10s = %10.4lf\n",argnames[5],mu_max);
-    fprintf(stderr,"\t\t %-10s = %dlf\n",argnames[6],nmu_bins);
+    fprintf(stderr,"\t\t %-10s = %10.4lf\n",argnames[4],mu_max);
+    fprintf(stderr,"\t\t %-10s = %dlf\n",argnames[5],nmu_bins);
 #if defined(_OPENMP)
-    fprintf(stderr,"\t\t %-10s = %d\n",argnames[7],nthreads);
+    fprintf(stderr,"\t\t %-10s = %d\n",argnames[6],nthreads);
 #endif
     fprintf(stderr,"\t\t -------------------------------------" ANSI_COLOR_RESET "\n");
 
-    {
-        int status = init_cosmology(cosmology);
-        if(status != EXIT_SUCCESS) {
-            return status;
-        }
-    }
     binarray bins;
     read_binfile(binfile, &bins);
 
@@ -145,11 +133,11 @@ int main(int argc, char **argv)
     {
         gettimeofday(&t0,NULL);
 #if defined(_OPENMP)
-        fprintf(stderr,ANSI_COLOR_MAGENTA "Command-line for running equivalent DD(rp,pi) calculation would be:\n `%s %s %s %s %s %s %lf %d %d'" ANSI_COLOR_RESET "\n",
-                "../DDrppi_mocks/DDrppi_mocks",file,fileformat,file,fileformat,binfile,pimax,cosmology,nthreads);
-#else
         fprintf(stderr,ANSI_COLOR_MAGENTA "Command-line for running equivalent DD(rp,pi) calculation would be:\n `%s %s %s %s %s %s %lf %d'" ANSI_COLOR_RESET "\n",
-                "../DDrppi_mocks/DDrppi_mocks",file,fileformat,file,fileformat,binfile,pimax,cosmology);
+                "../DDrppi_mocks/DDrppi_mocks",file,fileformat,file,fileformat,binfile,pimax,nthreads);
+#else
+        fprintf(stderr,ANSI_COLOR_MAGENTA "Command-line for running equivalent DD(rp,pi) calculation would be:\n `%s %s %s %s %s %s %lf'" ANSI_COLOR_RESET "\n",
+                "../DDrppi_mocks/DDrppi_mocks",file,fileformat,file,fileformat,binfile,pimax);
 #endif
 
         results_countpairs_mocks results;
@@ -160,7 +148,6 @@ int main(int argc, char **argv)
                                       &bins,
                                       pimax,
                                       (int) pimax,
-                                      cosmology,
                                       &results,
                                       &options, NULL);
         if(status != EXIT_SUCCESS) {
@@ -193,11 +180,11 @@ int main(int argc, char **argv)
     {
         gettimeofday(&t0,NULL);
 #if defined(_OPENMP)
-        fprintf(stderr,ANSI_COLOR_MAGENTA "Command-line for running equivalent DD(s,mu) calculation would be:\n `%s %s %s %s %s %s %lf %d %d %d'"ANSI_COLOR_RESET"\n",
-                "../DDsmu_mocks/DDsmu_mocks",file,fileformat,file,fileformat,binfile,mu_max,nmu_bins,cosmology,nthreads);
-#else
         fprintf(stderr,ANSI_COLOR_MAGENTA "Command-line for running equivalent DD(s,mu) calculation would be:\n `%s %s %s %s %s %s %lf %d %d'"ANSI_COLOR_RESET"\n",
-                "../DDsmu_mocks/DDsmu_mocks",file,fileformat,file,fileformat,binfile,mu_max,nmu_bins,cosmology);
+                "../DDsmu_mocks/DDsmu_mocks",file,fileformat,file,fileformat,binfile,mu_max,nmu_bins,nthreads);
+#else
+        fprintf(stderr,ANSI_COLOR_MAGENTA "Command-line for running equivalent DD(s,mu) calculation would be:\n `%s %s %s %s %s %s %lf %d'"ANSI_COLOR_RESET"\n",
+                "../DDsmu_mocks/DDsmu_mocks",file,fileformat,file,fileformat,binfile,mu_max,nmu_bins);
 #endif
 
         results_countpairs_mocks_s_mu results;
@@ -208,7 +195,6 @@ int main(int argc, char **argv)
                                            &bins,
                                            mu_max,
                                            nmu_bins,
-                                           cosmology,
                                            &results,
                                            &options, NULL);
         if(status != EXIT_SUCCESS) {
@@ -289,8 +275,8 @@ int main(int argc, char **argv)
         const int threshold_neighbors=1;
         const char centers_file[]="../tests/data/Mr19_centers_xyz_forVPF_rmax_10Mpc.txt";
         fprintf(stderr,ANSI_COLOR_MAGENTA "Command-line for running equivalent DD(theta) calculation would be:\n"
-                "`%s %lf %d %d %d %lf %s %s %s %s %s %d'"ANSI_COLOR_RESET "\n",
-                "../vpf_mocks/vpf_mocks",rmax,nbin,nc,num_pN,0.0,file,fileformat,"junk","junkformat",centers_file,cosmology);
+                "`%s %lf %d %d %d %lf %s %s %s %s %s'"ANSI_COLOR_RESET "\n",
+                "../vpf_mocks/vpf_mocks",rmax,nbin,nc,num_pN,0.0,file,fileformat,"junk","junkformat",centers_file);
 
         results_countspheres_mocks results;
         int status = countspheres_mocks(ND1, ra1, dec1, cz1,
@@ -299,7 +285,6 @@ int main(int argc, char **argv)
                                         rmax, nbin, nc,
                                         num_pN,
                                         centers_file,
-                                        cosmology,
                                         &results,
                                         &options, NULL);
         if(status != EXIT_SUCCESS) {

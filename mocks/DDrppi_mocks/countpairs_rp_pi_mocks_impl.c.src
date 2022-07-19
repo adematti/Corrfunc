@@ -12,12 +12,9 @@
 #include <stdlib.h>
 #include <signal.h>
 #include <unistd.h>
-#include <gsl/gsl_interp.h>
 
 #include "defs.h"
 #include "utils.h"
-#include "cosmology_params.h"
-#include "set_cosmo_dist.h"
 #include "cpu_features.h"
 #include "progressbar.h"
 
@@ -40,66 +37,20 @@ void interrupt_handler_countpairs_rp_pi_mocks_DOUBLE(int signo)
 }
 
 
-int check_ra_dec_cz_DOUBLE(const int64_t N, DOUBLE *phi, DOUBLE *theta, DOUBLE *cz)
+static int check_ra_dec_cz_DOUBLE(const int64_t N, DOUBLE *ra, DOUBLE *dec, DOUBLE *cz)
 {
-
-    if(N==0) {
+    if (N == 0) {
         return EXIT_SUCCESS;
     }
-    if(phi == NULL || theta == NULL || cz == NULL) {
-        fprintf(stderr,"Input arrays can not be NULL. Have RA = %p DEC = %p cz = %p\n", phi, theta, cz);
+    if(ra == NULL || dec == NULL || cz == NULL) {
+        fprintf(stderr,"Input arrays can not be NULL. Have RA = %p DEC = %p cz = %p\n", ra, dec, cz);
         return EXIT_FAILURE;
     }
 
-    int fix_cz  = 0;
-    int fix_ra  = 0;
-    int fix_dec = 0;
-
-    //const DOUBLE max_cz_threshold = 10.0;//if I find that max cz is smaller than this threshold, then I will assume z has been supplied rather than cz
-    const DOUBLE max_cz_threshold = -1.;
-    DOUBLE max_cz = 0.0;
-    //Check input cz -> ensure that cz contains cz and not z
     for(int64_t i=0;i<N;i++) {
-        if(cz[i] > max_cz) max_cz = cz[i];
-        if(phi[i] < 0.0) {
-            fix_ra = 1;
-        }
-        if(theta[i] > 90.0) {
-            fix_dec = 1;
-        }
-        if(theta[i] > 180) {
-            fprintf(stderr,"theta[%"PRId64"] = %"REAL_FORMAT"should be less than 180 deg\n", i, theta[i]);
-            return EXIT_FAILURE;
-        }
+        ra[i] = wrap_range(ra[i], 0., 360.);
+        dec[i] = wrap_range(dec[i], -90., 90);
     }
-    if(max_cz < max_cz_threshold) fix_cz = 1;
-
-    //Only run the loop if something needs to be fixed
-    if(fix_cz==1 || fix_ra == 1 || fix_dec == 1) {
-        if(fix_ra == 1) {
-            fprintf(stderr,"%s> Out of range values found for ra. Expected ra to be in the range [0.0,360.0]. Found ra values in [-180,180] -- fixing that\n", __FUNCTION__);
-        }
-        if(fix_dec == 1) {
-            fprintf(stderr,"%s> Out of range values found for dec. Expected dec to be in the range [-90.0,90.0]. Found dec values in [0,180] -- fixing that\n", __FUNCTION__);
-        }
-        if(fix_cz == 1)  {
-            fprintf(stderr,"%s> Out of range values found for cz. Expected input to be `cz' but found `z' instead. max_cz (found in input) = %"REAL_FORMAT" threshold "
-                    "= %"REAL_FORMAT"\n",__FUNCTION__,max_cz,max_cz_threshold);
-        }
-
-        for(int64_t i=0;i<N;i++) {
-            if(fix_ra==1) {
-                phi[i] += (DOUBLE) 180.0;
-            }
-            if(fix_dec==1) {
-                theta[i] -= (DOUBLE) 90.0;
-            }
-            if(fix_cz == 1) {
-                cz[i] *= (DOUBLE) SPEED_OF_LIGHT;//input was z -> convert to cz
-            }
-        }
-    }
-
     return EXIT_SUCCESS;
 }
 
@@ -207,7 +158,6 @@ int countpairs_mocks_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1, DOUBLE
                             binarray *bins,
                             const DOUBLE pimax,
                             const int npibin,
-                            const int cosmology,
                             results_countpairs_mocks *results,
                             struct config_options *options, struct extra_options *extra)
 {
@@ -312,67 +262,10 @@ int countpairs_mocks_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1, DOUBLE
        Let's Ctrl-C abort the extension  */
     SETUP_INTERRUPT_HANDLERS(interrupt_handler_countpairs_rp_pi_mocks_DOUBLE);
 
-    //Try to initialize cosmology - code will exit if comoslogy is not implemented.
-    //Putting in a different scope so I can call the variable status
-    {
-        int status = init_cosmology(cosmology);
-        if(status != EXIT_SUCCESS) {
-            return status;
-        }
-    }
-
     //Change cz into co-moving distance
     DOUBLE *D1 = NULL, *D2 = NULL;
-    if(options->is_comoving_dist == 0) {
-        D1 = my_malloc(sizeof(*D1),ND1);
-        D2 = autocorr == 0 ? my_malloc(sizeof(*D2),ND2):D1;
-    } else {
-        D1 = czD1;
-        D2 = autocorr == 0 ? czD2:czD1;
-    }
-
-    if(D1 == NULL || D2 == NULL) {
-        free(D1);free(D2);
-        return EXIT_FAILURE;
-    }
-
-    if(options->is_comoving_dist == 0) {
-        //Setup variables to do the cz->comoving distance
-        DOUBLE czmax = 0.0;
-        const DOUBLE inv_speed_of_light = 1.0/SPEED_OF_LIGHT;
-        get_max_DOUBLE(ND1, czD1, &czmax);
-        if(autocorr == 0) {
-            get_max_DOUBLE(ND2, czD2, &czmax);
-        }
-        const double zmax = czmax * inv_speed_of_light + 0.01;
-
-        const int workspace_size = 10000;
-        double *interp_redshift = my_calloc(sizeof(*interp_redshift), workspace_size);//the interpolation is done in 'z' and not in 'cz'
-        double *interp_comoving_dist = my_calloc(sizeof(*interp_comoving_dist),workspace_size);
-        int Nzdc = set_cosmo_dist(zmax, workspace_size, interp_redshift, interp_comoving_dist, cosmology);
-        if(Nzdc < 0) {
-            free(interp_redshift);free(interp_comoving_dist);
-            return EXIT_FAILURE;
-        }
-
-        gsl_interp *interpolation;
-        gsl_interp_accel *accelerator;
-        accelerator =  gsl_interp_accel_alloc();
-        interpolation = gsl_interp_alloc(gsl_interp_linear,Nzdc);
-        gsl_interp_init(interpolation, interp_redshift, interp_comoving_dist, Nzdc);
-        for(int64_t i=0;i<ND1;i++) {
-            D1[i] = gsl_interp_eval(interpolation, interp_redshift, interp_comoving_dist, czD1[i]*inv_speed_of_light, accelerator);
-        }
-
-        if(autocorr==0) {
-            for(int64_t i=0;i<ND2;i++) {
-                D2[i] = gsl_interp_eval(interpolation, interp_redshift, interp_comoving_dist, czD2[i]*inv_speed_of_light, accelerator);
-            }
-        }
-        free(interp_redshift);free(interp_comoving_dist);
-        gsl_interp_free(interpolation);
-        gsl_interp_accel_free(accelerator);
-    }
+    D1 = czD1;
+    D2 = autocorr == 0 ? czD2:czD1;
 
     DOUBLE *X1 = my_malloc(sizeof(*X1), ND1);
     DOUBLE *Y1 = my_malloc(sizeof(*Y1), ND1);
@@ -518,13 +411,6 @@ int countpairs_mocks_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1, DOUBLE
         free(X1);free(Y1);free(Z1);
         if(autocorr == 0) {
             free(X2);free(Y2);free(Z2);
-        }
-    }
-
-    if(options->is_comoving_dist == 0) {
-        free(D1);
-        if(autocorr == 0) {
-            free(D2);
         }
     }
 

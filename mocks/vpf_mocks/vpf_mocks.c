@@ -8,7 +8,7 @@
 
 /* PROGRAM vpf_mocks
 
-   --- vpf_mocks rmax nbin nc num_pN volume mocksfile mocksformat RANDfile randformat centers-file cosmology > output
+   --- vpf_mocks rmax nbin nc num_pN volume mocksfile mocksformat RANDfile randformat centers-file > output
    --- compute the void probability function for MOCK galaxies
 
    * rmax = maximum radius (in h^-1 Mpc)
@@ -21,7 +21,6 @@
    * random file        = (contains: ra,dec,cz)
    * random file format = (ascii, fast-food)
    * centers file       = file containing sphere centers (XYZ). If there are not enough centers, file will be truncated and re-written with centers
-   * cosmology          = flag to pick-up the cosmology combination to use (set as an array of combinations in ../utils/cosmology_params.c)
    > output: <R P0 P1 P2 ...>
 */
 
@@ -51,11 +50,10 @@ int main(int argc, char *argv[])
     DOUBLE *ra=NULL,*dec=NULL,*cz=NULL;
     DOUBLE *xran=NULL,*yran=NULL,*zran=NULL;
     char *galaxy_file,*galaxy_file_format,*random_file,*random_file_format,*centers_file;
-    int cosmology=1;
 
     struct timeval tstart,t0,t1;
 
-    const char argnames[][100]={"rmax","nbin","ncenters","num_pN","volume","galaxy file","galaxy file-format","randoms file","randoms file-format","centers file","cosmology flag"};
+    const char argnames[][100]={"rmax","nbin","ncenters","num_pN","volume","galaxy file","galaxy file-format","randoms file","randoms file-format","centers file"};
     int nargs=sizeof(argnames)/(sizeof(char)*100);
 
     gettimeofday(&tstart,NULL);
@@ -87,7 +85,6 @@ int main(int argc, char *argv[])
     random_file=argv[8];
     random_file_format=argv[9];
     centers_file=argv[10];
-    cosmology = atoi(argv[11]);
 
     fprintf(stderr,"Running `%s' with the parameters \n",argv[0]);
     fprintf(stderr,"\n\t\t -------------------------------------\n");
@@ -161,7 +158,6 @@ int main(int argc, char *argv[])
                                     rmax, nbin, nc,
                                     num_pN,
                                     centers_file,
-                                    cosmology,
                                     &results,
                                     &options, NULL);
 
@@ -195,7 +191,7 @@ int main(int argc, char *argv[])
 void Printhelp(void)
 {
     fprintf(stderr,"=========================================================================\n") ;
-    fprintf(stderr,"   --- vpf_mocks rmax nbin nc num_pN volume mocksfile mocksformat RANDfile randformat centers-file cosmology > output\n");
+    fprintf(stderr,"   --- vpf_mocks rmax nbin nc num_pN volume mocksfile mocksformat RANDfile randformat centers-file > output\n");
     fprintf(stderr,"   --- compute the void probability function for SDSS galaxies\n") ;
     fprintf(stderr,"      * rmax = maximum radius (in h^-1 Mpc)\n") ;
     fprintf(stderr,"      * nbin = number of radii (evenly spaced in r)\n") ;
@@ -213,8 +209,8 @@ void Printhelp(void)
     fprintf(stderr,"CZ column contains co-moving distance = True\n");
 #else
     fprintf(stderr,"CZ column contains co-moving distance = False\n");
-#endif    
-    
+#endif
+
 #ifdef DOUBLE_PREC
     fprintf(stderr,"Precision = double\n");
 #else

@@ -38,7 +38,6 @@ int countpairs_mocks_s_mu(const int64_t ND1, void *phi1, void *theta1, void *czD
                           binarray *bins,
                           const double mu_max,
                           const int nmu_bins,
-                          const int cosmology,
                           results_countpairs_mocks_s_mu *results,
                           struct config_options *options,
                           struct extra_options *extra)
@@ -62,7 +61,6 @@ int countpairs_mocks_s_mu(const int64_t ND1, void *phi1, void *theta1, void *czD
                                            bins,
                                            mu_max,
                                            nmu_bins,
-                                           cosmology,
                                            results,
                                            options,
                                            extra);
@@ -74,7 +72,6 @@ int countpairs_mocks_s_mu(const int64_t ND1, void *phi1, void *theta1, void *czD
                                             bins,
                                             mu_max,
                                             nmu_bins,
-                                            cosmology,
                                             results,
                                             options,
                                             extra);

@@ -33,7 +33,6 @@ extern "C" {
                          binarray* bins,
                          const double pimax,
                          const int npibins,
-                         const int cosmology,
                          results_countpairs_mocks *results,
                          struct config_options *options, struct extra_options *extra);
 

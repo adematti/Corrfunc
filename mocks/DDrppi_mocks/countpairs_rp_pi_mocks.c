@@ -37,7 +37,6 @@ int countpairs_mocks(const int64_t ND1, void *phi1, void *theta1, void *czD1,
                      binarray* bins,
                      const double pimax,
                      const int npibins,
-                     const int cosmology,
                      results_countpairs_mocks *results,
                      struct config_options *options, struct extra_options *extra)
 {
@@ -60,7 +59,6 @@ int countpairs_mocks(const int64_t ND1, void *phi1, void *theta1, void *czD1,
                                       bins,
                                       pimax,
                                       npibins,
-                                      cosmology,
                                       results,
                                       options,
                                       extra);
@@ -72,7 +70,6 @@ int countpairs_mocks(const int64_t ND1, void *phi1, void *theta1, void *czD1,
                                        bins,
                                        pimax,
                                        npibins,
-                                       cosmology,
                                        results,
                                        options,
                                        extra);

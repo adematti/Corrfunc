@@ -834,7 +834,7 @@ static PyMethodDef module_methods[] = {
      "      and so on...(note that p0 is the vpf).\n\n"
 
      "seed: unsigned integer\n"
-     "    Random number seed for the underlying GSL random number generator. Used\n"
+     "    Random number seed for the underlying random number generator. Used\n"
      "    to draw centers of the spheres.\n\n"
 
      "X/Y/Z: arraytype, real (float/double)\n"

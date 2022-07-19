@@ -9,7 +9,6 @@
 #include "tests_common.h"
 #include "io.h"
 #include "utils.h"
-#include "cosmology_params.h"
 
 #if !(defined(__INTEL_COMPILER)) && defined(USE_AVX)
 #warning Test suite for mocks are faster with Intel compiler, icc, AVX libraries.
@@ -40,7 +39,6 @@ double *RA2=NULL,*DEC2=NULL,*CZ2=NULL,*weights2=NULL;
 binarray bins;
 binarray angular_bins;
 
-const int cosmology_flag=1;
 char current_file1[MAXLEN+1],current_file2[MAXLEN+1];
 
 struct config_options options;
@@ -68,7 +66,6 @@ int test_DDrppi_mocks(const char *correct_outputfile)
                                       &bins,
                                       pimax,
                                       (int) pimax,
-                                      cosmology_flag,
                                       &results,
                                       &options,
                                       &extra);
@@ -159,7 +156,6 @@ int test_DDsmu_mocks(const char *correct_outputfile)
                                            &bins,
                                            mocks_mu_max,
                                            nmu_bins,
-                                           cosmology_flag,
                                            &results,
                                            &options,
                                            &extra);
@@ -329,7 +325,6 @@ int test_vpf_mocks(const char *correct_outputfile)
                                         rmax, nbin, nc,
                                         num_pN,
                                         centers_file,
-                                        cosmology_flag,
                                         &results,
                                         &options, NULL);
         if(status != EXIT_SUCCESS) {
@@ -455,7 +450,7 @@ void read_data_and_set_globals(const char *firstfilename, const char *firstforma
 int main(int argc, char **argv)
 {
     struct timeval tstart,t0,t1;
-    char file[]="../tests/data/Mr19_mock_northonly.rdcz.dat";
+    char file[]="../tests/data/Mr19_mock_northonly.rdcz.txt";
     char fileformat[]="a";
 
     options = get_config_options();
@@ -469,10 +464,8 @@ int main(int argc, char **argv)
     options.link_in_dec = 1;
     options.copy_particles = 1;
 
-    int status = init_cosmology(cosmology_flag);
-    if(status != EXIT_SUCCESS) {
-        return EXIT_FAILURE;
-    }
+    int status = EXIT_SUCCESS;
+
     gettimeofday(&tstart,NULL);
 
     //set the globals.
@@ -514,24 +507,24 @@ int main(int argc, char **argv)
                                                 "../tests/Mr19_randoms_vpf", /* Test 5 Mr19 randoms vpf */
                                                 "../tests/Mr19_mock_DDsmu.RR", /* Test 6 Mr19 RR smu */
                                                 "../tests/Mr19_mock_DDsmu.DR"}; /* Test 7 Mr19 DR smu */
-    const char firstfilename[][MAXLEN] = {"../tests/data/Mr19_mock_northonly.rdcz.dat",
-                                          "../tests/data/Mr19_mock_northonly.rdcz.dat",
-                                          "../tests/data/Mr19_mock_northonly.rdcz.dat",
-                                          "../tests/data/Mr19_randoms_northonly.rdcz.ff",
-                                          "../tests/data/Mr19_randoms_northonly.rdcz.ff",
-                                          "../tests/data/Mr19_randoms_northonly.rdcz.ff",
-                                          "../tests/data/Mr19_randoms_northonly.rdcz.ff",
-                                          "../tests/data/Mr19_randoms_northonly.rdcz.ff"};
-    const char firstfiletype[][MAXLEN]  = {"a","a","a","f","f","f","f","f"};
-    const char secondfilename[][MAXLEN] = {"../tests/data/Mr19_mock_northonly.rdcz.dat",
-                                           "../tests/data/Mr19_mock_northonly.rdcz.dat",
-                                           "../tests/data/Mr19_mock_northonly.rdcz.dat",
-                                           "../tests/data/Mr19_mock_northonly.rdcz.dat",
-                                           "../tests/data/Mr19_mock_northonly.rdcz.dat",
-                                           "../tests/data/Mr19_randoms_northonly.rdcz.ff",
-                                           "../tests/data/Mr19_randoms_northonly.rdcz.ff",
-                                           "../tests/data/Mr19_mock_northonly.rdcz.dat"};
-    const char secondfiletype[][MAXLEN] = {"a","a","a","a","a","f","f","a"};
+    const char firstfilename[][MAXLEN] = {"../tests/data/Mr19_mock_northonly.rdcz.txt",
+                                          "../tests/data/Mr19_mock_northonly.rdcz.txt",
+                                          "../tests/data/Mr19_mock_northonly.rdcz.txt",
+                                          "../tests/data/Mr19_randoms_northonly.rdcz.txt",
+                                          "../tests/data/Mr19_randoms_northonly.rdcz.txt",
+                                          "../tests/data/Mr19_randoms_northonly.rdcz.txt",
+                                          "../tests/data/Mr19_randoms_northonly.rdcz.txt",
+                                          "../tests/data/Mr19_randoms_northonly.rdcz.txt"};
+    const char firstfiletype[][MAXLEN]  = {"a","a","a","a","a","a","a","a"};
+    const char secondfilename[][MAXLEN] = {"../tests/data/Mr19_mock_northonly.rdcz.txt",
+                                           "../tests/data/Mr19_mock_northonly.rdcz.txt",
+                                           "../tests/data/Mr19_mock_northonly.rdcz.txt",
+                                           "../tests/data/Mr19_mock_northonly.rdcz.txt",
+                                           "../tests/data/Mr19_mock_northonly.rdcz.txt",
+                                           "../tests/data/Mr19_randoms_northonly.rdcz.txt",
+                                           "../tests/data/Mr19_randoms_northonly.rdcz.txt",
+                                           "../tests/data/Mr19_mock_northonly.rdcz.txt"};
+    const char secondfiletype[][MAXLEN] = {"a","a","a","a","a","a","a","a"};
 
     const double allpimax[]             = {40.0,40.0,40.0,40.0,40.0,40.0,40.0,40.0};
 

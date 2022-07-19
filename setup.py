@@ -32,6 +32,7 @@ builtins.__CORRFUNC_SETUP__ = True
 import Corrfunc
 from Corrfunc import read_text_file, write_text_file, which
 
+from distutils.command.clean import clean
 # numpy 1.7 supports python 2.4-2.5; python 3.1-3.3.
 try:
     from setuptools import setup, Extension, find_packages
@@ -325,7 +326,7 @@ def requirements_check():
     return common_dict
 
 
-class BuildExtSubclass(build_ext):
+class custom_build_ext(build_ext):
     def build_extensions(self):
         # Everything has already been configured - so just call make
         for ext in self.extensions:
@@ -432,6 +433,17 @@ def install_required():
             return True
 
     return False
+
+
+class custom_clean(clean):
+
+    def run(self):
+        # run the built-in clean
+        super(custom_clean, self).run()
+        # remove the recon products
+        for section in ['theory', 'mocks']:
+            command = "cd {0} && make clean".format(pjoin(dirname(abspath(__file__)), section))
+            run_command(command)
 
 
 # Taken from numpy setup.py
@@ -562,7 +574,7 @@ def setup_packages():
                               'wurlitzer'],
             python_requires='>=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, <4',
             zip_safe=False,
-            cmdclass={'build_ext': BuildExtSubclass})
+            cmdclass={'build_ext': custom_build_ext, 'clean': custom_clean})
 
     # Now the actual setup
     try:

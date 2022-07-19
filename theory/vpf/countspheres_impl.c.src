@@ -13,7 +13,9 @@
 #include <sys/time.h>
 #include <signal.h>
 #include <unistd.h>
+#if defined(USE_GSL)
 #include <gsl/gsl_rng.h>
+#endif
 
 #include "countspheres_impl_DOUBLE.h" //function proto-type
 #include "vpf_kernels_DOUBLE.c" // the kernels
@@ -131,7 +133,11 @@ vpf_func_ptr_DOUBLE vpf_driver_DOUBLE(const struct config_options *options)
 }
 
 
-
+static DOUBLE rng_uniform(void) {
+    DOUBLE r = rand() * (1.0 / RAND_MAX);
+    if (r >= 1.) r = 1;
+    return r;
+}
 
 int countspheres_DOUBLE(const int64_t np, DOUBLE * restrict X, DOUBLE * restrict Y, DOUBLE * restrict Z,
                         const double rmax, const int nbin, const int nc,
@@ -186,15 +192,17 @@ int countspheres_DOUBLE(const int64_t np, DOUBLE * restrict X, DOUBLE * restrict
        Let's Ctrl-C abort the extension  */
     SETUP_INTERRUPT_HANDLERS(interrupt_handler_vpf_DOUBLE);
 
-    const gsl_rng_type * T = gsl_rng_mt19937;
-    gsl_rng *rng = gsl_rng_alloc (T);
-    gsl_rng_set(rng, seed);
-
     int **pN = (int **) matrix_calloc(sizeof(**pN), nbin, num_pN);
     if(pN == NULL) {
-        gsl_rng_free(rng);
         return EXIT_FAILURE;
     }
+#if defined(USE_GSL)
+    const gsl_rng_type * T = gsl_rng_mt19937;
+    gsl_rng *rng = gsl_rng_alloc(T);
+    gsl_rng_set(rng, seed);
+#else
+    srand((unsigned int) seed);
+#endif
 
     //Find the min/max of the data
     DOUBLE xmin,xmax,ymin,ymax,zmin,zmax;
@@ -231,7 +239,6 @@ int countspheres_DOUBLE(const int64_t np, DOUBLE * restrict X, DOUBLE * restrict
         fprintf(stderr,"Running with [zmin,zmax] = %lf,%lf with periodic wrapping = %lf\n",zmin,zmax,zdiff);
     }
 
-
     const DOUBLE inv_xdiff = ((DOUBLE) 1.0)/xdiff;
     const DOUBLE inv_ydiff = ((DOUBLE) 1.0)/ydiff;
     const DOUBLE inv_zdiff = ((DOUBLE) 1.0)/zdiff;
@@ -253,11 +260,15 @@ int countspheres_DOUBLE(const int64_t np, DOUBLE * restrict X, DOUBLE * restrict
         if(options->verbose) {
             my_progressbar(ic,&interrupted);
         }
-
-        const DOUBLE xc = xdiff*gsl_rng_uniform (rng) + xmin;
-        const DOUBLE yc = ydiff*gsl_rng_uniform (rng) + ymin;
-        const DOUBLE zc = zdiff*gsl_rng_uniform (rng) + zmin;
-
+#if defined(USE_GSL)
+        const DOUBLE xc = xdiff*gsl_rng_uniform(rng) + xmin;
+        const DOUBLE yc = ydiff*gsl_rng_uniform(rng) + ymin;
+        const DOUBLE zc = zdiff*gsl_rng_uniform(rng) + zmin;
+#else
+        const DOUBLE xc = xdiff*rng_uniform() + xmin;
+        const DOUBLE yc = ydiff*rng_uniform() + ymin;
+        const DOUBLE zc = zdiff*rng_uniform() + zmin;
+#endif
         if( ! options->periodic) {
             //Check that the biggest sphere will not intersect
             //with the box edges iff non-periodic conditions are set
@@ -388,9 +399,9 @@ int countspheres_DOUBLE(const int64_t np, DOUBLE * restrict X, DOUBLE * restrict
 
         /* gettimeofday(&t1,NULL); */
     }//loop over number of spheres
-
-    gsl_rng_free (rng);
-
+#if defined(USE_GSL)
+    gsl_rng_free(rng);
+#endif
     if(options->copy_particles == 0) {
         int64_t *original_index = lattice[0].original_index;
         int status = reorder_particles_back_into_original_order_DOUBLE(np, original_index, X, Y, Z, &(extra->weights0));

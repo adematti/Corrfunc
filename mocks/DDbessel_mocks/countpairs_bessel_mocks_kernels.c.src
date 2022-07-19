@@ -12,12 +12,16 @@
 #include <stdlib.h>
 #include <math.h>
 #include <stdint.h>
+#if defined(USE_GSL)
+#include <gsl/gsl_sf.h>
+#else
+#define MAX_ELL 4
+#endif
 
 #include "function_precision.h"
 #include "utils.h"
 
 #include "weight_functions_DOUBLE.h"
-#include <gsl/gsl_sf.h>
 
 
 inline DOUBLE spherical_bessel(const DOUBLE x, const int ell) {
@@ -50,7 +54,11 @@ inline DOUBLE spherical_bessel(const DOUBLE x, const int ell) {
             x2 = x * x;
             return (x2 - 15) * COS(x) / (x * x2) - 3 * (2 * x2 - 5) * SIN(x) / (x2 * x2);
         default:
+#if defined(USE_GSL)
             return gsl_sf_bessel_jl(ell, (double) x);
+#else
+            return 0.;
+#endif
     }
 }
 
@@ -72,7 +80,12 @@ inline DOUBLE legendre(const DOUBLE x, const int ell) {
         case 3:
             return (5 * x * x * x - 3 * x) / 2;
         default:
+#if defined(USE_GSL)
             return gsl_sf_legendre_Pl(ell, (double) x);
+#else
+            return 0.;
+#endif
+
     }
 }
 

@@ -33,9 +33,9 @@ typedef struct{
                             results_countspheres *results,
                             struct config_options *options,
                             struct extra_options *extra);
-    
+
     extern void free_results_countspheres(results_countspheres *results);
-    
+
 #ifdef __cplusplus
 }
 #endif

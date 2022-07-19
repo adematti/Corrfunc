@@ -69,19 +69,6 @@ struct config_options
     /* Theory option for periodic boundaries */
     double boxsize;
 
-    /* Options for mocks */
-    //cosmology struct. Intentionally left anoynoymous, so I can
-    //directly access the fields.
-    struct{
-        double OMEGA_M;
-        double OMEGA_B;
-        double OMEGA_L;
-        double HUBBLE;
-        double LITTLE_H;
-        double SIGMA_8;
-        double NS;
-    };
-
     /* Measures the time spent in the C API while accessed from python.
        Enabled when the flag c_timer is set
      */
@@ -108,9 +95,6 @@ struct config_options
     /* Options for theory*/
     uint8_t periodic; /* count in periodic mode? flag ignored for wp/xi */
     uint8_t sort_on_z;/* option to sort particles based on their Z co-ordinate in gridlink */
-
-    /* For DDrppi_mocks and vpf*/
-    uint8_t is_comoving_dist;/* flag to indicate cz is already co-moving distance */
 
     /* the link_in_* variables control how the 3-D cell structure is created */
     uint8_t link_in_dec;/* relevant for DDthteta_mocks */
@@ -155,7 +139,7 @@ struct config_options
     /* Reserving to maintain ABI compatibility for the future */
     /* Note that the math here assumes no padding bytes, that's because of the
        order in which the fields are declared (largest to smallest alignments)  */
-    uint8_t reserved[OPTIONS_HEADER_SIZE - 33*sizeof(char) - sizeof(size_t) - 9*sizeof(double) - 3*sizeof(int)
+    uint8_t reserved[OPTIONS_HEADER_SIZE - 33*sizeof(char) - sizeof(size_t) - 2*sizeof(double) - 3*sizeof(int)
                      - sizeof(uint16_t) - 16*sizeof(uint8_t) - sizeof(bin_type_t) - sizeof(los_type_t) - sizeof(struct api_cell_timings *) - sizeof(int64_t)];
 };
 
@@ -308,21 +292,17 @@ static inline struct config_options get_config_options(void)
     options.link_in_dec = 1;
 #endif
 #ifdef LINK_IN_RA
-    options.link_in_ra=1;
-    options.link_in_dec=1;
+    options.link_in_ra = 1;
+    options.link_in_dec = 1;
 #endif
 
 #ifdef ENABLE_MIN_SEP_OPT
     //Introduced in Corrfunc v2.3
-    options.enable_min_sep_opt=1;/* optimizations based on min. separation between cell-pairs. Enabled by default */
+    options.enable_min_sep_opt = 1;/* optimizations based on min. separation between cell-pairs. Enabled by default */
 #endif
 
 #ifdef FAST_ACOS
     options.fast_acos=1;
-#endif
-
-#ifdef COMOVING_DIST
-    options.is_comoving_dist=1;
 #endif
 
 #ifdef COPY_PARTICLES

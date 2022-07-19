@@ -4,34 +4,28 @@ from os.path import dirname, abspath, join as pjoin
 import numpy as np
 import pytest
 
-from Corrfunc.io import read_fastfood_catalog
+from Corrfunc.io import read_fastfood_catalog, read_ascii_catalog
 
 @pytest.fixture(scope='module')
 def gals_Mr19():
 
     filename = pjoin(dirname(abspath(__file__)),
-                    "../../theory/tests/data", "gals_Mr19.ff")
-    x, y, z, w = read_fastfood_catalog(filename, need_weights=True)
-
-    return x, y, z, w
+                     '../../theory/tests/data', 'gals_Mr19.ff')
+    return read_fastfood_catalog(filename)  # x, y, z, w
 
 
 @pytest.fixture(scope='module')
 def Mr19_mock_northonly():
     filename = pjoin(dirname(abspath(__file__)),
-                "../../mocks/tests/data", "Mr19_mock_northonly.rdcz.ff")
-    ra,dec,cz,w = read_fastfood_catalog(filename, need_weights=True)
-
-    return ra, dec, cz, w
+                     '../../mocks/tests/data', 'Mr19_mock_northonly.rdcz.txt')
+    return read_ascii_catalog(filename)  # ra, dec, cz, w
 
 
 @pytest.fixture(scope='module')
 def Mr19_randoms_northonly():
     filename = pjoin(dirname(abspath(__file__)),
-                "../../mocks/tests/data", "Mr19_randoms_northonly.rdcz.ff")
-    ra,dec,cz,w = read_fastfood_catalog(filename, need_weights=True)
-
-    return ra, dec, cz, w
+                     '../../mocks/tests/data', 'Mr19_randoms_northonly.rdcz.txt')
+    return read_ascii_catalog(filename)  # ra, dec, cz, w
 
 
 def maxthreads():
@@ -53,10 +47,10 @@ def generate_isa_and_nthreads_combos(extra_isa=None):
     # the ISA sweep will use maxthreads
     # and then with the fastest ISA, we will test single-threaded,
     # plus "oversubscribed", where we use more threads than cores
-    all_nthreads = [1,mx+1][:1]
+    all_nthreads = [1, mx+1][:1]
 
     combos = []
-    all_isa = ['fallback','sse42','avx','avx512f']
+    all_isa = ['fallback', 'sse42', 'avx', 'avx512f']
     if extra_isa:
         all_isa += extra_isa
     combos += [(isa,mx) for isa in all_isa]
@@ -74,8 +68,8 @@ def check_against_reference(results, filename,
     # filename has the reference counts
     # ref_cols in order of npairs, weightavg, rpavg, [xi]
 
-    names = ['npairs','weightavg',ravg_name]
-    dtypes = [np.int64,np.float64,np.float64]
+    names = ['npairs', 'weightavg', ravg_name]
+    dtypes = [np.int64, np.float64, np.float64]
     if cf_name != None:
         # modules like xi return both npairs and xi, so we'll check both
         names += [cf_name]
@@ -89,13 +83,33 @@ def check_against_reference(results, filename,
     for name in names[1:]:
         assert np.allclose(results[name], refs[name], atol=atol, rtol=rtol)
 
+
 def check_vpf_against_reference(results, filename,
                                 atol=1e-9, rtol=1e-6):
     # results is output of Python function
     # filename has the reference counts
 
     numN = results['pN'].shape[-1]
-    refs = np.genfromtxt(filename, usecols=range(1,numN+1),
-                         dtype=np.float64,
-                        )
+    refs = np.genfromtxt(filename, usecols=range(1, numN+1), dtype=np.float64)
     assert np.allclose(results['pN'], refs, atol=atol, rtol=rtol)
+
+'''
+def convert_ff():
+
+    from cosmoprimo import Cosmology
+    # Las Damas cosmology
+    cosmo = Cosmology(Omega_m=0.25, Omega_b=0.04, h=0.7, sigma8=0.8, n_s=1., engine='class')
+    for filename in ['Mr19_mock_northonly.rdcz.ff', 'Mr19_randoms_northonly.rdcz.ff']:
+        filename = pjoin(dirname(abspath(__file__)), '../../mocks/tests/data', filename)
+        ra, dec, cz, w = read_fastfood_catalog(filename)
+        cz = cosmo.comoving_radial_distance(cz / 299800.0)
+        np.savetxt(filename[:-2] + 'txt', np.column_stack([ra, dec, cz, w]))
+
+if __name__ == '__main__':
+
+    convert_ff()
+'''
+if __name__ == '__main__':
+    filename = pjoin(dirname(abspath(__file__)),
+                     '../../mocks/tests/data', 'Mr19_randoms_northonly.rdcz.txt')
+    read_ascii_catalog(filename)

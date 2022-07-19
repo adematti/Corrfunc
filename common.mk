@@ -19,7 +19,7 @@ CLINK ?=
 ## Set the python command (supply the full path to python you want to
 ## use, if different from directly calling `python` on the shell,
 ## as can be the case if python is set via an alias)
-PYTHON:=python
+PYTHON:=/local/home/adematti/anaconda3/envs/cosmodesi/bin/python
 
 ## Important note -> if you directly call /some/path/to/python
 ## then the previous two variables will be updated to point
@@ -29,6 +29,10 @@ PYTHON:=python
 
 ## Set OpenMP for both theory and mocks
 OPT += -DUSE_OMP
+## Use GSL, not required; if available:
+## - used in theory/vpf to generate random centers (required for internal tests to pass)
+## - used in mocks/DDbessel for high ell multipoles
+#OPT += -DUSE_GSL
 
 ### You should NOT edit below this line
 DISTNAME:=Corrfunc
@@ -185,13 +189,16 @@ ifeq ($(DO_CHECKS), 1)
    -CFLAGS += -Wimplicit-fallthrough=1
   endif
 
-  GSL_FOUND := $(shell gsl-config --version 2>/dev/null)
-  ifndef GSL_FOUND
-    $(error $(ccred)Error:$(ccreset) GSL not found in path - please install GSL before installing $(DISTNAME).$(VERSION) $(ccreset))
-  endif
-  GSL_CFLAGS := $(shell gsl-config --cflags)
-  GSL_LIBDIR := $(shell gsl-config --prefix)/lib
-  GSL_LINK   := $(shell gsl-config --libs) -Xlinker -rpath -Xlinker $(GSL_LIBDIR)
+	ifeq (USE_GSL,$(findstring USE_GSL,$(OPT)))
+		GSL_FOUND := $(shell gsl-config --version 2>/dev/null)
+	  ifndef GSL_FOUND
+	    $(error $(ccred)Error:$(ccreset) GSL not found in path - please install GSL before installing, or unset USE_GSL $(DISTNAME).$(VERSION) $(ccreset))
+	  endif
+		CFLAGS += -DUSE_GSL
+	  GSL_CFLAGS := $(shell gsl-config --cflags)
+	  GSL_LIBDIR := $(shell gsl-config --prefix)/lib
+	  GSL_LINK   := $(shell gsl-config --libs) -Xlinker -rpath -Xlinker $(GSL_LIBDIR)
+	endif
 
   # Check if all progressbar output is to be suppressed
   OUTPUT_PGBAR := 1
@@ -507,7 +514,7 @@ ifeq ($(DO_CHECKS), 1)
     endif
   endif
 
-  ### The following sections are currently not relevant for the Corrfunc package
+	### The following sections are currently not relevant for the Corrfunc package
   ### but I do not want to have to figure this out again!
   ifeq (USE_MKL,$(findstring USE_MKL,$(OPT)))
     BLAS_INCLUDE:=-DMKL_ILP64 -m64 -I$(MKLROOT)/include
@@ -545,7 +552,7 @@ ifeq ($(DO_CHECKS), 1)
     # Therefore, I am going to split the variables into "small" and "long"
     # sets of variables. Ugly, but works. I get the aligned print at the end.
     BIG_MAKEFILE_VARS := GSL_CFLAGS GSL_LINK PYTHON_CFLAGS
-    ifeq (USE_MKL,$(findstring USE_MKL,$(OPT)))
+		ifeq (USE_MKL,$(findstring USE_MKL,$(OPT)))
       MAKEFILE_VARS += BLAS_INCLUDE BLAS_LINK
     endif
     tabvar:= $(shell printf "\t")

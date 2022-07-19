@@ -14,10 +14,9 @@ __author__ = ('Manodeep Sinha')
 __all__ = ('DDrppi_mocks', )
 
 
-def DDrppi_mocks(autocorr, cosmology, nthreads, binfile, pimax, npibins,
+def DDrppi_mocks(autocorr, nthreads, binfile, pimax, npibins,
                  RA1, DEC1, CZ1, weights1=None,
                  RA2=None, DEC2=None, CZ2=None, weights2=None,
-                 is_comoving_dist=False,
                  verbose=False, output_rpavg=False,
                  fast_divide_and_NR_steps=0,
                  xbin_refine_factor=2, ybin_refine_factor=2,
@@ -55,21 +54,6 @@ def DDrppi_mocks(autocorr, cosmology, nthreads, binfile, pimax, npibins,
     autocorr : boolean, required
         Boolean flag for auto/cross-correlation. If autocorr is set to 1,
         then the second set of particle positions are not required.
-
-    cosmology : integer, required
-        Integer choice for setting cosmology. Valid values are 1->LasDamas
-        cosmology and 2->Planck cosmology. If you need arbitrary cosmology,
-        easiest way is to convert the ``CZ`` values into co-moving distance,
-        based on your preferred cosmology. Set ``is_comoving_dist=True``, to
-        indicate that the co-moving distance conversion has already been done.
-
-        Choices:
-                 1. LasDamas cosmology. :math:`\\Omega_m=0.25`, :math:`\\Omega_\Lambda=0.75`
-                 2. Planck   cosmology. :math:`\\Omega_m=0.302`, :math:`\\Omega_\Lambda=0.698`
-
-        To setup a new cosmology, add an entry to the function,
-        ``init_cosmology`` in ``ROOT/utils/cosmology_params.c`` and re-install
-        the entire package.
 
     nthreads : integer
         The number of OpenMP threads to use. Has no effect if OpenMP was not
@@ -121,9 +105,6 @@ def DDrppi_mocks(autocorr, cosmology, nthreads, binfile, pimax, npibins,
         points. Code will try to detect cases where ``redshifts`` have been
         passed and multiply the entire array with the ``speed of light``.
 
-        If is_comoving_dist is set, then ``CZ1`` is interpreted as the
-        co-moving distance, rather than `cz`.
-
     weights1 : array_like, real (float/double), optional
         A scalar, or an array of weights of shape (n_weights, n_positions) or (n_positions,).
         `weight_type` specifies how these weights are used; results are returned
@@ -151,18 +132,10 @@ def DDrppi_mocks(autocorr, cosmology, nthreads, binfile, pimax, npibins,
         points. Code will try to detect cases where ``redshifts`` have been
         passed and multiply the entire array with the ``speed of light``.
 
-        If is_comoving_dist is set, then ``CZ2`` is interpreted as the
-        co-moving distance, rather than `cz`.
-
         Must be of same precision type as RA1/DEC1/CZ1.
 
     weights2 : array-like, real (float/double), optional
         Same as weights1, but for the second set of positions
-
-    is_comoving_dist : boolean (default false)
-        Boolean flag to indicate that ``cz`` values have already been
-        converted into co-moving distances. This flag allows arbitrary
-        cosmologies to be used in ``Corrfunc``.
 
     verbose : boolean (default false)
         Boolean flag to control output of informational messages
@@ -293,13 +266,12 @@ def DDrppi_mocks(autocorr, cosmology, nthreads, binfile, pimax, npibins,
     >>> DEC = 90.0 - np.arccos(Z)*180.0/math.pi
     >>> RA = (np.arctan2(Y, X)*180.0/math.pi) + 180.0
     >>> autocorr = 1
-    >>> cosmology = 1
     >>> nthreads = 2
     >>> pimax = 40.0
-    >>> results = DDrppi_mocks(autocorr, cosmology, nthreads,
+    >>> results = DDrppi_mocks(autocorr, nthreads,
     ...                        pimax, binfile, RA, DEC, CZ,
     ...                        weights1=weights, weight_type='pair_product',
-    ...                        output_rpavg=True, is_comoving_dist=True)
+    ...                        output_rpavg=True)
     >>> for r in results[519:]: print("{0:10.6f} {1:10.6f} {2:10.6f} {3:10.1f}"
     ...                               " {4:10d} {5:10.6f}".format(r['rmin'], r['rmax'],
     ...                               r['rpavg'], r['pimax'], r['npairs'], r['weightavg']))
@@ -357,8 +329,7 @@ def DDrppi_mocks(autocorr, cosmology, nthreads, binfile, pimax, npibins,
 
     import numpy as np
     from Corrfunc.utils import translate_isa_string_to_enum, translate_bin_type_string_to_enum,\
-        fix_ra_dec, get_edges, convert_to_native_endian,\
-        sys_pipes, process_weights
+                               get_edges, convert_to_native_endian, sys_pipes, process_weights
     from future.utils import bytes_to_native_str
 
     if not autocorr:
@@ -377,10 +348,6 @@ def DDrppi_mocks(autocorr, cosmology, nthreads, binfile, pimax, npibins,
     RA1, DEC1, CZ1, RA2, DEC2, CZ2 = [
             convert_to_native_endian(arr, warn=False) for arr in
             [RA1, DEC1, CZ1, RA2, DEC2, CZ2]]
-
-    fix_ra_dec(RA1, DEC1)
-    if autocorr == 0:
-        fix_ra_dec(RA2, DEC2)
 
     if weights1 is not None:
         weights1 = [convert_to_native_endian(arr, warn=False) for arr in weights1]
@@ -403,10 +370,9 @@ def DDrppi_mocks(autocorr, cosmology, nthreads, binfile, pimax, npibins,
     integer_bin_type = translate_bin_type_string_to_enum(bin_type)
     rbinfile = get_edges(binfile)
     with sys_pipes():
-        extn_results = DDrppi_extn(autocorr, cosmology, nthreads,
+        extn_results = DDrppi_extn(autocorr, nthreads,
                                    rbinfile, pimax, npibins,
                                    RA1, DEC1, CZ1,
-                                   is_comoving_dist=is_comoving_dist,
                                    verbose=verbose,
                                    output_rpavg=output_rpavg,
                                    fast_divide_and_NR_steps=fast_divide_and_NR_steps,

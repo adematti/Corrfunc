@@ -13,10 +13,9 @@ __author__ = ('Manodeep Sinha', 'Nick Hand')
 __all__ = ('DDsmu_mocks', )
 
 
-def DDsmu_mocks(autocorr, cosmology, nthreads, binfile, mumax, nmubins,
+def DDsmu_mocks(autocorr, nthreads, binfile, mumax, nmubins,
                 RA1, DEC1, CZ1, weights1=None,
                 RA2=None, DEC2=None, CZ2=None, weights2=None,
-                is_comoving_dist=False,
                 verbose=False, output_savg=False,
                 fast_divide_and_NR_steps=0,
                 xbin_refine_factor=2, ybin_refine_factor=2,
@@ -51,21 +50,6 @@ def DDsmu_mocks(autocorr, cosmology, nthreads, binfile, mumax, nmubins,
     autocorr : boolean, required
         Boolean flag for auto/cross-correlation. If autocorr is set to 1,
         then the second set of particle positions are not required.
-
-    cosmology : integer, required
-        Integer choice for setting cosmology. Valid values are 1->LasDamas
-        cosmology and 2->Planck cosmology. If you need arbitrary cosmology,
-        easiest way is to convert the ``CZ`` values into co-moving distance,
-        based on your preferred cosmology. Set ``is_comoving_dist=True``, to
-        indicate that the co-moving distance conversion has already been done.
-
-        Choices:
-                 1. LasDamas cosmology. :math:`\\Omega_m=0.25`, :math:`\\Omega_\Lambda=0.75`
-                 2. Planck   cosmology. :math:`\\Omega_m=0.302`, :math:`\\Omega_\Lambda=0.698`
-
-        To setup a new cosmology, add an entry to the function,
-        ``init_cosmology`` in ``ROOT/utils/cosmology_params.c`` and re-install
-        the entire package.
 
     nthreads : integer
         The number of OpenMP threads to use. Has no effect if OpenMP was not
@@ -119,9 +103,6 @@ def DDsmu_mocks(autocorr, cosmology, nthreads, binfile, mumax, nmubins,
         points. Code will try to detect cases where ``redshifts`` have been
         passed and multiply the entire array with the ``speed of light``.
 
-        If is_comoving_dist is set, then ``CZ1`` is interpreted as the
-        co-moving distance, rather than `cz`.
-
     weights1 : array_like, real (float/double), optional
         A scalar, or an array of weights of shape (n_weights, n_positions)
         or (n_positions,). `weight_type` specifies how these weights are used;
@@ -150,18 +131,10 @@ def DDsmu_mocks(autocorr, cosmology, nthreads, binfile, mumax, nmubins,
         points. Code will try to detect cases where ``redshifts`` have been
         passed and multiply the entire array with the ``speed of light``.
 
-        If is_comoving_dist is set, then ``CZ2`` is interpreted as the
-        co-moving distance, rather than `cz`.
-
         Must be of same precision type as RA1/DEC1/CZ1.
 
     weights2 : array-like, real (float/double), optional
         Same as weights1, but for the second set of positions
-
-    is_comoving_dist : boolean (default false)
-        Boolean flag to indicate that ``cz`` values have already been
-        converted into co-moving distances. This flag allows arbitrary
-        cosmologies to be used in ``Corrfunc``.
 
     verbose : boolean (default false)
         Boolean flag to control output of informational messages
@@ -280,8 +253,7 @@ def DDsmu_mocks(autocorr, cosmology, nthreads, binfile, mumax, nmubins,
 
     import numpy as np
     from Corrfunc.utils import translate_isa_string_to_enum, translate_bin_type_string_to_enum,\
-        fix_ra_dec, get_edges, convert_to_native_endian,\
-        sys_pipes, process_weights
+                               get_edges, convert_to_native_endian, sys_pipes, process_weights
     from future.utils import bytes_to_native_str
 
     # Check if mumax is scalar
@@ -314,11 +286,6 @@ def DDsmu_mocks(autocorr, cosmology, nthreads, binfile, mumax, nmubins,
             convert_to_native_endian(arr, warn=False) for arr in
             [RA1, DEC1, CZ1, RA2, DEC2, CZ2]]
 
-
-    fix_ra_dec(RA1, DEC1)
-    if autocorr == 0:
-        fix_ra_dec(RA2, DEC2)
-
     if weights1 is not None:
         weights1 = [convert_to_native_endian(arr, warn=False) for arr in weights1]
     if weights2 is not None:
@@ -341,10 +308,9 @@ def DDsmu_mocks(autocorr, cosmology, nthreads, binfile, mumax, nmubins,
     integer_los_type = {'midpoint':0, 'firstpoint':1}[los_type.lower()]
     sbinfile = get_edges(binfile)
     with sys_pipes():
-        extn_results = DDsmu_extn(autocorr, cosmology, nthreads,
+        extn_results = DDsmu_extn(autocorr, nthreads,
                                   sbinfile, mumax, nmubins,
                                   RA1, DEC1, CZ1,
-                                  is_comoving_dist=is_comoving_dist,
                                   verbose=verbose,
                                   output_savg=output_savg,
                                   fast_divide_and_NR_steps=fast_divide_and_NR_steps,
