@@ -16,9 +16,9 @@
    * nc = number of centers to place (does not count rejected centers)
    * numpN              = number of counts-in-spheres to output. [numpN=1-> P0, numpN=2->P0,P1, numpN=3->P0,P1,P2...\n");
    * volume             = volume of sample (in Mpc^3/h^3)
-   * galaxy file        = contains: ra,dec,cz)
+   * galaxy file        = contains: x,y,z)
    * galaxy file format = (ascii, fast-food)
-   * random file        = (contains: ra,dec,cz)
+   * random file        = (contains: x,y,z)
    * random file format = (ascii, fast-food)
    * centers file       = file containing sphere centers (XYZ). If there are not enough centers, file will be truncated and re-written with centers
    > output: <R P0 P1 P2 ...>
@@ -47,7 +47,7 @@ int main(int argc, char *argv[])
     /*---Particle-distribution-variables---*/
     int64_t Ngal,Nran=0;
 
-    DOUBLE *ra=NULL,*dec=NULL,*cz=NULL;
+    DOUBLE *xgal=NULL,*ygal=NULL,*zgal=NULL;
     DOUBLE *xran=NULL,*yran=NULL,*zran=NULL;
     char *galaxy_file,*galaxy_file_format,*random_file,*random_file_format,*centers_file;
 
@@ -125,7 +125,7 @@ int main(int argc, char *argv[])
 
     gettimeofday(&t0,NULL);
     /*---Read-galaxy-data1-file----------------------------------*/
-    Ngal=read_positions(galaxy_file,galaxy_file_format, sizeof(DOUBLE), 3, &ra, &dec, &cz);
+    Ngal=read_positions(galaxy_file,galaxy_file_format, sizeof(DOUBLE), 3, &xgal, &ygal, &zgal);
     gettimeofday(&t1,NULL);
     fprintf(stderr,"vpf_mocks> Ngal = %"PRId64". Time to read-in galaxies=%6.2lf sec\n",Ngal,ADD_DIFF_TIME(t0,t1)) ;
 
@@ -152,7 +152,7 @@ int main(int argc, char *argv[])
     results_countspheres_mocks results;
     struct config_options options = get_config_options();
 
-    int status = countspheres_mocks(Ngal, ra, dec, cz,
+    int status = countspheres_mocks(Ngal, xgal, ygal, zgal,
                                     Nran, xran, yran, zran,
                                     threshold_neighbors,
                                     rmax, nbin, nc,
@@ -161,7 +161,7 @@ int main(int argc, char *argv[])
                                     &results,
                                     &options, NULL);
 
-    free(ra);free(dec);free(cz);
+    free(xgal);free(ygal);free(zgal);
     if(need_randoms == 1) {
         free(xran);free(yran);free(zran);
     }
@@ -198,9 +198,9 @@ void Printhelp(void)
     fprintf(stderr,"      * nc = number of centers to place (does not count rejected centers)\n") ;
     fprintf(stderr,"      * numpN        = number of counts-in-spheres to output. [numpN=1-> P0, numpN=2->P0,P1, numpN=3->P0,P1,P2...\n");
     fprintf(stderr,"      * volume = volume of sample (in Mpc^3/h^3)\n") ;
-    fprintf(stderr,"      * galaxy file, (contains: ra,dec,cz)\n") ;
+    fprintf(stderr,"      * galaxy file, (contains: xgal,ygal,zgal)\n") ;
     fprintf(stderr,"      * galaxy file format (a -> ascii, f->fast-food)\n") ;
-    fprintf(stderr,"      * random file, (contains: ra,dec,cz)\n") ;
+    fprintf(stderr,"      * random file, (contains: xgal,ygal,zgal)\n") ;
     fprintf(stderr,"      * random file format (a -> ascii, f-> fast-food)\n");
     fprintf(stderr,"      * file with sphere centers (centers will be read-in if enough centers exist, otherwise centers will be output into this file)\n");
     fprintf(stderr,"      > output: <R P0 P1 P2 ...>\n") ;

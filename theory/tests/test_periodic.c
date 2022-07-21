@@ -525,7 +525,6 @@ void read_data_and_set_globals(const char *firstfilename, const char *firstforma
         free_X2=1;
     }
 
-
     //Check to see if data has to be read for X1/Y1/Z1
     if (strncmp(current_file1,firstfilename,strlen(current_file1)) != 0) {
         //replace the data-set

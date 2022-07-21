@@ -8,7 +8,7 @@ from os.path import dirname, abspath, join as pjoin
 import numpy as np
 import pytest
 
-from Corrfunc.io import read_fastfood_catalog
+from Corrfunc.io import read_fastfood_catalog, read_ascii_catalog
 from Corrfunc.tests.common import gals_Mr19
 from Corrfunc.tests.common import maxthreads
 
@@ -43,7 +43,7 @@ def points(request, npts=10**4):
     if request.param == 'gals_Mr19':
         filename = pjoin(dirname(abspath(__file__)),
                     "../../theory/tests/data", "gals_Mr19.ff")
-        data = read_fastfood_catalog(filename, need_weights=True)
+        data = read_fastfood_catalog(filename)
         np.random.seed(42)
         i = np.random.choice(len(data[0]), size=npts, replace=False)
         return dict(data=[d[i] for d in data], boxsize=420.)
@@ -55,8 +55,22 @@ def points(request, npts=10**4):
 def points_mock(request, npts=10**4):
     if request.param == 'Mr19_mock_northonly':
         filename = pjoin(dirname(abspath(__file__)),
-                    "../../mocks/tests/data", "Mr19_mock_northonly.rdcz.ff")
-        data = read_fastfood_catalog(filename, need_weights=True)
+                    "../../mocks/tests/data", "Mr19_mock_northonly.xyz.txt")
+        data = read_ascii_catalog(filename)
+        np.random.seed(42)
+        i = np.random.choice(len(data[0]), size=npts, replace=False)
+
+        return dict(data=[d[i] for d in data])
+
+    raise ValueError
+
+
+@pytest.fixture(scope='module', params=['Mr19_mock_northonly_rdcz',])
+def points_mock_rdcz(request, npts=10**4):
+    if request.param == 'Mr19_mock_northonly_rdcz':
+        filename = pjoin(dirname(abspath(__file__)),
+                    "../../mocks/tests/data", "Mr19_mock_northonly.rdcz.txt")
+        data = read_ascii_catalog(filename)
         np.random.seed(42)
         i = np.random.choice(len(data[0]), size=npts, replace=False)
 
@@ -72,38 +86,37 @@ def linbins():
 
 
 @pytest.mark.parametrize('isa', ['fallback','sse42','avx','avx512f'])
-def test_linear_binning_mocks_DDrppi(points_mock, linbins, isa, nthreads, autocorr=True, pimax=40.0, cosmology=1):
+def test_linear_binning_mocks_DDrppi(points_mock, linbins, isa, nthreads, autocorr=True, pimax=40.0):
     from Corrfunc.mocks import DDrppi_mocks
-    ra,dec,cz,w = points_mock['data']
+    x, y, z, w = points_mock['data']
 
-    _test_bin_types(DDrppi_mocks, autocorr, cosmology, nthreads,
+    _test_bin_types(DDrppi_mocks, autocorr, nthreads,
                     linbins, pimax, int(pimax),
-                    ra, dec, cz, weights1=w,
+                    x, y, z, weights1=w,
                     output_rpavg=True, verbose=True,
                     isa=isa, ravg_name='rpavg')
 
 
 @pytest.mark.parametrize('isa', ['fallback','sse42','avx','avx512f'])
-def test_linear_binning_mocks_DDsmu(points_mock, linbins, isa, nthreads, autocorr=True, periodic=True, cosmology=1, nmu_bins=11, mu_max=1.0):
+def test_linear_binning_mocks_DDsmu(points_mock, linbins, isa, nthreads, autocorr=True, periodic=True, nmu_bins=11, mu_max=1.0):
     from Corrfunc.mocks import DDsmu_mocks
-    ra,dec,cz,w = points_mock['data']
+    x, y, z, w = points_mock['data']
 
-    _test_bin_types(DDsmu_mocks, autocorr, cosmology, nthreads,
+    _test_bin_types(DDsmu_mocks, autocorr, nthreads,
                     linbins, mu_max, nmu_bins,
-                    ra, dec, cz, weights1=w,
+                    x, y, z, weights1=w,
                     output_savg=True, verbose=True,
                     isa=isa, ravg_name='savg')
 
 
 @pytest.mark.parametrize('isa', ['fallback','sse42','avx','avx512f'])
-def test_linear_binning_mocks_DDtheta(points_mock, linbins, isa, nthreads, autocorr=True):
+def test_linear_binning_mocks_DDtheta(points_mock_rdcz, linbins, isa, nthreads, autocorr=True):
     from Corrfunc.mocks import DDtheta_mocks
-    ra,dec,cz,w = points_mock['data']
+    ra, dec, cz, w = points_mock_rdcz['data']
 
     _test_bin_types(DDtheta_mocks, autocorr, nthreads, linbins,
                     ra, dec, RA2=ra, DEC2=dec,
-                    weights1=w,
-                    weights2=w,
+                    weights1=w, weights2=w,
                     output_thetaavg=True, fast_acos=False,
                     verbose=True, isa=isa, ravg_name='thetaavg')
 
@@ -111,7 +124,7 @@ def test_linear_binning_mocks_DDtheta(points_mock, linbins, isa, nthreads, autoc
 @pytest.mark.parametrize('isa', ['fallback','sse42','avx','avx512f'])
 def test_linear_binning_theory_DD(points, linbins, isa, nthreads, autocorr=True, periodic=True):
     from Corrfunc.theory import DD
-    x,y,z,w = points['data']
+    x, y, z, w = points['data']
     boxsize = points['boxsize']
 
     _test_bin_types(DD, autocorr, nthreads, linbins, x, y, z, weights1=w,
@@ -122,7 +135,7 @@ def test_linear_binning_theory_DD(points, linbins, isa, nthreads, autocorr=True,
 @pytest.mark.parametrize('isa', ['fallback','sse42','avx','avx512f'])
 def test_linear_binning_theory_DDrppi(points, linbins, isa, nthreads, autocorr=True, periodic=True, pimax=40.):
     from Corrfunc.theory import DDrppi
-    x,y,z,w = points['data']
+    x, y, z, w = points['data']
     boxsize = points['boxsize']
 
     _test_bin_types(DDrppi, autocorr, nthreads,
@@ -136,7 +149,7 @@ def test_linear_binning_theory_DDrppi(points, linbins, isa, nthreads, autocorr=T
 def test_linear_binning_theory_DDsmu(points, linbins, isa, nthreads, autocorr=True, periodic=True,
                                       mu_max=0.5, nmu_bins=11):
     from Corrfunc.theory import DDsmu
-    x,y,z,w = points['data']
+    x, y, z, w = points['data']
     boxsize = points['boxsize']
 
     _test_bin_types(DDsmu, autocorr, nthreads, linbins,
@@ -150,7 +163,7 @@ def test_linear_binning_theory_DDsmu(points, linbins, isa, nthreads, autocorr=Tr
 @pytest.mark.parametrize('isa', ['fallback','sse42','avx','avx512f'])
 def test_linear_binning_theory_wp(points, linbins, isa, nthreads, autocorr=True, periodic=True, pimax=40.):
     from Corrfunc.theory import wp
-    x,y,z,w = points['data']
+    x, y, z, w = points['data']
     boxsize = points['boxsize']
 
     _test_bin_types(wp, boxsize, nthreads,
@@ -162,7 +175,7 @@ def test_linear_binning_theory_wp(points, linbins, isa, nthreads, autocorr=True,
 @pytest.mark.parametrize('isa', ['fallback','sse42','avx','avx512f'])
 def test_linear_binning_theory_xi(points, linbins, isa, nthreads, autocorr=True, periodic=True):
     from Corrfunc.theory import xi
-    x,y,z,w = points['data']
+    x, y, z, w = points['data']
     boxsize = points['boxsize']
 
     _test_bin_types(xi, boxsize, nthreads, linbins,

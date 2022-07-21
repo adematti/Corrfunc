@@ -31,10 +31,10 @@ void read_data_and_set_globals(const char *firstfilename, const char *firstforma
 
 //Global variables
 int64_t ND1;
-double *RA1=NULL,*DEC1=NULL,*CZ1=NULL,*weights1=NULL;
+double *X1=NULL,*Y1=NULL,*Z1=NULL,*weights1=NULL;
 
 int64_t ND2;
-double *RA2=NULL,*DEC2=NULL,*CZ2=NULL,*weights2=NULL;
+double *X2=NULL,*Y2=NULL,*Z2=NULL,*weights2=NULL;
 
 binarray bins;
 binarray angular_bins;
@@ -48,8 +48,8 @@ int test_DDrppi_mocks(const char *correct_outputfile)
 {
     results_countpairs_mocks results;
     int ret = EXIT_FAILURE;
-    assert(RA1 != NULL && DEC1 != NULL && CZ1 != NULL && "ERROR: In test suite for DDrppi ra/dec/cz can not be NULL pointers");
-    int autocorr = (RA1==RA2) ? 1:0;
+    assert(X1 != NULL && Y1 != NULL && Z1 != NULL && "ERROR: In test suite for DDrppi ra/dec/cz can not be NULL pointers");
+    int autocorr = (X1==X2) ? 1:0;
 
     // Set up the weights pointers
     weight_method_t weight_method = PAIR_PRODUCT;
@@ -59,8 +59,8 @@ int test_DDrppi_mocks(const char *correct_outputfile)
 
     //Do DD(rp,pi) counts
     BEGIN_INTEGRATION_TEST_SECTION
-        int status = countpairs_mocks(ND1,RA1,DEC1,CZ1,
-                                      ND2,RA2,DEC2,CZ2,
+        int status = countpairs_mocks(ND1,X1,Y1,Z1,
+                                      ND2,X2,Y2,Z2,
                                       nthreads,
                                       autocorr,
                                       &bins,
@@ -138,8 +138,8 @@ int test_DDsmu_mocks(const char *correct_outputfile)
     results_countpairs_mocks_s_mu results;
     int ret = EXIT_FAILURE;
 
-    assert(RA1 != NULL && DEC1 != NULL && CZ1 != NULL && "ERROR: In test suite for DDsmu ra/dec/cz can not be NULL pointers");
-    int autocorr = (RA1==RA2) ? 1:0;
+    assert(X1 != NULL && Y1 != NULL && Z1 != NULL && "ERROR: In test suite for DDsmu ra/dec/cz can not be NULL pointers");
+    int autocorr = (X1==X2) ? 1:0;
 
     // Set up the weights pointers
     weight_method_t weight_method = PAIR_PRODUCT;
@@ -149,8 +149,8 @@ int test_DDsmu_mocks(const char *correct_outputfile)
 
     BEGIN_INTEGRATION_TEST_SECTION
         //Do DD(s,mu) counts
-        int status = countpairs_mocks_s_mu(ND1,RA1,DEC1,CZ1,
-                                           ND2,RA2,DEC2,CZ2,
+        int status = countpairs_mocks_s_mu(ND1,X1,Y1,Z1,
+                                           ND2,X2,Y2,Z2,
                                            nthreads,
                                            autocorr,
                                            &bins,
@@ -190,7 +190,7 @@ int test_DDsmu_mocks(const char *correct_outputfile)
                     ret = EXIT_SUCCESS;
                 } else {
                     fprintf(stderr,"True npairs = %"PRIu64 " Computed results npairs = %"PRIu64"\n", npairs, results.npairs[index]);
-                    fprintf(stderr,"True savg  = %20.12e Computed savg = %20.12e. floats_equal = %d\n", savg, results.savg[index], floats_equal);
+                    fprintf(stderr,"True savg = %20.12e Computed savg = %20.12e. floats_equal = %d\n", savg, results.savg[index], floats_equal);
                     fprintf(stderr,"True weightavg = %e Computed weightavg = %e. weights_equal = %d\n", weightavg, results.weightavg[index], weights_equal);
                     ret = EXIT_FAILURE;//not required but showing intent
                     i = results.nsbin;
@@ -226,7 +226,7 @@ int test_DDsmu_mocks(const char *correct_outputfile)
 
 int test_DDtheta_mocks(const char *correct_outputfile)
 {
-    int autocorr = (RA1==RA2) ? 1:0;
+    int autocorr = (X1==X2) ? 1:0;
     int ret = EXIT_FAILURE;
     results_countpairs_theta results;
 
@@ -237,8 +237,8 @@ int test_DDtheta_mocks(const char *correct_outputfile)
     extra.weights1.weights[0] = weights2;
 
     BEGIN_DDTHETA_INTEGRATION_TEST_SECTION;
-        int status = countpairs_theta_mocks(ND1,RA1,DEC1,
-                                            ND2,RA2,DEC2,
+        int status = countpairs_theta_mocks(ND1,X1,Y1,
+                                            ND2,X2,Y2,
                                             nthreads,
                                             autocorr,
                                             &angular_bins,
@@ -319,7 +319,7 @@ int test_vpf_mocks(const char *correct_outputfile)
     int ret = EXIT_FAILURE;
 
     BEGIN_INTEGRATION_TEST_SECTION
-        int status = countspheres_mocks(ND1, RA1, DEC1, CZ1,
+        int status = countspheres_mocks(ND1, X1, Y1, Z1,
                                         Nran, xran, yran, zran,
                                         threshold_neighbors,
                                         rmax, nbin, nc,
@@ -394,54 +394,52 @@ int test_vpf_mocks(const char *correct_outputfile)
 
 void read_data_and_set_globals(const char *firstfilename, const char *firstformat,const char *secondfilename,const char *secondformat)
 {
-    int free_RA2=0;
-    if(RA2 != NULL && RA2 != RA1) {
-        free_RA2=1;
+    int free_X2=0;
+    if(X2 != NULL && X2 != X1) {
+        free_X2=1;
     }
-
-
-    //Check to see if data has to be read for RA1/DEC1/CZ1
-    if (strcmp(current_file1,firstfilename) != 0) {
+    //Check to see if data has to be read for X1/Y1/Z1
+    if (strncmp(current_file1,firstfilename,strlen(current_file1)) != 0) {
         /* fprintf(stderr,"Freeing the first data-set and replacing with data from file `%s'\n",firstfilename); */
         //replace the data-set
-        if(RA1 != NULL) {
-            free(RA1);free(DEC1);free(CZ1);free(weights1);
-            if(free_RA2 == 0) {
-                RA2  = NULL;
-                DEC2 = NULL;
-                CZ2  = NULL;
+        if(X1 != NULL) {
+            free(X1);free(Y1);free(Z1);free(weights1);
+            if(free_X2 == 0) {
+                X2  = NULL;
+                Y2 = NULL;
+                Z2 = NULL;
                 weights2 = NULL;
             }
         }
-        ND1 = read_positions(firstfilename,firstformat, sizeof(double), 4, &RA1, &DEC1, &CZ1, &weights1);
+        ND1 = read_positions(firstfilename,firstformat, sizeof(double), 4, &X1, &Y1, &Z1, &weights1);
+        strncpy(current_file1,firstfilename,MAXLEN);
     }
 
     //first check if only one unique file is asked for
     if(strncmp(firstfilename,secondfilename,strlen(firstfilename))==0) {
-        //But RA2 might have read-in a different file->avoid a memory-leak
-        if(free_RA2 == 1) {
-            free(RA2);free(DEC2);free(CZ2);free(weights2);
-            free_RA2 = 0;//not essential since the code returns after this section
+        //But X2 might have read-in a different file->avoid a memory-leak
+        if(free_X2 == 1) {
+            free(X2);free(Y2);free(Z2);free(weights2);
+            free_X2 = 0;//not essential since the code returns after this section
         }
         /* fprintf(stderr,"Second data-set is the same as the first data-set. First file = `%s' and second file = `%s'\n",firstfilename,secondfilename); */
-        RA2=RA1;
-        DEC2=DEC1;
-        CZ2=CZ1;
+        X2=X1;
+        Y2=Y1;
+        Z2=Z1;
         weights2=weights1;
         ND2=ND1;
         strncpy(current_file2,secondfilename,MAXLEN);
         return;
     }
 
-
-    //Check to see if data has to be read for RA2/DEC2/CZ2
-    if (strncmp(current_file2,secondfilename,strlen(current_file2)) != 0 || RA2 == NULL) {
+    //Check to see if data has to be read for X2/Y2/Z2
+    if (strncmp(current_file2,secondfilename,strlen(current_file2)) != 0 || X2 == NULL) {
         //replace the data-set
-        if(free_RA2 == 1) {
-            free(RA2);free(DEC2);free(CZ2);free(weights2);
+        if(free_X2 == 1) {
+            free(X2);free(Y2);free(Z2);free(weights2);
         }
         /* fprintf(stderr,"Second data-set is different -- reading in the new data-set from `%s'\n",secondfilename); */
-        ND2 = read_positions(secondfilename,secondformat, sizeof(double), 4, &RA2, &DEC2, &CZ2, &weights2);
+        ND2 = read_positions(secondfilename,secondformat, sizeof(double), 4, &X2, &Y2, &Z2, &weights2);
         strncpy(current_file2,secondfilename,MAXLEN);
     }
 }
@@ -469,13 +467,13 @@ int main(int argc, char **argv)
     gettimeofday(&tstart,NULL);
 
     //set the globals.
-    ND1 = read_positions(file,fileformat, sizeof(double), 4, &RA1, &DEC1, &CZ1, &weights1);
+    ND1 = read_positions(file,fileformat, sizeof(double), 4, &X1, &Y1, &Z1, &weights1);
     nthreads = get_nthreads_from_affinity();
 
     ND2 = ND1;
-    RA2 = RA1;
-    DEC2 = DEC1;
-    CZ2 = CZ1;
+    X2 = X1;
+    Y2 = Y1;
+    Z2 = Z1;
     weights2 = weights1;
 
     read_binfile(binfile, &bins);
@@ -507,26 +505,26 @@ int main(int argc, char **argv)
                                                 "../tests/Mr19_randoms_vpf", /* Test 5 Mr19 randoms vpf */
                                                 "../tests/Mr19_mock_DDsmu.RR", /* Test 6 Mr19 RR smu */
                                                 "../tests/Mr19_mock_DDsmu.DR"}; /* Test 7 Mr19 DR smu */
-    const char firstfilename[][MAXLEN] = {"../tests/data/Mr19_mock_northonly.rdcz.txt",
+    const char firstfilename[][MAXLEN] = {"../tests/data/Mr19_mock_northonly.xyz.txt",
                                           "../tests/data/Mr19_mock_northonly.rdcz.txt",
-                                          "../tests/data/Mr19_mock_northonly.rdcz.txt",
+                                          "../tests/data/Mr19_mock_northonly.xyz.txt",
+                                          "../tests/data/Mr19_randoms_northonly.xyz.txt",
                                           "../tests/data/Mr19_randoms_northonly.rdcz.txt",
-                                          "../tests/data/Mr19_randoms_northonly.rdcz.txt",
-                                          "../tests/data/Mr19_randoms_northonly.rdcz.txt",
-                                          "../tests/data/Mr19_randoms_northonly.rdcz.txt",
-                                          "../tests/data/Mr19_randoms_northonly.rdcz.txt"};
+                                          "../tests/data/Mr19_randoms_northonly.xyz.txt",
+                                          "../tests/data/Mr19_randoms_northonly.xyz.txt",
+                                          "../tests/data/Mr19_randoms_northonly.xyz.txt"};
     const char firstfiletype[][MAXLEN]  = {"a","a","a","a","a","a","a","a"};
-    const char secondfilename[][MAXLEN] = {"../tests/data/Mr19_mock_northonly.rdcz.txt",
+    const char secondfilename[][MAXLEN] = {"../tests/data/Mr19_mock_northonly.xyz.txt",
                                            "../tests/data/Mr19_mock_northonly.rdcz.txt",
+                                           "../tests/data/Mr19_mock_northonly.xyz.txt",
+                                           "../tests/data/Mr19_mock_northonly.xyz.txt",
                                            "../tests/data/Mr19_mock_northonly.rdcz.txt",
-                                           "../tests/data/Mr19_mock_northonly.rdcz.txt",
-                                           "../tests/data/Mr19_mock_northonly.rdcz.txt",
-                                           "../tests/data/Mr19_randoms_northonly.rdcz.txt",
-                                           "../tests/data/Mr19_randoms_northonly.rdcz.txt",
-                                           "../tests/data/Mr19_mock_northonly.rdcz.txt"};
+                                           "../tests/data/Mr19_randoms_northonly.xyz.txt",
+                                           "../tests/data/Mr19_randoms_northonly.xyz.txt",
+                                           "../tests/data/Mr19_mock_northonly.xyz.txt"};
     const char secondfiletype[][MAXLEN] = {"a","a","a","a","a","a","a","a"};
 
-    const double allpimax[]             = {40.0,40.0,40.0,40.0,40.0,40.0,40.0,40.0};
+    const double allpimax[] = {40.0,40.0,40.0,40.0,40.0,40.0,40.0,40.0};
 
     int (*allfunctions[]) (const char *) = {test_DDrppi_mocks,test_DDtheta_mocks,test_vpf_mocks,test_DDsmu_mocks};
     const int numfunctions=4;//4 functions total
@@ -621,10 +619,10 @@ int main(int argc, char **argv)
         fprintf(stderr,ANSI_COLOR_MAGENTA "Tests are skipped on the PyPI installed code-base. Please use the git repo if you want to run the entire suite of tests"ANSI_COLOR_RESET"\n\n");
     }
 
-    if(RA2 != RA1) {
-        free(RA2);free(DEC2);free(CZ2);
+    if(X2 != X1) {
+        free(X2);free(Y2);free(Z2);
     }
-    free(RA1);free(DEC1);free(CZ1);
+    free(X1);free(Y1);free(Z1);
     free_binarray(&bins);
     return EXIT_SUCCESS;
 }

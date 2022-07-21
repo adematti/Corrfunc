@@ -5,7 +5,7 @@ from os.path import dirname, abspath, join as pjoin
 import pytest
 import numpy as np
 
-from Corrfunc.tests.common import gals_Mr19, Mr19_mock_northonly, Mr19_randoms_northonly
+from Corrfunc.tests.common import gals_Mr19, Mr19_mock_northonly, Mr19_mock_northonly_rdz, Mr19_randoms_northonly
 from Corrfunc.tests.common import check_against_reference, check_vpf_against_reference
 from Corrfunc.tests.common import generate_isa_and_nthreads_combos
 
@@ -41,11 +41,11 @@ def test_DDrppi_mocks(Mr19_mock_northonly, isa, nthreads):
                      "../../mocks/tests/", "bins")
     autocorr = 1
 
-    ra, dec, cz, w = Mr19_mock_northonly
+    x, y, z, w = Mr19_mock_northonly
     for size in [0, None]:
         results_DDrppi_mocks = DDrppi_mocks(autocorr, nthreads,
                                             binfile, pimax, int(pimax),
-                                            ra[:size], dec[:size], cz[:size], weights1=w[:size],
+                                            x[:size], y[:size], z[:size], weights1=w[:size],
                                             weight_type='pair_product',
                                             output_rpavg=True, verbose=True,
                                             isa=isa)
@@ -67,11 +67,11 @@ def test_DDsmu_mocks(Mr19_randoms_northonly, isa, nthreads):
     mu_max = 1.0
     nmu_bins = 11
 
-    ra, dec, cz, w = Mr19_randoms_northonly
+    x, y, z, w = Mr19_randoms_northonly
     for size in [0, None]:
         results_DDsmu_mocks = DDsmu_mocks(autocorr, nthreads,
                                           binfile, mu_max, nmu_bins,
-                                          ra[:size], dec[:size], cz[:size], weights1=w[:size],
+                                          x[:size], y[:size], z[:size], weights1=w[:size],
                                           weight_type='pair_product',
                                           output_savg=True, verbose=True,
                                           isa=isa)
@@ -84,20 +84,21 @@ def test_DDsmu_mocks(Mr19_randoms_northonly, isa, nthreads):
 
 
 @pytest.mark.parametrize('isa,nthreads', generate_isa_and_nthreads_combos())
-def test_DDtheta_mocks(Mr19_mock_northonly, isa, nthreads):
+def test_DDtheta_mocks(Mr19_mock_northonly_rdz, isa, nthreads):
     from Corrfunc.mocks import DDtheta_mocks
 
     autocorr = 1
     binfile = pjoin(dirname(abspath(__file__)),
                      "../../mocks/tests/", "angular_bins")
 
-    ra, dec, cz, w = Mr19_mock_northonly
+    ra, dec, cz, w = Mr19_mock_northonly_rdz
     for size in [0, None]:
-        results_DDtheta_mocks = DDtheta_mocks(autocorr, nthreads, binfile,
-                                              ra[:size], dec[:size], weights1=w[:size],
-                                              weight_type='pair_product',
-                                              output_thetaavg=True, fast_acos=False,
-                                              verbose=True, isa=isa)
+        for offset in [(0., 0.), (380., 180.)]:
+            results_DDtheta_mocks = DDtheta_mocks(autocorr, nthreads, binfile,
+                                                  ra[:size] + offset[0], dec[:size] + offset[1], weights1=w[:size],
+                                                  weight_type='pair_product',
+                                                  output_thetaavg=True, fast_acos=False,
+                                                  verbose=True, isa=isa)
         if size == 0:
             for name in ['npairs', 'weightavg', 'thetaavg']:
                 assert np.allclose(results_DDtheta_mocks[name], 0.)
@@ -125,10 +126,10 @@ def test_vpf_mocks(Mr19_mock_northonly, isa, nthreads):
     binfile = pjoin(dirname(abspath(__file__)),
                     "../../mocks/tests/", "angular_bins")
 
-    ra, dec, cz, w = Mr19_mock_northonly
+    x, y, z, w = Mr19_mock_northonly
     results_vpf_mocks = vpf_mocks(rmax, nbin, num_spheres, num_pN,
                                   threshold_neighbors, centers_file,
-                                  ra, dec, cz, ra, dec, cz,
+                                  x, y, z, x, y, z,
                                   verbose=True, isa=isa,)
 
     file_ref = pjoin(dirname(abspath(__file__)),

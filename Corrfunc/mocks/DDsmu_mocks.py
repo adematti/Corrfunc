@@ -14,8 +14,8 @@ __all__ = ('DDsmu_mocks', )
 
 
 def DDsmu_mocks(autocorr, nthreads, binfile, mumax, nmubins,
-                RA1, DEC1, CZ1, weights1=None,
-                RA2=None, DEC2=None, CZ2=None, weights2=None,
+                X1, Y1, Z1, weights1=None,
+                X2=None, Y2=None, Z2=None, weights2=None,
                 verbose=False, output_savg=False,
                 fast_divide_and_NR_steps=0,
                 xbin_refine_factor=2, ybin_refine_factor=2,
@@ -82,26 +82,9 @@ def DDsmu_mocks(autocorr, nthreads, binfile, mumax, nmubins,
         The number of linear ``mu`` bins, with the bins ranging from
         from (:math:`-\\mu_{max}`, :math:`\\mu_{max}`).
 
-    RA1 : array-like, real (float/double)
-        The array of Right Ascensions for the first set of points. RA's
-        are expected to be in [0.0, 360.0], but the code will try to fix cases
-        where the RA's are in [-180, 180.0]. For peace of mind, always supply
-        RA's in [0.0, 360.0].
-
+    X1/Y1/Z1 : array_like, real (float/double)
+        The array of X/Y/Z positions for the first set of points.
         Calculations are done in the precision of the supplied arrays.
-
-    DEC1 : array-like, real (float/double)
-        Array of Declinations for the first set of points. DEC's are expected
-        to be in the [-90.0, 90.0], but the code will try to fix cases where
-        the DEC's are in [0.0, 180.0]. Again, for peace of mind, always supply
-        DEC's in [-90.0, 90.0].
-
-        Must be of same precision type as RA1.
-
-    CZ1 : array-like, real (float/double)
-        Array of (Speed Of Light * Redshift) values for the first set of
-        points. Code will try to detect cases where ``redshifts`` have been
-        passed and multiply the entire array with the ``speed of light``.
 
     weights1 : array_like, real (float/double), optional
         A scalar, or an array of weights of shape (n_weights, n_positions)
@@ -110,28 +93,28 @@ def DDsmu_mocks(autocorr, nthreads, binfile, mumax, nmubins,
         ``weights1`` or ``weights2`` is specified, the other will be set
         to uniform weights.
 
-    RA2 : array-like, real (float/double)
-        The array of Right Ascensions for the second set of points. RA's
+    X2 : array-like, real (float/double)
+        The array of Right Ascensions for the second set of points. X's
         are expected to be in [0.0, 360.0], but the code will try to fix cases
-        where the RA's are in [-180, 180.0]. For peace of mind, always supply
-        RA's in [0.0, 360.0].
+        where the X's are in [-180, 180.0]. For peace of mind, always supply
+        X's in [0.0, 360.0].
 
-        Must be of same precision type as RA1/DEC1/CZ1.
+        Must be of same precision type as X1/Y1/Z1.
 
-    DEC2 : array-like, real (float/double)
-        Array of Declinations for the second set of points. DEC's are expected
+    Y2 : array-like, real (float/double)
+        Array of Declinations for the second set of points. Y's are expected
         to be in the [-90.0, 90.0], but the code will try to fix cases where
-        the DEC's are in [0.0, 180.0]. Again, for peace of mind, always supply
-        DEC's in [-90.0, 90.0].
+        the Y's are in [0.0, 180.0]. Again, for peace of mind, always supply
+        Y's in [-90.0, 90.0].
 
-        Must be of same precision type as RA1/DEC1/CZ1.
+        Must be of same precision type as X1/Y1/Z1.
 
-    CZ2 : array-like, real (float/double)
+    Z2 : array-like, real (float/double)
         Array of (Speed Of Light * Redshift) values for the second set of
         points. Code will try to detect cases where ``redshifts`` have been
         passed and multiply the entire array with the ``speed of light``.
 
-        Must be of same precision type as RA1/DEC1/CZ1.
+        Must be of same precision type as X1/Y1/Z1.
 
     weights2 : array-like, real (float/double), optional
         Same as weights1, but for the second set of positions
@@ -270,21 +253,21 @@ def DDsmu_mocks(autocorr, nthreads, binfile, mumax, nmubins,
         raise ValueError(msg)
 
     if not autocorr:
-        if RA2 is None or DEC2 is None or CZ2 is None:
-            msg = "Must pass valid arrays for RA2/DEC2/CZ2 for "\
+        if X2 is None or Y2 is None or Z2 is None:
+            msg = "Must pass valid arrays for X2/Y2/Z2 for "\
                   "computing cross-correlation"
             raise ValueError(msg)
     else:
-        RA2 = np.empty(1)
-        DEC2 = np.empty(1)
-        CZ2 = np.empty(1)
+        X2 = np.empty(1)
+        Y2 = np.empty(1)
+        Z2 = np.empty(1)
 
-    weights1, weights2 = process_weights(weights1, weights2, RA1, RA2, weight_type, autocorr)
+    weights1, weights2 = process_weights(weights1, weights2, X1, X2, weight_type, autocorr)
 
     # Ensure all input arrays are native endian
-    RA1, DEC1, CZ1, RA2, DEC2, CZ2 = [
+    X1, Y1, Z1, X2, Y2, Z2 = [
             convert_to_native_endian(arr, warn=False) for arr in
-            [RA1, DEC1, CZ1, RA2, DEC2, CZ2]]
+            [X1, Y1, Z1, X2, Y2, Z2]]
 
     if weights1 is not None:
         weights1 = [convert_to_native_endian(arr, warn=False) for arr in weights1]
@@ -297,7 +280,7 @@ def DDsmu_mocks(autocorr, nthreads, binfile, mumax, nmubins,
 
     # Passing None parameters breaks the parsing code, so avoid this
     kwargs = {}
-    for k in ['weights1', 'weights2', 'weight_type', 'RA2', 'DEC2', 'CZ2',
+    for k in ['weights1', 'weights2', 'weight_type', 'X2', 'Y2', 'Z2',
               'pair_weights', 'sep_pair_weights', 'attrs_pair_weights']:
         v = locals()[k]
         if v is not None:
@@ -310,7 +293,7 @@ def DDsmu_mocks(autocorr, nthreads, binfile, mumax, nmubins,
     with sys_pipes():
         extn_results = DDsmu_extn(autocorr, nthreads,
                                   sbinfile, mumax, nmubins,
-                                  RA1, DEC1, CZ1,
+                                  X1, Y1, Z1,
                                   verbose=verbose,
                                   output_savg=output_savg,
                                   fast_divide_and_NR_steps=fast_divide_and_NR_steps,

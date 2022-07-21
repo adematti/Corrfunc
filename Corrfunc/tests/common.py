@@ -17,6 +17,13 @@ def gals_Mr19():
 @pytest.fixture(scope='module')
 def Mr19_mock_northonly():
     filename = pjoin(dirname(abspath(__file__)),
+                     '../../mocks/tests/data', 'Mr19_mock_northonly.xyz.txt')
+    return read_ascii_catalog(filename)  # ra, dec, cz, w
+
+
+@pytest.fixture(scope='module')
+def Mr19_mock_northonly_rdz():
+    filename = pjoin(dirname(abspath(__file__)),
                      '../../mocks/tests/data', 'Mr19_mock_northonly.rdcz.txt')
     return read_ascii_catalog(filename)  # ra, dec, cz, w
 
@@ -24,7 +31,7 @@ def Mr19_mock_northonly():
 @pytest.fixture(scope='module')
 def Mr19_randoms_northonly():
     filename = pjoin(dirname(abspath(__file__)),
-                     '../../mocks/tests/data', 'Mr19_randoms_northonly.rdcz.txt')
+                     '../../mocks/tests/data', 'Mr19_randoms_northonly.xyz.txt')
     return read_ascii_catalog(filename)  # ra, dec, cz, w
 
 
@@ -103,13 +110,16 @@ def convert_ff():
         filename = pjoin(dirname(abspath(__file__)), '../../mocks/tests/data', filename)
         ra, dec, cz, w = read_fastfood_catalog(filename)
         cz = cosmo.comoving_radial_distance(cz / 299800.0)
-        np.savetxt(filename[:-2] + 'txt', np.column_stack([ra, dec, cz, w]))
+        np.savetxt(filename.replace('rdcz.ff', 'rdcz.txt'), np.column_stack([ra, dec, cz, w]))
+        conversion = np.pi / 180.
+        cos_dec = np.cos(dec * conversion)
+        x = cz * cos_dec * np.cos(ra * conversion)
+        y = cz * cos_dec * np.sin(ra * conversion)
+        z = cz * np.sin(dec * conversion)
+        np.savetxt(filename.replace('rdcz.ff', 'xyz.txt'), np.column_stack([x, y, z, w]))
+
 
 if __name__ == '__main__':
 
     convert_ff()
 '''
-if __name__ == '__main__':
-    filename = pjoin(dirname(abspath(__file__)),
-                     '../../mocks/tests/data', 'Mr19_randoms_northonly.rdcz.txt')
-    read_ascii_catalog(filename)

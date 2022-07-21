@@ -26,16 +26,16 @@ extern "C" {
   } results_countpairs_mocks_bessel;
 
   extern int countpairs_mocks_bessel(const int64_t ND1, void *X1, void *Y1, void *Z1,
-                        const int64_t ND2, void *X2, void *Y2, void *Z2,
-                        const int numthreads,
-                        const int autocorr,
-                        polearray *bins,
-                        double rmin,
-                        double rmax,
-                        double mumax,
-                        results_countpairs_mocks_bessel *results,
-                        struct config_options *options,
-                        struct extra_options *extra) __attribute__((warn_unused_result));
+                                     const int64_t ND2, void *X2, void *Y2, void *Z2,
+                                     const int numthreads,
+                                     const int autocorr,
+                                     polearray *bins,
+                                     double rmin,
+                                     double rmax,
+                                     double mumax,
+                                     results_countpairs_mocks_bessel *results,
+                                     struct config_options *options,
+                                     struct extra_options *extra) __attribute__((warn_unused_result));
 
   extern void free_results_mocks_bessel(results_countpairs_mocks_bessel *results);
 

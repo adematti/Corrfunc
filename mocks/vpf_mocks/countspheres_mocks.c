@@ -54,7 +54,7 @@ int countspheres_mocks(const int64_t Ngal, void *xgal, void *ygal, void *zgal,
     }
 
     if(options->float_type == sizeof(float)) {
-        return countspheres_mocks_float(Ngal, (float *) xgal, (float *)ygal, (float *)zgal,
+        return countspheres_mocks_float(Ngal, (float *) xgal, (float *) ygal, (float *) zgal,
                                         Nran, (float *) xran, (float *) yran, (float *) zran,
                                         threshold_neighbors,
                                         rmax, nbin, nc,
@@ -64,7 +64,7 @@ int countspheres_mocks(const int64_t Ngal, void *xgal, void *ygal, void *zgal,
                                         options,
                                         extra);
     } else {
-        return countspheres_mocks_double(Ngal, (double *) xgal, (double *)ygal, (double *)zgal,
+        return countspheres_mocks_double(Ngal, (double *) xgal, (double *) ygal, (double *) zgal,
                                          Nran, (double *) xran, (double *) yran, (double *) zran,
                                          threshold_neighbors,
                                          rmax, nbin, nc,

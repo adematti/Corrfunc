@@ -74,8 +74,8 @@ static PyMethodDef module_methods[] = {
     {"countpairs_bessel_mocks"      ,(PyCFunction)(void(*)(void)) countpairs_countpairs_bessel_mocks ,METH_VARARGS | METH_KEYWORDS, ""},
     {"countpairs_rp_pi_mocks"       ,(PyCFunction)(void(*)(void)) countpairs_countpairs_rp_pi_mocks ,METH_VARARGS | METH_KEYWORDS,
      "countpairs_rp_pi_mocks(autocorr, nthreads, pimax, binfile,\n"
-     "                       RA1, DEC1, CZ1, weights1=None, weight_type=None,\n"
-     "                       RA2=None, DEC2=None, CZ2=None, weights2=None,\n"
+     "                       X1, Y1, Z1, weights1=None, weight_type=None,\n"
+     "                       X2=None, Y2=None, Z2=None, weights2=None,\n"
      "                       verbose=False, output_rpavg=False,\n"
      "                       fast_divide_and_NR_steps=0, xbin_refine_factor=2, \n"
      "                       ybin_refine_factor=2, zbin_refine_factor=1, \n"
@@ -83,7 +83,7 @@ static PyMethodDef module_methods[] = {
      "                       enable_min_sep_opt=True, c_api_timer=False, isa=-1)\n\n"
 
      "Calculate the 2-D pair-counts, "XI_CHAR"("RP_CHAR", "PI_CHAR"), auto/cross-correlation function given two\n"
-     "sets of RA1/DEC1/CZ1 and RA2/DEC2/CZ2 arrays. This module is suitable for mock catalogs that have been\n"
+     "sets of X1/Y1/Z1 and X2/Y2/Z2 arrays. This module is suitable for mock catalogs that have been\n"
      "created by carving out a survey footprint from simulated data. The module can also be used for actual\n"
      "observed galaxies, but you probably want to attach weights to the points to account for completeness etc.\n"
      "Default bins in "PI_CHAR" are set to 1.0 Mpc/h.\n\n"
@@ -99,8 +99,8 @@ static PyMethodDef module_methods[] = {
      "Every parameter can be passed as a keyword of the corresponding name.\n\n"
 
      "autocorr: boolean\n"
-     "    Flag for auto/cross-correlation. If autocorr is not 0, the RA2/DEC2/CZ2 arrays\n"
-     "    are not used (but must still be passed, as RA1/DEC1/CZ1).\n\n"
+     "    Flag for auto/cross-correlation. If autocorr is not 0, the X2/Y2/Z2 arrays\n"
+     "    are not used (but must still be passed, as X1/Y1/Z1).\n\n"
 
      "nthreads: integer\n"
      "    The number of OpenMP threads to use. Has no effect if OpenMP was not used\n"
@@ -117,26 +117,9 @@ static PyMethodDef module_methods[] = {
      "    for a sample). For usual logarithmic bins, ``logbins``in the root directory\n"
      "    of this package will create a compatible ``binfile``.\n\n"
 
-     "RA1: array-like, float/double (default double)\n"
-     "    The right-ascension of the galaxy, in the range [0, 360]. If there are\n"
-     "    negative RA's in the supplied array (input RA in the range [-180, 180]),\n"
-     "    then the code will shift the entire array by 180 to put RA's in the\n"
-     "    [0, 360] range.\n\n"
-
-     "DEC1: array-like, float/double (default double)\n"
-     "    The declination of the galaxy, in the range [-90, 90]. If there are\n"
-     "    declinations > 90 in the supplied array (input dec in the range [0, 180]),\n"
-     "    then the code will shift the entire array by -90 to put declinations in\n"
-     "    the [-90, 90] range. If the code finds declinations more than 180, then\n"
-     "    it assumes RA and DEC have been swapped and aborts with that message.\n\n"
-
-     "CZ1: array-like, float/double (default double)\n"
-     "    The redshift multiplied by speed of light for the galaxies. The code will\n"
-     "    checks that cz has been supplied by comparing with a threshold (currently\n"
-     "    set to 10, defined in function check_ra_dec_cz in file\n"
-     "    `DDrppi_mocks/countpairs_rp_pi_mocks_impl.c.src`) and multiplies by the speed of light if\n"
-     "    max z is less than that threshold. If you really want to change the speed\n"
-     "    of light, then edit the macro in `ROOT/utils/set_cosmo_dist.h`.\n\n"
+     "X1/Y1/Z1 : array-like, real (float/double)\n"
+     "    The array of X/Y/Z positions for the first set of points.\n"
+     "    Calculations are done in the precision of the supplied arrays.\n\n"
 
      "weights1 : array-like, real (float/double), shape (n_weights_per_particle,n_particles), optional\n"
      "    Weights for computing a weighted pair count.\n\n"
@@ -146,8 +129,8 @@ static PyMethodDef module_methods[] = {
      "    Options: \"pair_product\", None\n"
      "    Default: None.\n\n"
 
-     "RA2/DEC2/CZ2: float/double (default double)\n"
-     "    Same as for RA1/DEC1/CZ1\n\n"
+     "X2/Y2/Z2: float/double (default double)\n"
+     "    Same as for X1/Y1/Z1\n\n"
 
      "weights2\n : array-like, real (float/double), shape (n_weights_per_particle,n_particles), optional\n"
      "    Weights for computing a weighted pair count.\n\n"
@@ -240,8 +223,8 @@ static PyMethodDef module_methods[] = {
     },
     {"countpairs_s_mu_mocks"       ,(PyCFunction)(void(*)(void)) countpairs_countpairs_s_mu_mocks ,METH_VARARGS | METH_KEYWORDS,
      "countpairs_s_mu_mocks(autocorr, nthreads, mu_max, nmu_bins, binfile,\n"
-     "                       RA1, DEC1, CZ1, weights1=None, weight_type=None,\n"
-     "                       RA2=None, DEC2=None, CZ2=None, weights2=None,\n"
+     "                       X1, Y1, Z1, weights1=None, weight_type=None,\n"
+     "                       X2=None, Y2=None, Z2=None, weights2=None,\n"
      "                       verbose=False, output_savg=False,\n"
      "                       fast_divide_and_NR_steps=0, xbin_refine_factor=2, \n"
      "                       ybin_refine_factor=2, zbin_refine_factor=1, \n"
@@ -249,7 +232,7 @@ static PyMethodDef module_methods[] = {
      "                       enable_min_sep_opt=True, c_api_timer=False, isa=-1)\n\n"
 
      "Calculate the 2-D pair-counts, "XI_CHAR"(s, "MU_CHAR"), auto/cross-correlation function given two\n"
-     "sets of RA1/DEC1/CZ1 and RA2/DEC2/CZ2 arrays. This module is suitable for mock catalogs that have been\n"
+     "sets of X1/Y1/Z1 and X2/Y2/Z2 arrays. This module is suitable for mock catalogs that have been\n"
      "created by carving out a survey footprint from simulated data. The module can also be used for actual\n"
      "observed galaxies, but you probably want to attach weights to the points to account for completeness etc.\n"
      "\n"
@@ -260,8 +243,8 @@ static PyMethodDef module_methods[] = {
      "Every parameter can be passed as a keyword of the corresponding name.\n\n"
 
      "autocorr: boolean\n"
-     "    Flag for auto/cross-correlation. If autocorr is not 0, the RA2/DEC2/CZ2 arrays\n"
-     "    are not used (but must still be passed, as RA1/DEC1/CZ1).\n\n"
+     "    Flag for auto/cross-correlation. If autocorr is not 0, the X2/Y2/Z2 arrays\n"
+     "    are not used (but must still be passed, as X1/Y1/Z1).\n\n"
 
      "nthreads: integer\n"
      "    The number of OpenMP threads to use. Has no effect if OpenMP was not used\n"
@@ -280,26 +263,9 @@ static PyMethodDef module_methods[] = {
      "    for a sample). For usual logarithmic bins, ``logbins``in the root directory\n"
      "    of this package will create a compatible ``binfile``.\n\n"
 
-     "RA1: array-like, float/double (default double)\n"
-     "    The right-ascension of the galaxy, in the range [0, 360]. If there are\n"
-     "    negative RA's in the supplied array (input RA in the range [-180, 180]),\n"
-     "    then the code will shift the entire array by 180 to put RA's in the\n"
-     "    [0, 360] range.\n\n"
-
-     "DEC1: array-like, float/double (default double)\n"
-     "    The declination of the galaxy, in the range [-90, 90]. If there are\n"
-     "    declinations > 90 in the supplied array (input dec in the range [0, 180]),\n"
-     "    then the code will shift the entire array by -90 to put declinations in\n"
-     "    the [-90, 90] range. If the code finds declinations more than 180, then\n"
-     "    it assumes RA and DEC have been swapped and aborts with that message.\n\n"
-
-     "CZ1: array-like, float/double (default double)\n"
-     "    The redshift multiplied by speed of light for the galaxies. The code will\n"
-     "    checks that cz has been supplied by comparing with a threshold (currently\n"
-     "    set to 10, defined in function check_ra_dec_cz in file\n"
-     "    `DDrppi/countpairs_rp_pi_mocks_impl.c.src`) and multiplies by the speed of light if\n"
-     "    max z is less than that threshold. If you really want to change the speed\n"
-     "    of light, then edit the macro in `ROOT/utils/set_cosmo_dist.h`.\n\n"
+     "X1/Y1/Z1 : array-like, real (float/double)\n"
+     "    The array of X/Y/Z positions for the first set of points.\n"
+     "    Calculations are done in the precision of the supplied arrays.\n\n"
 
      "weights1 : array-like, real (float/double), shape (n_weights_per_particle,n_particles), optional\n"
      "    Weights for computing a weighted pair count.\n\n"
@@ -309,8 +275,8 @@ static PyMethodDef module_methods[] = {
      "    Options: \"pair_product\", None\n"
      "    Default: None.\n\n"
 
-     "RA2/DEC2/CZ2: float/double (default double)\n"
-     "    Same as for RA1/DEC1/CZ1\n\n"
+     "X2/Y2/Z2: float/double (default double)\n"
+     "    Same as for X1/Y1/Z1\n\n"
 
      "weights2\n : array-like, real (float/double), shape (n_weights_per_particle,n_particles), optional\n"
      "    Weights for computing a weighted pair count.\n\n"
@@ -557,8 +523,8 @@ static PyMethodDef module_methods[] = {
     {"countspheres_vpf_mocks"       ,(PyCFunction)(void(*)(void)) countpairs_countspheres_vpf_mocks ,METH_VARARGS | METH_KEYWORDS,
      "countspheres_vpf_mocks(rmax, nbins, nspheres, numpN,\n"
      "                       threshold_ngb, centers_file,\n"
-     "                       RA, DEC, CZ,\n"
-     "                       RAND_RA, RAND_DEC, RAND_CZ,\n"
+     "                       X, Y, Z,\n"
+     "                       RAND_X, RAND_Y, RAND_Z,\n"
      "                       verbose=False,\n"
      "                       xbin_refine_factor=2, ybin_refine_factor=2, \n"
      "                       zbin_refine_factor=1, max_cells_per_dim=100, \n"
@@ -606,7 +572,7 @@ static PyMethodDef module_methods[] = {
      "centers_file: string, filename\n"
      "    A file containing random sphere centers. If the file does not exist,\n"
      "    then a list of random centers will be written out. In that case, the\n"
-     "    randoms arrays, ``RAND_RA``, ``RAND_DEC`` and ``RAND_CZ`` are used to\n"
+     "    randoms arrays, ``RAND_RA``, ``RAND_DEC`` and ``RAND_Z`` are used to\n"
      "    check that the sphere is entirely within the footprint. If the file does\n"
      "    exist but either ``rmax`` is too small or there are not enough centers\n"
      "    then the file will be overwritten.\n\n"
@@ -614,52 +580,13 @@ static PyMethodDef module_methods[] = {
      "    significantly longer to finish. However, subsequent runs can re-use\n"
      "    that centers file and will be faster.\n\n"
 
-     "RA: array-like, real (float/double)\n"
-     "    The array of Right Ascensions for the first set of points. RA's\n"
-     "    are expected to be in [0.0, 360.0], but the code will try to fix cases\n"
-     "    where the RA's are in [-180, 180.0]. For peace of mind, always supply\n"
-     "    RA's in [0.0, 360.0].\n"
-     "\n"
+     "X1/Y1/Z1 : array-like, real (float/double)\n"
+     "    The array of X/Y/Z positions for the first set of points.\n"
      "    Calculations are done in the precision of the supplied arrays.\n\n"
 
-     "DEC: array-like, real (float/double)\n"
-     "    Array of Declinations for the first set of points. DEC's are expected\n"
-     "    to be in the [-90.0, 90.0], but the code will try to fix cases where\n"
-     "    the DEC's are in [0.0, 180.0]. Again, for peace of mind, always supply\n"
-     "    DEC's in [-90.0, 90.0].\n"
-     "\n"
-     "    Must be of same precision type as RA.\n\n"
-
-     "CZ: array-like, real (float/double)\n"
-     "    Array of (Speed Of Light * Redshift) values for the first set of\n"
-     "    points. Code will try to detect cases where ``redshifts`` have been\n"
-     "    passed and multiply the entire array with the ``speed of light``.\n"
-     "\n"
-
-     "RAND_RA: array-like, real (float/double)\n"
-     "    The array of Right Ascensions for the randoms. RA's are expected to be\n"
-     "    in [0.0, 360.0], but the code will try to fix cases where the RA's are\n"
-     "    in [-180, 180.0]. For peace of mind, always supply RA's in\n"
-     "    [0.0, 360.0].\n"
-     "\n"
-     "    Must be of same precision type as RA/DEC/CZ.\n\n"
-
-     "RAND_DEC: array-like, real (float/double)\n"
-     "    Array of Declinations for the randoms. DEC's are expected to be in the\n"
-     "    [-90.0, 90.0], but the code will try to fix cases where the DEC's are\n"
-     "    in [0.0, 180.0]. Again, for peace of mind, always supply DEC's in\n"
-     "    [-90.0, 90.0].\n"
-     "\n"
-     "    Must be of same precision type as RA/DEC/CZ.\n\n"
-
-     "RAND_CZ: array-like, real (float/double)\n"
-     "    Array of (Speed Of Light * Redshift) values for the randoms. Code\n"
-     "    will try to detect cases where ``redshifts`` have been\n"
-     "    passed and multiply the entire array with the ``speed of light``.\n"
-     "\n"
-     "    **Note** RAND_RA, RAND_DEC and RAND_CZ are only used when the\n"
-     "      ``centers_file``  needs to be written out. In that case, the\n"
-     "      RAND_RA, RAND_DEC, and RAND_CZ are used as random centers.\n\n"
+     "RAND_X1/RAND_Y1/RAND_Z1 : array-like, real (float/double)\n"
+     "    The array of X/Y/Z positions for randoms.\n"
+     "    Calculations are done in the precision of the supplied arrays.\n\n"
 
      "verbose : boolean (default false)\n"
      "    Boolean flag to control output of informational messages\n\n"
@@ -731,17 +658,10 @@ static PyMethodDef module_methods[] = {
     ">>> X = np.random.uniform(-0.5*boxsize, 0.5*boxsize, N)\n"
     ">>> Y = np.random.uniform(-0.5*boxsize, 0.5*boxsize, N)\n"
     ">>> Z = np.random.uniform(-0.5*boxsize, 0.5*boxsize, N)\n"
-    ">>> CZ = np.sqrt(X*X + Y*Y + Z*Z)\n"
-    ">>> inv_cz = 1.0/CZ\n"
-    ">>> X *= inv_cz\n"
-    ">>> Y *= inv_cz\n"
-    ">>> Z *= inv_cz\n"
-    ">>> DEC = 90.0 - np.arccos(Z)*180.0/math.pi\n"
-    ">>> RA = (np.arctan2(Y, X)*180.0/math.pi) + 180.0\n"
     ">>> results = vpf_mocks(rmax, nbins, nspheres, numpN,\n"
     "                        threshold_ngb, centers_file,\n"
-    "                        RA, DEC, CZ,\n"
-    "                        RA, DEC, CZ,\n"
+    "                        X, Y, Z,\n"
+    "                        X, Y, Z,\n"
     "                        verbose=True)\n"
     "\n"
     },
@@ -1600,13 +1520,13 @@ static PyObject *countpairs_countpairs_rp_pi_mocks(PyObject *self, PyObject *arg
         "binfile",
         "pimax",
         "npibins",
-        "RA1",
-        "DEC1",
-        "CZ1",
+        "X1",
+        "Y1",
+        "Z1",
         "weights1",
-        "RA2",
-        "DEC2",
-        "CZ2",
+        "X2",
+        "Y2",
+        "Z2",
         "weights2",
         "verbose", /* keyword verbose -> print extra info at runtime + progressbar */
         "output_rpavg",
@@ -1911,13 +1831,13 @@ static PyObject *countpairs_countpairs_s_mu_mocks(PyObject *self, PyObject *args
         "binfile",
         "mu_max",
         "nmu_bins",
-        "RA1",
-        "DEC1",
-        "CZ1",
+        "X1",
+        "Y1",
+        "Z1",
         "weights1",
-        "RA2",
-        "DEC2",
-        "CZ2",
+        "X2",
+        "Y2",
+        "Z2",
         "weights2",
         "verbose", /* keyword verbose -> print extra info at runtime + progressbar */
         "output_savg",

@@ -27,7 +27,7 @@ else
   $(warning $(ccmagenta) Skipping python tests since python or numpy is unavailable $(ccreset))
 endif
 
-TARGETSRC   := tests_mocks.c $(IO_DIR)/io.c $(IO_DIR)/ftread.c $(UTILS_DIR)/utils.c $(UTILS_DIR)/cosmology_params.c
+TARGETSRC   := tests_mocks.c $(IO_DIR)/io.c $(IO_DIR)/ftread.c $(UTILS_DIR)/utils.c
 TARGETOBJS  := $(TARGETSRC:.c=.o)
 C_LIBRARIES := $(DDrppi_mocks_DIR)/lib$(DDrppi_mocks_LIB).a $(DDtheta_mocks_DIR)/lib$(DDtheta_mocks_LIB).a \
              $(VPF_mocks_DIR)/lib$(VPF_mocks_LIB).a $(DDsmu_mocks_DIR)/lib$(DDsmu_mocks_LIB).a

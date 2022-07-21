@@ -31,16 +31,16 @@ void free_results_mocks_bessel(results_countpairs_mocks_bessel *results)
 
 
 int countpairs_mocks_bessel(const int64_t ND1, void * restrict X1, void * restrict Y1, void * restrict Z1,
-                      const int64_t ND2, void * restrict X2, void * restrict Y2, void * restrict Z2,
-                      const int numthreads,
-                      const int autocorr,
-                      polearray *bins,
-                      double rmin,
-                      double rmax,
-                      double mumax,
-                      results_countpairs_mocks_bessel *results,
-                      struct config_options *options,
-                      struct extra_options *extra)
+                            const int64_t ND2, void * restrict X2, void * restrict Y2, void * restrict Z2,
+                            const int numthreads,
+                            const int autocorr,
+                            polearray *bins,
+                            double rmin,
+                            double rmax,
+                            double mumax,
+                            results_countpairs_mocks_bessel *results,
+                            struct config_options *options,
+                            struct extra_options *extra)
 {
 
 
@@ -58,28 +58,28 @@ int countpairs_mocks_bessel(const int64_t ND1, void * restrict X1, void * restri
 
     if(options->float_type == sizeof(float)) {
         return countpairs_mocks_bessel_float(ND1, (float *) X1, (float *) Y1, (float *) Z1,
-                                       ND2, (float *) X2, (float *) Y2, (float *) Z2,
-                                       numthreads,
-                                       autocorr,
-                                       bins,
-                                       rmin,
-                                       rmax,
-                                       mumax,
-                                       results,
-                                       options,
-                                       extra);
+                                             ND2, (float *) X2, (float *) Y2, (float *) Z2,
+                                             numthreads,
+                                             autocorr,
+                                             bins,
+                                             rmin,
+                                             rmax,
+                                             mumax,
+                                             results,
+                                             options,
+                                             extra);
   } else {
         return countpairs_mocks_bessel_double(ND1, (double *) X1, (double *) Y1, (double *) Z1,
-                                        ND2, (double *) X2, (double *) Y2, (double *) Z2,
-                                        numthreads,
-                                        autocorr,
-                                        bins,
-                                        rmin,
-                                        rmax,
-                                        mumax,
-                                        results,
-                                        options,
-                                        extra);
+                                              ND2, (double *) X2, (double *) Y2, (double *) Z2,
+                                              numthreads,
+                                              autocorr,
+                                              bins,
+                                              rmin,
+                                              rmax,
+                                              mumax,
+                                              results,
+                                              options,
+                                              extra);
     }
 
 }

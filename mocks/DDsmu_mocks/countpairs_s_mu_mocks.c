@@ -31,8 +31,8 @@ void free_results_mocks_s_mu(results_countpairs_mocks_s_mu *results)
 }
 
 
-int countpairs_mocks_s_mu(const int64_t ND1, void *phi1, void *theta1, void *czD1,
-                          const int64_t ND2, void *phi2, void *theta2, void *czD2,
+int countpairs_mocks_s_mu(const int64_t ND1, void *X1, void *Y1, void *Z1,
+                          const int64_t ND2, void *X2, void *Y2, void *Z2,
                           const int numthreads,
                           const int autocorr,
                           binarray *bins,
@@ -54,8 +54,8 @@ int countpairs_mocks_s_mu(const int64_t ND1, void *phi1, void *theta1, void *czD
     }
 
     if(options->float_type == sizeof(float)) {
-        return countpairs_mocks_s_mu_float(ND1, (float *) phi1, (float *) theta1, (float *) czD1,
-                                           ND2, (float *) phi2, (float *) theta2, (float *) czD2,
+        return countpairs_mocks_s_mu_float(ND1, (float *) X1, (float *) Y1, (float *) Z1,
+                                           ND2, (float *) X2, (float *) Y2, (float *) Z2,
                                            numthreads,
                                            autocorr,
                                            bins,
@@ -65,8 +65,8 @@ int countpairs_mocks_s_mu(const int64_t ND1, void *phi1, void *theta1, void *czD
                                            options,
                                            extra);
     } else {
-        return countpairs_mocks_s_mu_double(ND1, (double *) phi1, (double *) theta1, (double *) czD1,
-                                            ND2, (double *) phi2, (double *) theta2, (double *) czD2,
+        return countpairs_mocks_s_mu_double(ND1, (double *) X1, (double *) Y1, (double *) Z1,
+                                            ND2, (double *) X2, (double *) Y2, (double *) Z2,
                                             numthreads,
                                             autocorr,
                                             bins,

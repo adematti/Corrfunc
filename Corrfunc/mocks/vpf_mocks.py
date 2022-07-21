@@ -16,8 +16,8 @@ __all__ = ('vpf_mocks', )
 
 def vpf_mocks(rmax, nbins, nspheres, numpN,
               threshold_ngb, centers_file,
-              RA, DEC, CZ,
-              RAND_RA, RAND_DEC, RAND_CZ,
+              X, Y, Z,
+              RAND_X, RAND_Y, RAND_Z,
               verbose=False,
               xbin_refine_factor=1, ybin_refine_factor=1,
               zbin_refine_factor=1, max_cells_per_dim=100,
@@ -73,7 +73,7 @@ def vpf_mocks(rmax, nbins, nspheres, numpN,
     centers_file : string, filename
         A file containing random sphere centers. If the file does not exist,
         then a list of random centers will be written out. In that case, the
-        randoms arrays, ``RAND_RA``, ``RAND_DEC`` and ``RAND_CZ`` are used to
+        randoms arrays, ``RAND_X``, ``RAND_Y`` and ``RAND_Z`` are used to
         check that the sphere is entirely within the footprint. If the file
         does exist but either ``rmax`` is too small or there are not enough
         centers then the file will be overwritten.
@@ -82,51 +82,17 @@ def vpf_mocks(rmax, nbins, nspheres, numpN,
         significantly longer to finish. However, subsequent runs can re-use
         that centers file and will be faster.
 
-    RA : array-like, real (float/double)
-        The array of Right Ascensions for the first set of points. RA's
-        are expected to be in [0.0, 360.0], but the code will try to fix cases
-        where the RA's are in [-180, 180.0]. For peace of mind, always supply
-        RA's in [0.0, 360.0].
-
+    X1/Y1/Z1 : array_like, real (float/double)
+        The array of X/Y/Z positions for the first set of points.
         Calculations are done in the precision of the supplied arrays.
 
-    DEC : array-like, real (float/double)
-        Array of Declinations for the first set of points. DEC's are expected
-        to be in the [-90.0, 90.0], but the code will try to fix cases where
-        the DEC's are in [0.0, 180.0]. Again, for peace of mind, always supply
-        DEC's in [-90.0, 90.0].
+    RAND_X/RAND_Y/RAND_Z : array_like, real (float/double)
+        The array of X/Y/Z positions for the randoms.
+        Calculations are done in the precision of the supplied arrays.
 
-        Must be of same precision type as RA.
-
-    CZ : array-like, real (float/double)
-        Array of (Speed Of Light * Redshift) values for the first set of
-        points. Code will try to detect cases where ``redshifts`` have been
-        passed and multiply the entire array with the ``speed of light``.
-
-    RAND_RA : array-like, real (float/double)
-        The array of Right Ascensions for the randoms. RA's are expected to be
-        in [0.0, 360.0], but the code will try to fix cases where the RA's are
-        in [-180, 180.0]. For peace of mind, always supply RA's in
-        [0.0, 360.0].
-
-        Must be of same precision type as RA/DEC/CZ.
-
-    RAND_DEC : array-like, real (float/double)
-        Array of Declinations for the randoms. DEC's are expected to be in the
-        [-90.0, 90.0], but the code will try to fix cases where the DEC's are
-        in [0.0, 180.0]. Again, for peace of mind, always supply DEC's in
-        [-90.0, 90.0].
-
-        Must be of same precision type as RA/DEC/CZ.
-
-    RAND_CZ : array-like, real (float/double)
-        Array of (Speed Of Light * Redshift) values for the randoms. Code
-        will try to detect cases where ``redshifts`` have been
-        passed and multiply the entire array with the ``speed of light``.
-
-        Note: RAND_RA, RAND_DEC and RAND_CZ are only used when the
+        Note: RAND_X, RAND_Y and RAND_Z are only used when the
            ``centers_file``  needs to be written out. In that case, the
-           RAND_RA, RAND_DEC, and RAND_CZ are used as random centers.
+           RAND_X, RAND_Y, and RAND_Z are used as random centers.
 
     verbose : boolean (default false)
         Boolean flag to control output of informational messages
@@ -209,17 +175,10 @@ def vpf_mocks(rmax, nbins, nspheres, numpN,
     >>> X = np.random.uniform(-0.5*boxsize, 0.5*boxsize, N)
     >>> Y = np.random.uniform(-0.5*boxsize, 0.5*boxsize, N)
     >>> Z = np.random.uniform(-0.5*boxsize, 0.5*boxsize, N)
-    >>> CZ = np.sqrt(X*X + Y*Y + Z*Z)
-    >>> inv_cz = 1.0/CZ
-    >>> X *= inv_cz
-    >>> Y *= inv_cz
-    >>> Z *= inv_cz
-    >>> DEC = 90.0 - np.arccos(Z)*180.0/math.pi
-    >>> RA = (np.arctan2(Y, X)*180.0/math.pi) + 180.0
     >>> results = vpf_mocks(rmax, nbins, nspheres, numpN, threshold_ngb,
     ...                     centers_file,
-    ...                     RA, DEC, CZ,
-    ...                     RA, DEC, CZ)
+    ...                     X, Y, Z,
+    ...                     X, Y, Z)
     >>> for r in results:
     ...     print("{0:10.1f} ".format(r[0]), end="")
     ...     # doctest: +NORMALIZE_WHITESPACE
@@ -254,16 +213,16 @@ def vpf_mocks(rmax, nbins, nspheres, numpN,
         convert_to_native_endian, sys_pipes
 
     # Ensure all input arrays are native endian
-    RA, DEC, CZ, RAND_RA, RAND_DEC, RAND_CZ = [
+    X, Y, Z, RAND_X, RAND_Y, RAND_Z = [
             convert_to_native_endian(arr, warn=False) for arr in
-            [RA, DEC, CZ, RAND_RA, RAND_DEC, RAND_CZ]]
+            [X, Y, Z, RAND_X, RAND_Y, RAND_Z]]
 
     integer_isa = translate_isa_string_to_enum(isa)
     with sys_pipes():
       extn_results = vpf_extn(rmax, nbins, nspheres, numpN,
                               threshold_ngb, centers_file,
-                              RA, DEC, CZ,
-                              RAND_RA, RAND_DEC, RAND_CZ,
+                              X, Y, Z,
+                              RAND_X, RAND_Y, RAND_Z,
                               verbose=verbose,
                               xbin_refine_factor=xbin_refine_factor,
                               ybin_refine_factor=ybin_refine_factor,

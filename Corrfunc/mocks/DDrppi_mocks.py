@@ -15,8 +15,8 @@ __all__ = ('DDrppi_mocks', )
 
 
 def DDrppi_mocks(autocorr, nthreads, binfile, pimax, npibins,
-                 RA1, DEC1, CZ1, weights1=None,
-                 RA2=None, DEC2=None, CZ2=None, weights2=None,
+                 X1, Y1, Z1, weights1=None,
+                 X2=None, Y2=None, Z2=None, weights2=None,
                  verbose=False, output_rpavg=False,
                  fast_divide_and_NR_steps=0,
                  xbin_refine_factor=2, ybin_refine_factor=2,
@@ -84,26 +84,9 @@ def DDrppi_mocks(autocorr, nthreads, binfile, pimax, npibins,
         The number of linear ``pi`` bins, with the bins ranging from
         from (0, :math:`\\pi_{max}`)
 
-    RA1 : array-like, real (float/double)
-        The array of Right Ascensions for the first set of points. RA's
-        are expected to be in [0.0, 360.0], but the code will try to fix cases
-        where the RA's are in [-180, 180.0]. For peace of mind, always supply
-        RA's in [0.0, 360.0].
-
+    X1/Y1/Z1 : array_like, real (float/double)
+        The array of X/Y/Z positions for the first set of points.
         Calculations are done in the precision of the supplied arrays.
-
-    DEC1 : array-like, real (float/double)
-        Array of Declinations for the first set of points. DEC's are expected
-        to be in the [-90.0, 90.0], but the code will try to fix cases where
-        the DEC's are in [0.0, 180.0]. Again, for peace of mind, always supply
-        DEC's in [-90.0, 90.0].
-
-        Must be of same precision type as RA1.
-
-    CZ1 : array-like, real (float/double)
-        Array of (Speed Of Light * Redshift) values for the first set of
-        points. Code will try to detect cases where ``redshifts`` have been
-        passed and multiply the entire array with the ``speed of light``.
 
     weights1 : array_like, real (float/double), optional
         A scalar, or an array of weights of shape (n_weights, n_positions) or (n_positions,).
@@ -111,28 +94,28 @@ def DDrppi_mocks(autocorr, nthreads, binfile, pimax, npibins,
         in the `weightavg` field.  If only one of weights1 and weights2 is
         specified, the other will be set to uniform weights.
 
-    RA2 : array-like, real (float/double)
-        The array of Right Ascensions for the second set of points. RA's
+    X2 : array-like, real (float/double)
+        The array of Right Ascensions for the second set of points. X's
         are expected to be in [0.0, 360.0], but the code will try to fix cases
-        where the RA's are in [-180, 180.0]. For peace of mind, always supply
-        RA's in [0.0, 360.0].
+        where the X's are in [-180, 180.0]. For peace of mind, always supply
+        X's in [0.0, 360.0].
 
-        Must be of same precision type as RA1/DEC1/CZ1.
+        Must be of same precision type as X1/Y1/Z1.
 
-    DEC2 : array-like, real (float/double)
-        Array of Declinations for the second set of points. DEC's are expected
+    Y2 : array-like, real (float/double)
+        Array of Declinations for the second set of points. Y's are expected
         to be in the [-90.0, 90.0], but the code will try to fix cases where
-        the DEC's are in [0.0, 180.0]. Again, for peace of mind, always supply
-        DEC's in [-90.0, 90.0].
+        the Y's are in [0.0, 180.0]. Again, for peace of mind, always supply
+        Y's in [-90.0, 90.0].
 
-        Must be of same precision type as RA1/DEC1/CZ1.
+        Must be of same precision type as X1/Y1/Z1.
 
-    CZ2 : array-like, real (float/double)
+    Z2 : array-like, real (float/double)
         Array of (Speed Of Light * Redshift) values for the second set of
         points. Code will try to detect cases where ``redshifts`` have been
         passed and multiply the entire array with the ``speed of light``.
 
-        Must be of same precision type as RA1/DEC1/CZ1.
+        Must be of same precision type as X1/Y1/Z1.
 
     weights2 : array-like, real (float/double), optional
         Same as weights1, but for the second set of positions
@@ -258,18 +241,11 @@ def DDrppi_mocks(autocorr, nthreads, binfile, pimax, npibins,
     >>> Y = np.random.uniform(-0.5*boxsize, 0.5*boxsize, N)
     >>> Z = np.random.uniform(-0.5*boxsize, 0.5*boxsize, N)
     >>> weights = np.ones_like(X)
-    >>> CZ = np.sqrt(X*X + Y*Y + Z*Z)
-    >>> inv_cz = 1.0/CZ
-    >>> X *= inv_cz
-    >>> Y *= inv_cz
-    >>> Z *= inv_cz
-    >>> DEC = 90.0 - np.arccos(Z)*180.0/math.pi
-    >>> RA = (np.arctan2(Y, X)*180.0/math.pi) + 180.0
     >>> autocorr = 1
     >>> nthreads = 2
     >>> pimax = 40.0
     >>> results = DDrppi_mocks(autocorr, nthreads,
-    ...                        pimax, binfile, RA, DEC, CZ,
+    ...                        pimax, binfile, X, Y, Z,
     ...                        weights1=weights, weight_type='pair_product',
     ...                        output_rpavg=True)
     >>> for r in results[519:]: print("{0:10.6f} {1:10.6f} {2:10.6f} {3:10.1f}"
@@ -333,21 +309,21 @@ def DDrppi_mocks(autocorr, nthreads, binfile, pimax, npibins,
     from future.utils import bytes_to_native_str
 
     if not autocorr:
-        if RA2 is None or DEC2 is None or CZ2 is None:
-            msg = "Must pass valid arrays for RA2/DEC2/CZ2 for "\
+        if X2 is None or Y2 is None or Z2 is None:
+            msg = "Must pass valid arrays for X2/Y2/Z2 for "\
                   "computing cross-correlation"
             raise ValueError(msg)
     else:
-        RA2 = np.empty(1)
-        DEC2 = np.empty(1)
-        CZ2 = np.empty(1)
+        X2 = np.empty(1)
+        Y2 = np.empty(1)
+        Z2 = np.empty(1)
 
-    weights1, weights2 = process_weights(weights1, weights2, RA1, RA2, weight_type, autocorr)
+    weights1, weights2 = process_weights(weights1, weights2, X1, X2, weight_type, autocorr)
 
     # Ensure all input arrays are native endian
-    RA1, DEC1, CZ1, RA2, DEC2, CZ2 = [
+    X1, Y1, Z1, X2, Y2, Z2 = [
             convert_to_native_endian(arr, warn=False) for arr in
-            [RA1, DEC1, CZ1, RA2, DEC2, CZ2]]
+            [X1, Y1, Z1, X2, Y2, Z2]]
 
     if weights1 is not None:
         weights1 = [convert_to_native_endian(arr, warn=False) for arr in weights1]
@@ -360,7 +336,7 @@ def DDrppi_mocks(autocorr, nthreads, binfile, pimax, npibins,
 
     # Passing None parameters breaks the parsing code, so avoid this
     kwargs = {}
-    for k in ['weights1', 'weights2', 'weight_type', 'RA2', 'DEC2', 'CZ2',
+    for k in ['weights1', 'weights2', 'weight_type', 'X2', 'Y2', 'Z2',
               'pair_weights', 'sep_pair_weights', 'attrs_pair_weights']:
         v = locals()[k]
         if v is not None:
@@ -372,7 +348,7 @@ def DDrppi_mocks(autocorr, nthreads, binfile, pimax, npibins,
     with sys_pipes():
         extn_results = DDrppi_extn(autocorr, nthreads,
                                    rbinfile, pimax, npibins,
-                                   RA1, DEC1, CZ1,
+                                   X1, Y1, Z1,
                                    verbose=verbose,
                                    output_rpavg=output_rpavg,
                                    fast_divide_and_NR_steps=fast_divide_and_NR_steps,

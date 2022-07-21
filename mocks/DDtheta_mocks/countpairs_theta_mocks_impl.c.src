@@ -50,7 +50,7 @@ static int check_ra_dec_DOUBLE(const int64_t N, DOUBLE *ra, DOUBLE *dec)
 
     for(int64_t i=0;i<N;i++) {
         ra[i] = wrap_range(ra[i], 0., 360.);
-        dec[i] = wrap_range(dec[i], -90., 90);
+        dec[i] = wrap_range(dec[i], -90., 90.);
     }
     return EXIT_SUCCESS;
 }
@@ -749,7 +749,7 @@ int countpairs_theta_mocks_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1,
         }
     } else {
         /* Only link in declination */
-        lattice1 = gridlink_mocks_theta_dec_DOUBLE(ND1,ra1,dec1,X1,Y1,Z1, &(extra->weights0),
+        lattice1 = gridlink_mocks_theta_dec_DOUBLE(ND1, ra1, dec1, X1, Y1, Z1, &(extra->weights0),
                                                    dec_min, dec_max,
                                                    options->max_cells_per_dim,
                                                    options->bin_refine_factors[1],

@@ -429,13 +429,13 @@ int countpairs_mocks_bessel_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DO
 
     if(options->copy_particles == 0) {
         int64_t *original_index = lattice1[0].original_index;
-        int status = reorder_particles_mocks_back_into_original_order_DOUBLE(ND1, original_index, &(extra->weights0));
+        int status = reorder_particles_back_into_original_order_DOUBLE(ND1, original_index, X1, Y1, Z1, &(extra->weights0));
         if(status != EXIT_SUCCESS) {
             return status;
         }
         if(autocorr == 0) {
             original_index = lattice2[0].original_index;
-            status = reorder_particles_mocks_back_into_original_order_DOUBLE(ND2, original_index, &(extra->weights1));
+            status = reorder_particles_back_into_original_order_DOUBLE(ND2, original_index, X2, Y2, Z2, &(extra->weights1));
             if(status != EXIT_SUCCESS) {
                 return status;
             }

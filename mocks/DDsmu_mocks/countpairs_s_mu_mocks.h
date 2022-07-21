@@ -27,8 +27,8 @@ extern "C" {
         int nmu_bins;
     } results_countpairs_mocks_s_mu;
 
-    int countpairs_mocks_s_mu(const int64_t ND1, void *theta1, void *phi1, void *czD1,
-                              const int64_t ND2, void *theta2, void *phi2, void *czD2,
+    int countpairs_mocks_s_mu(const int64_t ND1, void *X1, void *Y1, void *Z1,
+                              const int64_t ND2, void *X2, void *Y2, void *Z2,
                               const int numthreads,
                               const int autocorr,
                               binarray *bins,

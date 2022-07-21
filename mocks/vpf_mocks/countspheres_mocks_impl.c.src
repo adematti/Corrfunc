@@ -201,8 +201,8 @@ int count_neighbors_DOUBLE(const DOUBLE xcen,const DOUBLE ycen,const DOUBLE zcen
 }
 
 
-int countspheres_mocks_DOUBLE(const int64_t Ngal, DOUBLE *RA, DOUBLE *DEC, DOUBLE *CZ,
-                              const int64_t Nran, DOUBLE *RAND_RA, DOUBLE *RAND_DEC, DOUBLE *RAND_CZ,
+int countspheres_mocks_DOUBLE(const int64_t Ngal, DOUBLE *xgal, DOUBLE *ygal, DOUBLE *zgal,
+                              const int64_t Nran, DOUBLE *xran, DOUBLE *yran, DOUBLE *zran,
                               const int threshold_neighbors,
                               const DOUBLE rmax, const int nbin, const int nc,
                               const int num_pN,
@@ -273,41 +273,18 @@ int countspheres_mocks_DOUBLE(const int64_t Ngal, DOUBLE *RA, DOUBLE *DEC, DOUBL
     }
 
     DOUBLE rcube=0.0;
-
-    DOUBLE *xgal = my_malloc(sizeof(*xgal), Ngal);
-    DOUBLE *ygal = my_malloc(sizeof(*ygal), Ngal);
-    DOUBLE *zgal = my_malloc(sizeof(*zgal), Ngal);
-    if(xgal == NULL || ygal == NULL || zgal == NULL) {
-        return EXIT_FAILURE;
-    }
     for(int64_t i=0;i<Ngal;i++) {
-        DOUBLE dc = CZ[i];
-        if(dc>rcube) rcube = dc;
-        xgal[i] = dc*COSD(DEC[i])*COSD(RA[i]);
-        ygal[i] = dc*COSD(DEC[i])*SIND(RA[i]);
-        zgal[i] = dc*SIND(DEC[i]);
+        DOUBLE dc2 = xgal[i]*xgal[i] + ygal[i]*ygal[i] + zgal[i]*zgal[i];
+        if(dc2 > rcube) rcube = dc2;
     }
-
-    DOUBLE *xran = NULL;
-    DOUBLE *yran = NULL;
-    DOUBLE *zran = NULL;
 
     if (need_randoms == 1) {
-        xran = my_malloc(sizeof(*xran), Nran);
-        yran = my_malloc(sizeof(*yran), Nran);
-        zran = my_malloc(sizeof(*zran), Nran);
-        if(xran == NULL || yran == NULL || zran == NULL) {
-            return EXIT_FAILURE;
-        }
         for(int64_t i=0;i<Nran;i++) {
-            DOUBLE dc = RAND_CZ[i];
-            if(dc>rcube) rcube = dc;
-
-            xran[i] = dc*COSD(RAND_DEC[i])*COSD(RAND_RA[i]) ;
-            yran[i] = dc*COSD(RAND_DEC[i])*SIND(RAND_RA[i]) ;
-            zran[i] = dc*SIND(RAND_DEC[i]);
+            DOUBLE dc2 = xran[i]*xran[i] + yran[i]*yran[i] + zran[i]*zran[i];
+            if(dc2 > rcube) rcube = dc2;
         }
     }
+    rcube = SQRT(rcube);
 
     /*---Shift-coordinates--------------------------------*/
     if(options->verbose) {
@@ -315,19 +292,28 @@ int countspheres_mocks_DOUBLE(const int64_t Ngal, DOUBLE *RA, DOUBLE *DEC, DOUBL
     }
 
     rcube = rcube + 1. ; //add buffer
+    DOUBLE *xgali = xgal, *ygali = ygal, *zgali = zgal;
+    DOUBLE *xrani = xran, *yrani = yran, *zrani = zran;
+
+    xgal = my_malloc(sizeof(*xgal), Ngal);
+    ygal = my_malloc(sizeof(*ygal), Ngal);
+    zgal = my_malloc(sizeof(*zgal), Ngal);
 
     //translate from -rcube, rcube to [0, 2*rcube]
     for(int i=0;i<Ngal;i++) {
-        xgal[i] += rcube ;
-        ygal[i] += rcube ;
-        zgal[i] += rcube ;
+        xgal[i] = xgali[i] + rcube;
+        ygal[i] = ygali[i] + rcube;
+        zgal[i] = zgali[i] + rcube;
     }
 
     if(need_randoms == 1) {
+        xran = my_malloc(sizeof(*xran), Nran);
+        yran = my_malloc(sizeof(*yran), Nran);
+        zran = my_malloc(sizeof(*zran), Nran);
         for(int i=0;i<Nran;i++) {
-            xran[i] += rcube ;
-            yran[i] += rcube ;
-            zran[i] += rcube ;
+            xran[i] = xrani[i] + rcube;
+            yran[i] = yrani[i] + rcube;
+            zran[i] = zrani[i] + rcube;
         }
     }
     rcube = 2.0*rcube;
@@ -368,6 +354,7 @@ int countspheres_mocks_DOUBLE(const int64_t Ngal, DOUBLE *RA, DOUBLE *DEC, DOUBL
                                                 options->bin_refine_factors[2],
                                                 &nmesh_x, &nmesh_y, &nmesh_z,
                                                 options);
+
     if(options->copy_particles) {
         free(xgal);free(ygal);free(zgal);
     }
@@ -521,12 +508,24 @@ int countspheres_mocks_DOUBLE(const int64_t Ngal, DOUBLE *RA, DOUBLE *DEC, DOUBL
 
     if(options->copy_particles == 0) {
         free(xgal);free(ygal);free(zgal);
+        int64_t *original_index = lattice[0].original_index;
+        int status = reorder_particles_mocks_back_into_original_order_DOUBLE(Ngal, original_index, &(extra->weights0));
+        if(status != EXIT_SUCCESS) {
+            return status;
+        }
     }
 
     free_cellarray_DOUBLE(lattice, totncells);
     if(need_randoms == 1) {
-        free(xran);free(yran);free(zran);
-        free_cellarray_DOUBLE(randoms_lattice, totncells);
+      free(xran);free(yran);free(zran);
+      if(options->copy_particles == 0) {
+          int64_t *original_index = randoms_lattice[0].original_index;
+          int status = reorder_particles_mocks_back_into_original_order_DOUBLE(Nran, original_index, &(extra->weights1));
+          if(status != EXIT_SUCCESS) {
+              return status;
+          }
+      }
+      free_cellarray_DOUBLE(randoms_lattice, totncells);
     }
     if(interrupt_status_vpf_mocks_DOUBLE != EXIT_SUCCESS) {
         matrix_free((void **) pN, nbin);

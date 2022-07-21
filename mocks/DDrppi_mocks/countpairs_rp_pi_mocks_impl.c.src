@@ -37,24 +37,6 @@ void interrupt_handler_countpairs_rp_pi_mocks_DOUBLE(int signo)
 }
 
 
-static int check_ra_dec_cz_DOUBLE(const int64_t N, DOUBLE *ra, DOUBLE *dec, DOUBLE *cz)
-{
-    if (N == 0) {
-        return EXIT_SUCCESS;
-    }
-    if(ra == NULL || dec == NULL || cz == NULL) {
-        fprintf(stderr,"Input arrays can not be NULL. Have RA = %p DEC = %p cz = %p\n", ra, dec, cz);
-        return EXIT_FAILURE;
-    }
-
-    for(int64_t i=0;i<N;i++) {
-        ra[i] = wrap_range(ra[i], 0., 360.);
-        dec[i] = wrap_range(dec[i], -90., 90);
-    }
-    return EXIT_SUCCESS;
-}
-
-
 countpairs_mocks_func_ptr_DOUBLE countpairs_rp_pi_mocks_driver_DOUBLE(const struct config_options *options)
 {
 
@@ -151,8 +133,8 @@ countpairs_mocks_func_ptr_DOUBLE countpairs_rp_pi_mocks_driver_DOUBLE(const stru
 }
 
 
-int countpairs_mocks_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1, DOUBLE *czD1,
-                            const int64_t ND2, DOUBLE *ra2, DOUBLE *dec2, DOUBLE *czD2,
+int countpairs_mocks_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z1,
+                            const int64_t ND2, DOUBLE *X2, DOUBLE *Y2, DOUBLE *Z2,
                             const int numthreads,
                             const int autocorr,
                             binarray *bins,
@@ -227,18 +209,6 @@ int countpairs_mocks_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1, DOUBLE
         options->fast_divide_and_NR_steps = 0;
     }
 
-    //Check inputs
-    int status1 = check_ra_dec_cz_DOUBLE(ND1, ra1, dec1, czD1);
-    if(status1 != EXIT_SUCCESS) {
-        return status1;
-    }
-    if(autocorr==0) {
-        int status2 = check_ra_dec_cz_DOUBLE(ND2, ra2, dec2, czD2);
-        if(status2 != EXIT_SUCCESS) {
-            return status2;
-        }
-    }
-
 #if defined(_OPENMP)
     omp_set_num_threads(numthreads);
 #else
@@ -261,40 +231,6 @@ int countpairs_mocks_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1, DOUBLE
     /* setup interrupt handler -> mostly useful during the python execution.
        Let's Ctrl-C abort the extension  */
     SETUP_INTERRUPT_HANDLERS(interrupt_handler_countpairs_rp_pi_mocks_DOUBLE);
-
-    //Change cz into co-moving distance
-    DOUBLE *D1 = NULL, *D2 = NULL;
-    D1 = czD1;
-    D2 = autocorr == 0 ? czD2:czD1;
-
-    DOUBLE *X1 = my_malloc(sizeof(*X1), ND1);
-    DOUBLE *Y1 = my_malloc(sizeof(*Y1), ND1);
-    DOUBLE *Z1 = my_malloc(sizeof(*Z1), ND1);
-    if(X1 == NULL || Y1 == NULL || Z1 == NULL) {
-        free(X1);free(Y1);free(Z1);
-        return EXIT_FAILURE;
-    }
-    for(int64_t i=0;i<ND1;i++) {
-        X1[i] = D1[i]*COSD(dec1[i])*COSD(ra1[i]);
-        Y1[i] = D1[i]*COSD(dec1[i])*SIND(ra1[i]);
-        Z1[i] = D1[i]*SIND(dec1[i]);
-    }
-
-    DOUBLE *X2,*Y2,*Z2;
-    if(autocorr==0) {
-        X2 = my_malloc(sizeof(*X2), ND2);
-        Y2 = my_malloc(sizeof(*Y2), ND2);
-        Z2 = my_malloc(sizeof(*Z2), ND2);
-        for(int64_t i=0;i<ND2;i++) {
-            X2[i] = D2[i]*COSD(dec2[i])*COSD(ra2[i]);
-            Y2[i] = D2[i]*COSD(dec2[i])*SIND(ra2[i]);
-            Z2[i] = D2[i]*SIND(dec2[i]);
-        }
-    } else {
-        X2 = X1;
-        Y2 = Y1;
-        Z2 = Z1;
-    }
 
     DOUBLE rupp_sqr[nrpbin];
     for(int i=0;i<nrpbin;i++) {
@@ -405,13 +341,6 @@ int countpairs_mocks_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1, DOUBLE
         }
     } else {
         lattice2 = lattice1;
-    }
-
-    if(options->copy_particles) {
-        free(X1);free(Y1);free(Z1);
-        if(autocorr == 0) {
-            free(X2);free(Y2);free(Z2);
-        }
     }
 
     const int64_t totncells = (int64_t) nmesh_x * (int64_t) nmesh_y * (int64_t) nmesh_z;
@@ -562,22 +491,19 @@ int countpairs_mocks_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1, DOUBLE
     free(all_cell_pairs);
 
     if(options->copy_particles == 0) {
-        free(X1);free(Y1);free(Z1);
         int64_t *original_index = lattice1[0].original_index;
-        int status = reorder_particles_mocks_back_into_original_order_DOUBLE(ND1, original_index, &(extra->weights0));
+        int status = reorder_particles_back_into_original_order_DOUBLE(ND1, original_index, X1, Y1, Z1, &(extra->weights0));
         if(status != EXIT_SUCCESS) {
             return status;
         }
         if(autocorr == 0) {
-            free(X2);free(Y2);free(Z2);
             original_index = lattice2[0].original_index;
-            status = reorder_particles_mocks_back_into_original_order_DOUBLE(ND2, original_index, &(extra->weights1));
+            status = reorder_particles_back_into_original_order_DOUBLE(ND2, original_index, X2, Y2, Z2, &(extra->weights1));
             if(status != EXIT_SUCCESS) {
                 return status;
             }
         }
     }
-
 
     free_cellarray_mocks_DOUBLE(lattice1,totncells);
     if(autocorr == 0) {

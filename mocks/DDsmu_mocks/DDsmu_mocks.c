@@ -61,8 +61,8 @@ int main(int argc, char *argv[])
     /*---Data-variables--------------------*/
     int64_t ND1,ND2 ;
 
-    DOUBLE *thetaD1,*phiD1,*czD1, *weights1[MAX_NUM_WEIGHTS]={NULL};
-    DOUBLE *thetaD2,*phiD2,*czD2, *weights2[MAX_NUM_WEIGHTS]={NULL};
+    DOUBLE *X1,*Y1,*Z1, *weights1[MAX_NUM_WEIGHTS]={NULL};
+    DOUBLE *X2,*Y2,*Z2, *weights2[MAX_NUM_WEIGHTS]={NULL};
 
     struct timeval t_end,t_start,t0,t1;
     double read_time=0.0;
@@ -169,7 +169,7 @@ int main(int argc, char *argv[])
     read_binfile(sbinfile, &bins);
     /*---Read-data1-file----------------------------------*/
     gettimeofday(&t0,NULL);
-    ND1=read_positions(file1,fileformat1,sizeof(DOUBLE), 3, &phiD1, &thetaD1, &czD1);
+    ND1=read_positions(file1,fileformat1,sizeof(DOUBLE), 3, &X1, &Y1, &Z1);
     gettimeofday(&t1,NULL);
     read_time += ADD_DIFF_TIME(t0,t1);
     gettimeofday(&t0,NULL);
@@ -189,7 +189,7 @@ int main(int argc, char *argv[])
 
     if (autocorr==0) {
         /*---Read-data2-file----------------------------------*/
-        ND2=read_positions(file2,fileformat2,sizeof(DOUBLE), 3, &phiD2, &thetaD2, &czD2);
+        ND2=read_positions(file2,fileformat2,sizeof(DOUBLE), 3, &X2, &Y2, &Z2);
         gettimeofday(&t1,NULL);
         read_time += ADD_DIFF_TIME(t0,t1);
 
@@ -207,9 +207,9 @@ int main(int argc, char *argv[])
     } else {
         //None of these are required. But I prefer to preserve the possibility
         ND2 = ND1;
-        thetaD2 = thetaD1;
-        phiD2 = phiD1;
-        czD2 = czD1;
+        X2 = X1;
+        Y2 = Y1;
+        Z2 = Z1;
         for(int w = 0; w < MAX_NUM_WEIGHTS; w++){
           weights2[w] = weights1[w];
         }
@@ -228,8 +228,8 @@ int main(int argc, char *argv[])
         extra.weights1.weights[w] = (void *) weights2[w];
     }
 
-    int status = countpairs_mocks_s_mu(ND1,phiD1,thetaD1,czD1,
-                                  ND2,phiD2,thetaD2,czD2,
+    int status = countpairs_mocks_s_mu(ND1,X1,Y1,Z1,
+                                  ND2,X2,Y2,Z2,
                                   nthreads,
                                   autocorr,
                                   &bins,
@@ -239,12 +239,12 @@ int main(int argc, char *argv[])
                                   &options,
                                   &extra);
 
-    free(phiD1);free(thetaD1);free(czD1);
+    free(X1);free(Y1);free(Z1);
     for(int w = 0; w < num_weights; w++){
         free(weights1[w]);
     }
     if(autocorr == 0) {
-        free(phiD2);free(thetaD2);free(czD2);
+        free(X2);free(Y2);free(Z2);
         for(int w = 0; w < num_weights; w++){
           free(weights2[w]);
         }
