@@ -189,16 +189,16 @@ ifeq ($(DO_CHECKS), 1)
    -CFLAGS += -Wimplicit-fallthrough=1
   endif
 
-	ifeq (USE_GSL,$(findstring USE_GSL,$(OPT)))
-		GSL_FOUND := $(shell gsl-config --version 2>/dev/null)
-	  ifndef GSL_FOUND
-	    $(error $(ccred)Error:$(ccreset) GSL not found in path - please install GSL before installing, or unset USE_GSL $(DISTNAME).$(VERSION) $(ccreset))
-	  endif
-		CFLAGS += -DUSE_GSL
-	  GSL_CFLAGS := $(shell gsl-config --cflags)
-	  GSL_LIBDIR := $(shell gsl-config --prefix)/lib
-	  GSL_LINK   := $(shell gsl-config --libs) -Xlinker -rpath -Xlinker $(GSL_LIBDIR)
-	endif
+  ifeq (USE_GSL,$(findstring USE_GSL,$(OPT)))
+    GSL_FOUND := $(shell gsl-config --version 2>/dev/null)
+    ifndef GSL_FOUND
+      $(error $(ccred)Error:$(ccreset) GSL not found in path - please install GSL before installing, or unset USE_GSL $(DISTNAME).$(VERSION) $(ccreset))
+    endif
+    CFLAGS += -DUSE_GSL
+    GSL_CFLAGS := $(shell gsl-config --cflags)
+    GSL_LIBDIR := $(shell gsl-config --prefix)/lib
+    GSL_LINK   := $(shell gsl-config --libs) -Xlinker -rpath -Xlinker $(GSL_LIBDIR)
+  endif
 
   # Check if all progressbar output is to be suppressed
   OUTPUT_PGBAR := 1
@@ -275,15 +275,18 @@ ifeq ($(DO_CHECKS), 1)
         else
           # Apple clang/gcc does not support OpenMP
           ifeq (Apple, $(findstring Apple, $(CC_VERSION)))
-            CLANG_OMP_AVAIL:= false
-            export CLANG_OMP_WARNING_PRINTED ?= 0
-            ifeq ($(CLANG_OMP_WARNING_PRINTED), 0)
-              $(warning $(ccmagenta)Compiler is Apple clang and does not support OpenMP$(ccreset))
-              $(info $(ccmagenta)If you want OpenMP support, please install clang with OpenMP support$(ccreset))
-              $(info $(ccmagenta)For homebrew, use $(ccgreen)"brew update && (brew outdated xctool || brew upgrade xctool) && brew tap homebrew/versions && brew install clang-omp"$(ccreset))
-              $(info $(ccmagenta)For Macports, use $(ccgreen)"sudo port install clang-3.8 +assertions +debug + openmp"$(ccreset))
-              export CLANG_OMP_WARNING_PRINTED := 1
-            endif
+            #CLANG_OMP_AVAIL:= false
+            #export CLANG_OMP_WARNING_PRINTED ?= 0
+            #ifeq ($(CLANG_OMP_WARNING_PRINTED), 0)
+            #  $(warning $(ccmagenta)Compiler is Apple clang and does not support OpenMP$(ccreset))
+            #  $(info $(ccmagenta)If you want OpenMP support, please install clang with OpenMP support$(ccreset))
+            #  $(info $(ccmagenta)For homebrew, use $(ccgreen)"brew update && (brew outdated xctool || brew upgrade xctool) && brew tap homebrew/versions && brew install clang-omp"$(ccreset))
+            #  $(info $(ccmagenta)For Macports, use $(ccgreen)"sudo port install clang-3.8 +assertions +debug + openmp"$(ccreset))
+            #  export CLANG_OMP_WARNING_PRINTED := 1
+            #endif
+            CLANG_OMP_AVAIL:= true
+            CFLAGS += -Xclang -fopenmp
+            CLINK  += -lomp
             export APPLE_CLANG := 1
           else
             ## Need to do a version check clang >= 3.7 supports OpenMP. If it is Apple clang, then it doesn't support OpenMP.
@@ -334,9 +337,12 @@ ifeq ($(DO_CHECKS), 1)
         endif # CLANG_OMP_AVAIL is not 1
       endif # USE_OMP
     endif # CC is clang
+    ifeq ($(APPLE_CLANG),0)
+      CFLAGS += -march=native
+    endif
 
     CFLAGS += -funroll-loops
-    CFLAGS += -march=native -fno-strict-aliasing
+    CFLAGS += -fno-strict-aliasing
     CFLAGS += -Wformat=2  -Wpacked  -Wnested-externs -Wpointer-arith  -Wredundant-decls  -Wfloat-equal -Wcast-qual
     CFLAGS += -Wcast-align -Wmissing-declarations -Wmissing-prototypes  -Wnested-externs -Wstrict-prototypes  #-D_POSIX_C_SOURCE=2 -Wpadded -Wconversion
     CFLAGS += -Wno-unused-local-typedefs ## to suppress the unused typedef warning for the compile time assert for sizeof(struct config_options)
@@ -381,17 +387,17 @@ ifeq ($(DO_CHECKS), 1)
     endif
   endif
 
-	# AVX512 has not been tested, let us disable it for the moment
-	CC_SUPPORTS_AVX512 := $(shell $(CC) $(CFLAGS) -dM -E - < /dev/null | \grep -Ecm1 __AVX512F__)
-	ifeq ($(CC_SUPPORTS_AVX512),1)
-		ifeq ($(shell test 0$(ICC_MAJOR_VER) -ge 019 -o -z "$(ICC_MAJOR_VER)"; echo $$?),0)
-			# If gcc, clang, or new icc, we can use this
-			CFLAGS += -mno-avx512f
-		else
-			CFLAGS += -xCORE-AVX2
-		endif
-		CFLAGS += -DGAS_BUG_DISABLE_AVX512
-	endif
+  # AVX512 has not been tested, let us disable it for the moment
+  CC_SUPPORTS_AVX512 := $(shell $(CC) $(CFLAGS) -dM -E - < /dev/null | \grep -Ecm1 __AVX512F__)
+  ifeq ($(CC_SUPPORTS_AVX512),1)
+    ifeq ($(shell test 0$(ICC_MAJOR_VER) -ge 019 -o -z "$(ICC_MAJOR_VER)"; echo $$?),0)
+      # If gcc, clang, or new icc, we can use this
+      CFLAGS += -mno-avx512f
+    else
+      CFLAGS += -xCORE-AVX2
+    endif
+    CFLAGS += -DGAS_BUG_DISABLE_AVX512
+  endif
 
   # All of the python/numpy checks follow
   export PYTHON_CHECKED ?= 0
@@ -449,7 +455,7 @@ ifeq ($(DO_CHECKS), 1)
       endif
 
       ifneq ($(COMPILE_PYTHON_EXT), 0)
-	PYTHON_INCL := $(shell $(PYTHON) -c "from __future__ import print_function; import sysconfig; flags = set(['-I' + sysconfig.get_path('include'),'-I' + sysconfig.get_path('platinclude')]); print(' '.join(flags));")
+  PYTHON_INCL := $(shell $(PYTHON) -c "from __future__ import print_function; import sysconfig; flags = set(['-I' + sysconfig.get_path('include'),'-I' + sysconfig.get_path('platinclude')]); print(' '.join(flags));")
         PYTHON_INCL:=$(patsubst -I%,-isystem%, $(PYTHON_INCL))
 
         # NUMPY is available -> next step should not fail
@@ -514,12 +520,12 @@ ifeq ($(DO_CHECKS), 1)
     endif
   endif
 
-	### The following sections are currently not relevant for the Corrfunc package
+  ### The following sections are currently not relevant for the Corrfunc package
   ### but I do not want to have to figure this out again!
   ifeq (USE_MKL,$(findstring USE_MKL,$(OPT)))
     BLAS_INCLUDE:=-DMKL_ILP64 -m64 -I$(MKLROOT)/include
     ##Use the Intel MKL library. Check the compiler + openmp
-	  ifneq (USE_OMP,$(findstring USE_OMP,$(OPT)))
+    ifneq (USE_OMP,$(findstring USE_OMP,$(OPT)))
       ##Link+include sequential libraries
       ifeq (icc,$(findstring icc,$(CC)))
         ##icc with Intel MKL
@@ -530,7 +536,7 @@ ifeq ($(DO_CHECKS), 1)
       endif
     else
       ifeq (icc,$(findstring icc,$(CC)))
-	      ##icc with Intel MKL+OpenMP
+        ##icc with Intel MKL+OpenMP
         BLAS_LINK:= -L$(MKLROOT)/lib -lmkl_intel_ilp64 -lmkl_core -lmkl_intel_thread -lpthread -lm
       else
         ##gcc with Intel MKL
@@ -552,7 +558,7 @@ ifeq ($(DO_CHECKS), 1)
     # Therefore, I am going to split the variables into "small" and "long"
     # sets of variables. Ugly, but works. I get the aligned print at the end.
     BIG_MAKEFILE_VARS := GSL_CFLAGS GSL_LINK PYTHON_CFLAGS
-		ifeq (USE_MKL,$(findstring USE_MKL,$(OPT)))
+    ifeq (USE_MKL,$(findstring USE_MKL,$(OPT)))
       MAKEFILE_VARS += BLAS_INCLUDE BLAS_LINK
     endif
     tabvar:= $(shell printf "\t")
