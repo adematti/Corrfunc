@@ -79,7 +79,7 @@ static inline int xi_avx512_intrinsics_DOUBLE(DOUBLE *x1, DOUBLE *y1, DOUBLE *z1
         local_w1 = *weights1;
         local_w2 = *weights2;
 
-        set_pair_struct_DOUBLE(&pair, &local_w0, &local_w1, &pair_weight);
+        set_pair_struct_DOUBLE(&pair, &local_w1, &local_w2, &pair_weight);
         avx512_weight_func = get_avx512_weight_func_by_method_DOUBLE(weight_method);
     }
 

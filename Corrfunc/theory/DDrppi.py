@@ -69,15 +69,12 @@ def DDrppi(autocorr, nthreads, binfile, pimax, npibins, X1, Y1, Z1, weights1=Non
         A double-precision value for the maximum separation along
         the Z-dimension.
 
-        Distances along the :math:``\\pi`` direction are binned with unit
-        depth. For instance, if ``pimax=40``, then 40 bins will be created
-        along the ``pi`` direction.
-
-        Note: Only pairs with ``0 <= dz < pimax`` are counted (no equality).
+        Note: pairs with :math:`-\\pi_{max} < \\pi < \\pi_{max}`
+        (exclusive on both ends) are counted.
 
     npibins : int
         The number of linear ``pi`` bins, with the bins ranging from
-        from (0, :math:`\\pi_{max}`)
+        from (:math:`-\\pi_{max}`, :math:`\\pi_{max}`).
 
     X1/Y1/Z1 : array-like, real (float/double)
         The array of X/Y/Z positions for the first set of points.

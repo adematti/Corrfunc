@@ -486,7 +486,7 @@ int countpairs_rp_pi_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z
                                                                     this_cell_pair->min_dx, this_cell_pair->min_dy, this_cell_pair->min_dz,
                                                                     this_cell_pair->closest_x1, this_cell_pair->closest_y1, this_cell_pair->closest_z1,
                                                                     tmp_rpavg, this_npairs,
-                                                                    tmp_weightavg, extra->weight_method, extra->pair_weight, options->bin_type);
+                                                                    tmp_weightavg, extra->weight_method, extra->pair_weight, options->bin_type, autocorr);
 
                 /* This actually causes a race condition under OpenMP - but mostly
                    I care that an error occurred - rather than the exact value of
@@ -571,18 +571,6 @@ int countpairs_rp_pi_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z
     //The code does not double count for autocorrelations
     //which means the npairs and rpavg values need to be doubled;
     if(autocorr == 1) {
-        const uint64_t int_fac = 2;
-        const DOUBLE dbl_fac = (DOUBLE) 2.0;
-        for(int i=0;i<totnbins;i++) {
-            npairs[i] *= int_fac;
-            if(options->need_avg_sep) {
-                rpavg[i] *= dbl_fac;
-            }
-            if(need_weightavg) {
-                weightavg[i] *= dbl_fac;
-            }
-        }
-
         /* Is the min. requested separation 0.0 ?*/
         /* The comparison is '<=' rather than '==' only to silence
            the compiler  */
@@ -590,7 +578,7 @@ int countpairs_rp_pi_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z
             /* Then, add all the self-pairs. This ensures that
                a cross-correlation with two identical datasets
                produces the same result as the auto-correlation  */
-            npairs[npibin+1] += ND1;
+            npairs[npibin+npibin/2+1] += ND1;
 
             // Increasing npairs affects rpavg and weightavg.
             // We don't need to add anything to rpavg; all the self-pairs have 0 separation!
@@ -605,7 +593,7 @@ int countpairs_rp_pi_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z
                         pair.weights0[w].d = ((DOUBLE *) extra->weights0.weights[w])[j];
                         pair.weights1[w].d = ((DOUBLE *) extra->weights0.weights[w])[j];
                     }
-                    weightavg[npibin+1] += weight_func(&pair);
+                    weightavg[npibin+npibin/2+1] += weight_func(&pair);
                 }
             }
         }

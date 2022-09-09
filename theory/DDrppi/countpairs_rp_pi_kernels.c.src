@@ -31,7 +31,7 @@ static inline int countpairs_rp_pi_avx512_intrinsics_DOUBLE(const int64_t N0, DO
                                                             const DOUBLE closest_icell_xpos, const DOUBLE closest_icell_ypos, const DOUBLE closest_icell_zpos,
                                                             DOUBLE *rpavg, uint64_t *npairs,
                                                             DOUBLE *weightavg, const weight_method_t weight_method, const pair_weight_struct pair_weight,
-                                                            const bin_type_t bin_type)
+                                                            const bin_type_t bin_type, int autocorr)
 {
 
     if(N0 == 0 || N1 == 0) {
@@ -60,8 +60,8 @@ static inline int countpairs_rp_pi_avx512_intrinsics_DOUBLE(const int64_t N0, DO
         m_rupp_sqr[i] = AVX512_SET_FLOAT(rupp_sqr[i]);
     }
 
-    const DOUBLE dpi = pimax/npibin;
-    const DOUBLE inv_dpi = 1.0/dpi;
+    const DOUBLE inv_dpi = ((DOUBLE) npibin)/(2*pimax);
+    const DOUBLE pimin_invstep = pimax*inv_dpi;
 
     // A copy whose pointers we can advance
     weight_struct_DOUBLE local_w0 = {.weights={NULL}, .num_weights=0}, local_w1 = {.weights={NULL}, .num_weights=0};
@@ -180,11 +180,6 @@ static inline int countpairs_rp_pi_avx512_intrinsics_DOUBLE(const int64_t N0, DO
             const AVX512_FLOATS m_x1 = AVX512_MASKZ_LOAD_FLOATS_UNALIGNED(m_mask_left, localx1);
             const AVX512_FLOATS m_y1 = AVX512_MASKZ_LOAD_FLOATS_UNALIGNED(m_mask_left, localy1);
             const AVX512_FLOATS m_z1 = AVX512_MASKZ_LOAD_FLOATS_UNALIGNED(m_mask_left, localz1);
-            if(need_costheta) {
-                const AVX512_FLOATS m_norm1 = AVX512_MASKZ_LOAD_FLOATS_UNALIGNED(m_mask_left, norm1 + j);
-                pair.costheta.a512 = AVX512_MASKZ_ADD_FLOATS(m_mask_left, AVX512_MASKZ_ADD_FLOATS(AVX512_MASKZ_MULTIPLY_FLOATS(m_mask_left, m_x1, m_xpos), AVX512_MASKZ_MULTIPLY_FLOATS(m_mask_left, m_y1, m_ypos)), AVX512_MASKZ_MULTIPLY_FLOATS(m_mask_left, m_z1, m_zpos));
-                pair.costheta.a512 = AVX512_MASKZ_DIVIDE_FLOATS(m_mask_left, pair.costheta.a512, AVX512_MASKZ_MULTIPLY_FLOATS(m_mask_left, m_norm1, m_norm0));
-            }
 
             localx1 += AVX512_NVEC;//this might actually exceed the allocated range but we will never dereference that
             localy1 += AVX512_NVEC;
@@ -202,7 +197,11 @@ static inline int countpairs_rp_pi_avx512_intrinsics_DOUBLE(const int64_t N0, DO
             const AVX512_FLOATS m_pimax = AVX512_SET_FLOAT((DOUBLE) pimax);
             const AVX512_FLOATS m_sqr_rpmax = m_rupp_sqr[nbin-1];
             const AVX512_FLOATS m_sqr_rpmin = m_rupp_sqr[0];
-            const AVX512_FLOATS m_inv_dpi    = AVX512_SET_FLOAT(inv_dpi);
+            const AVX512_FLOATS m_inv_dpi = AVX512_SET_FLOAT(inv_dpi);
+            const AVX512_FLOATS m_inv_dpi_opp = AVX512_SET_FLOAT(-inv_dpi);
+            const AVX512_FLOATS m_pimin_invstep = AVX512_SET_FLOAT(pimin_invstep);
+            const AVX512_FLOATS m_npibin = AVX512_SET_FLOAT((DOUBLE) npibin);
+            const AVX512_FLOATS m_npibin_p1 = AVX512_SET_FLOAT((DOUBLE) npibin + 1);
 
             const AVX512_FLOATS m_xdiff = AVX512_MASKZ_SUBTRACT_FLOATS(m_mask_left, m_x1, m_xpos);  //(x[j:j+NVEC-1] - x0)
             const AVX512_FLOATS m_ydiff = AVX512_MASKZ_SUBTRACT_FLOATS(m_mask_left, m_y1, m_ypos);  //(y[j:j+NVEC-1] - y0)
@@ -218,13 +217,13 @@ static inline int countpairs_rp_pi_avx512_intrinsics_DOUBLE(const int64_t N0, DO
             //no future iteration in j can produce a zdiff value less than pimax.
             const AVX512_MASK m_neg_pimax_mask = AVX512_MASK_COMPARE_FLOATS(m_mask_left, m_zdiff, -m_pimax,_CMP_GT_OQ);
             if(m_neg_pimax_mask == 0) continue;
-            m_zdiff = AVX512_ABS_FLOAT(m_zdiff);//now take the absolute value
+            const AVX512_FLOATS m_zdiff_abs = AVX512_ABS_FLOAT(m_zdiff);//now take the absolute value
 
-            const AVX512_MASK m_mask_geq_pimax = AVX512_MASK_COMPARE_FLOATS(m_mask_left, m_zdiff, m_pimax,_CMP_GE_OQ);
+            const AVX512_MASK m_mask_geq_pimax = AVX512_MASK_COMPARE_FLOATS(m_mask_left, m_zdiff_abs, m_pimax,_CMP_GE_OQ);
             if(m_mask_geq_pimax > 0) {
                 j=N1;// but do not break yet -> need to process this chunk
             }
-            const AVX512_MASK m_mask_pimax = AVX512_MASK_COMPARE_FLOATS(m_mask_left, m_zdiff, m_pimax,_CMP_LT_OQ);
+            const AVX512_MASK m_mask_pimax = AVX512_MASK_COMPARE_FLOATS(m_mask_left, m_zdiff_abs, m_pimax,_CMP_LT_OQ);
             if(m_mask_pimax == 0) {
                 j=N1;//should already be set by the previous check
                 break;
@@ -237,6 +236,11 @@ static inline int countpairs_rp_pi_avx512_intrinsics_DOUBLE(const int64_t N0, DO
             m_mask_left = AVX512_MASK_COMPARE_FLOATS(m_rpmax_mask, r2, m_sqr_rpmin, _CMP_GE_OQ);
             if(m_mask_left == 0) {
                 continue;
+            }
+            if(need_costheta) {
+                const AVX512_FLOATS m_norm1 = AVX512_MASKZ_LOAD_FLOATS_UNALIGNED(m_mask_left, norm1 + j);
+                pair.costheta.a512 = AVX512_MASKZ_ADD_FLOATS(m_mask_left, AVX512_MASKZ_ADD_FLOATS(m_mask_left, AVX512_MASKZ_MULTIPLY_FLOATS(m_mask_left, m_x1, m_xpos), AVX512_MASKZ_MULTIPLY_FLOATS(m_mask_left, m_y1, m_ypos)), AVX512_MASKZ_MULTIPLY_FLOATS(m_mask_left, m_z1, m_zpos));
+                pair.costheta.a512 = AVX512_MASKZ_DIVIDE_FLOATS(m_mask_left, pair.costheta.a512, AVX512_MASKZ_MULTIPLY_FLOATS(m_mask_left, m_norm1, m_norm0));
             }
 
             if(need_rpavg || bin_type == BIN_LIN) {
@@ -269,16 +273,13 @@ static inline int countpairs_rp_pi_avx512_intrinsics_DOUBLE(const int64_t N0, DO
                     }
                 }
             }
-
-            const AVX512_FLOATS m_npibin = AVX512_SET_FLOAT((DOUBLE) npibin);
-            /* pibin := (int) dist_pi/dpi */
-            const AVX512_FLOATS m_pibin = AVX512_MULTIPLY_FLOATS(m_zdiff, m_inv_dpi);
             /* Compute the 1-D index to the [rpbin, pibin] := rpbin*(npibin+1) + pibin */
-            const AVX512_FLOATS m_npibin_p1 = AVX512_SET_FLOAT((DOUBLE) npibin + 1);
             const AVX512_FLOATS m_rpbin_linear_index = AVX512_MULTIPLY_FLOATS(m_rpbin, m_npibin_p1);
-            const AVX512_FLOATS m_finalbin = AVX512_MASK_ADD_FLOATS(m_npibin, m_mask, m_rpbin_linear_index, m_pibin);
-            union_finalbin.m_ibin = AVX512_TRUNCATE_FLOAT_TO_INT(m_finalbin);
-            if(need_rpavg && need_weightavg) union_mDperp.m_Dperp = AVX512_MASKZ_MULTIPLY_FLOATS(m_mask_left, union_mDperp.m_Dperp, union_mweight.m_weights);
+            if(need_rpavg && need_weightavg) union_mDperp.m_Dperp = AVX512_MASKZ_MULTIPLY_FLOATS(m_mask, union_mDperp.m_Dperp, union_mweight.m_weights);
+
+            /* pibin := (int) dist_pi/dpi */
+            AVX512_FLOATS m_pibin = AVX512_FMA_ADD_TRUNCATE_FLOATS(m_zdiff, m_inv_dpi, m_pimin_invstep);
+            union_finalbin.m_ibin = AVX512_TRUNCATE_FLOAT_TO_INT(AVX512_MASK_ADD_FLOATS(m_npibin, m_mask, m_rpbin_linear_index, m_pibin));
 
 #if  __INTEL_COMPILER
 #pragma unroll(AVX512_NVEC)
@@ -291,6 +292,23 @@ static inline int countpairs_rp_pi_avx512_intrinsics_DOUBLE(const int64_t N0, DO
                 }
                 if(need_weightavg){
                     weightavg[ibin] += union_mweight.weights[jj];
+                }
+            }
+            if (autocorr == 1) {
+                m_pibin = AVX512_FMA_ADD_TRUNCATE_FLOATS(m_zdiff, m_inv_dpi_opp, m_pimin_invstep);
+                union_finalbin.m_ibin = AVX512_TRUNCATE_FLOAT_TO_INT(AVX512_MASK_ADD_FLOATS(m_npibin, m_mask, m_rpbin_linear_index, m_pibin));
+#if  __INTEL_COMPILER
+#pragma unroll(AVX512_NVEC)
+#endif
+                for(int jj=0;jj<AVX512_NVEC;jj++) {
+                    const int ibin=union_finalbin.ibin[jj];
+                    npairs[ibin]++;
+                    if(need_rpavg) {
+                        rpavg[ibin] += union_mDperp.Dperp[jj];
+                    }
+                    if(need_weightavg){
+                        weightavg[ibin] += union_mweight.weights[jj];
+                    }
                 }
             }
         }//AVX512 j loop
@@ -316,7 +334,7 @@ static inline int countpairs_rp_pi_avx_intrinsics_DOUBLE(const int64_t N0, DOUBL
                                                          const DOUBLE closest_icell_xpos, const DOUBLE closest_icell_ypos, const DOUBLE closest_icell_zpos,
                                                          DOUBLE *rpavg, uint64_t *npairs,
                                                          DOUBLE *weightavg, const weight_method_t weight_method, const pair_weight_struct pair_weight,
-                                                         const bin_type_t bin_type)
+                                                         const bin_type_t bin_type, int autocorr)
 {
     if(N0 == 0 || N1 == 0) {
         return EXIT_SUCCESS;
@@ -348,8 +366,8 @@ static inline int countpairs_rp_pi_avx_intrinsics_DOUBLE(const int64_t N0, DOUBL
         m_kbin[i] = AVX_SET_FLOAT((DOUBLE) i);
     }
 
-    const DOUBLE dpi = pimax/npibin;
-    const DOUBLE inv_dpi = 1.0/dpi;
+    const DOUBLE inv_dpi = ((DOUBLE) npibin)/(2*pimax);
+    const DOUBLE pimin_invstep = pimax*inv_dpi;
 
     // A copy whose pointers we can advance
     weight_struct_DOUBLE local_w0 = {.weights={NULL}, .num_weights=0}, local_w1 = {.weights={NULL}, .num_weights=0};
@@ -490,9 +508,10 @@ static inline int countpairs_rp_pi_avx_intrinsics_DOUBLE(const int64_t N0, DOUBL
             const AVX_FLOATS m_pimax = AVX_SET_FLOAT((DOUBLE) pimax);
             const AVX_FLOATS m_sqr_rpmax = m_rupp_sqr[nbin-1];
             const AVX_FLOATS m_sqr_rpmin = m_rupp_sqr[0];
-            const AVX_FLOATS m_inv_dpi    = AVX_SET_FLOAT(inv_dpi);
-            const AVX_FLOATS m_npibin     = AVX_SET_FLOAT((DOUBLE) npibin);
-            const AVX_FLOATS m_one    = AVX_SET_FLOAT((DOUBLE) 1);
+            const AVX_FLOATS m_inv_dpi = AVX_SET_FLOAT(inv_dpi);
+            const AVX_FLOATS m_inv_dpi_opp = AVX_SET_FLOAT(-inv_dpi);
+            const AVX_FLOATS m_pimin_invstep = AVX_SET_FLOAT(pimin_invstep);
+            const AVX_FLOATS m_npibin_p1 = AVX_SET_FLOAT((DOUBLE) npibin + 1);
 
             const AVX_FLOATS m_xdiff = AVX_SUBTRACT_FLOATS(m_x1, m_xpos);  //(x[j:j+NVEC-1] - x0)
             const AVX_FLOATS m_ydiff = AVX_SUBTRACT_FLOATS(m_y1, m_ypos);  //(y[j:j+NVEC-1] - y0)
@@ -502,7 +521,7 @@ static inline int countpairs_rp_pi_avx_intrinsics_DOUBLE(const int64_t N0, DOUBL
             if(AVX_TEST_COMPARISON(m_neg_pimax_mask)==0) {
                 continue;
             }
-            m_zdiff = AVX_MAX_FLOATS(m_zdiff,AVX_SUBTRACT_FLOATS(AVX_SETZERO_FLOAT(),m_zdiff));//dz = fabs(dz) => dz = max(dz, -dz);
+            const AVX_FLOATS m_zdiff_abs = AVX_ABS_FLOAT(m_zdiff);//dz = fabs(dz) => dz = max(dz, -dz);
 
             const AVX_FLOATS m_sqr_xdiff = AVX_SQUARE_FLOAT(m_xdiff);  //(x0 - x[j])^2
             const AVX_FLOATS m_sqr_ydiff = AVX_SQUARE_FLOAT(m_ydiff);  //(y0 - y[j])^2
@@ -517,12 +536,12 @@ static inline int countpairs_rp_pi_avx_intrinsics_DOUBLE(const int64_t N0, DOUBL
                 //that implies the zdiff values are also monotonically increasing
                 //Therefore, if any of the zdiff values are less than pimax, then
                 //no future iteration in j can produce a zdiff value less than pimax.
-                const AVX_FLOATS m_mask_geq_pimax = AVX_COMPARE_FLOATS(m_zdiff,m_pimax,_CMP_GE_OQ);
+                const AVX_FLOATS m_mask_geq_pimax = AVX_COMPARE_FLOATS(m_zdiff_abs,m_pimax,_CMP_GE_OQ);
                 if(AVX_TEST_COMPARISON(m_mask_geq_pimax) > 0) {
                     j=N1;// but do not break yet -> need to process this chunk
                 }
 
-                AVX_FLOATS m_mask_pimax = AVX_COMPARE_FLOATS(m_zdiff,m_pimax,_CMP_LT_OS);
+                AVX_FLOATS m_mask_pimax = AVX_COMPARE_FLOATS(m_zdiff_abs,m_pimax,_CMP_LT_OS);
                 if(AVX_TEST_COMPARISON(m_mask_pimax) == 0) {
                     j=N1;
                     break;
@@ -557,7 +576,6 @@ static inline int countpairs_rp_pi_avx_intrinsics_DOUBLE(const int64_t N0, DOUBL
                 union_mweight.m_weights = avx_weight_func(&pair);
             }
 
-            const AVX_FLOATS m_pibin = AVX_MULTIPLY_FLOATS(m_zdiff,m_inv_dpi);
             AVX_FLOATS m_rpbin = AVX_SETZERO_FLOAT();
             //AVX_FLOATS m_all_ones  = AVX_CAST_INT_TO_FLOAT(AVX_SET_INT(-1));
             if (bin_type == BIN_LIN) {
@@ -577,10 +595,13 @@ static inline int countpairs_rp_pi_avx_intrinsics_DOUBLE(const int64_t N0, DOUBL
                     }
                 }
             }
-            const AVX_FLOATS m_npibin_p1 = AVX_ADD_FLOATS(m_npibin,m_one);
-            const AVX_FLOATS m_binproduct = AVX_ADD_FLOATS(AVX_MULTIPLY_FLOATS(m_rpbin,m_npibin_p1),m_pibin);
-            union_finalbin.m_ibin = AVX_TRUNCATE_FLOAT_TO_INT(m_binproduct);
+            /* Compute the 1-D index to the [rpbin, pibin] := rpbin*(npibin+1) + pibin */
+            m_rpbin = AVX_MULTIPLY_FLOATS(m_rpbin, m_npibin_p1);
             if(need_rpavg && need_weightavg) union_mDperp.m_Dperp = AVX_MULTIPLY_FLOATS(union_mDperp.m_Dperp, union_mweight.m_weights);
+
+            /* pibin := (int) dist_pi/dpi */
+            AVX_FLOATS m_pibin = AVX_FMA_ADD_TRUNCATE_FLOATS(m_zdiff, m_inv_dpi, m_pimin_invstep);
+            union_finalbin.m_ibin = AVX_TRUNCATE_FLOAT_TO_INT(AVX_ADD_FLOATS(m_rpbin, m_pibin));
 
             //update the histograms
 #if defined(__ICC) || defined(__INTEL_COMPILER)
@@ -596,8 +617,24 @@ static inline int countpairs_rp_pi_avx_intrinsics_DOUBLE(const int64_t N0, DOUBL
                     weightavg[ibin] += union_mweight.weights[jj];
                 }
             }
+            if (autocorr == 1) {
+                m_pibin = AVX_FMA_ADD_TRUNCATE_FLOATS(m_zdiff, m_inv_dpi_opp, m_pimin_invstep);
+                union_finalbin.m_ibin = AVX_TRUNCATE_FLOAT_TO_INT(AVX_ADD_FLOATS(m_rpbin, m_pibin));
+    #if defined(__ICC) || defined(__INTEL_COMPILER)
+    #pragma unroll(AVX_NVEC)
+    #endif
+                for(int jj=0;jj<AVX_NVEC;jj++) {
+                    int ibin = union_finalbin.ibin[jj];
+                    npairs[ibin]++;
+                    if(need_rpavg) {
+                        rpavg[ibin] += union_mDperp.Dperp[jj];
+                    }
+                    if(need_weightavg){
+                        weightavg[ibin] += union_mweight.weights[jj];
+                    }
+                }
+            }
         }
-
 
         //remainder loop
         for(;j<N1;j++){
@@ -616,7 +653,6 @@ static inline int countpairs_rp_pi_avx_intrinsics_DOUBLE(const int64_t N0, DOUBL
             }
             if(dz <= -pimax) continue;
             if(dz >= pimax) break;
-            dz = FABS(dz);
 
             const DOUBLE r2 = dx*dx + dy*dy;
             if(r2 >= sqr_rpmax || r2 < sqr_rpmin) {
@@ -634,8 +670,6 @@ static inline int countpairs_rp_pi_avx_intrinsics_DOUBLE(const int64_t N0, DOUBL
 
                 pairweight = fallback_weight_func(&pair);
             }
-            int pibin = (int) (dz*inv_dpi);
-            pibin = pibin > npibin ? npibin:pibin;
 
             int kbin = 0;
             if (bin_type == BIN_LIN) {
@@ -648,7 +682,10 @@ static inline int countpairs_rp_pi_avx_intrinsics_DOUBLE(const int64_t N0, DOUBL
                     }
                 }//finding kbin
             }
-            const int ibin = kbin*(npibin+1) + pibin;
+
+            kbin *= npibin+1;
+            const DOUBLE pibin = dz * inv_dpi;
+            int ibin = kbin + (int) (pibin + pimin_invstep);
             npairs[ibin]++;
             if(need_rpavg) {
                 if(need_weightavg) r *= pairweight;
@@ -656,6 +693,12 @@ static inline int countpairs_rp_pi_avx_intrinsics_DOUBLE(const int64_t N0, DOUBL
             }
             if(need_weightavg){
                 weightavg[ibin] += pairweight;
+            }
+            if(autocorr == 1){
+                ibin = kbin + (int) (-pibin + pimin_invstep);
+                npairs[ibin]++;
+                if(need_rpavg) rpavg[ibin] += r;
+                if(need_weightavg) weightavg[ibin] += pairweight;
             }
         }//remainder loop over second set of particles
   }//loop over first set of particles
@@ -681,7 +724,7 @@ static inline int countpairs_rp_pi_sse_intrinsics_DOUBLE(const int64_t N0, DOUBL
                                                          const DOUBLE closest_icell_xpos, const DOUBLE closest_icell_ypos, const DOUBLE closest_icell_zpos,
                                                          DOUBLE *rpavg, uint64_t *npairs,
                                                          DOUBLE *weightavg, const weight_method_t weight_method, const pair_weight_struct pair_weight,
-                                                         const bin_type_t bin_type)
+                                                         const bin_type_t bin_type, int autocorr)
 {
     if(N0 == 0 || N1 == 0) {
         return EXIT_SUCCESS;
@@ -737,8 +780,8 @@ static inline int countpairs_rp_pi_sse_intrinsics_DOUBLE(const int64_t N0, DOUBL
         }
     }
 
-    const DOUBLE dpi = pimax/npibin;
-    const DOUBLE inv_dpi = 1.0/dpi;
+    const DOUBLE inv_dpi = ((DOUBLE) npibin)/(2*pimax);
+    const DOUBLE pimin_invstep = pimax*inv_dpi;
 
     const DOUBLE *zstart = z1, *zend = z1 + N1;
     for(int64_t i=0;i<N0;i++) {
@@ -861,10 +904,10 @@ static inline int countpairs_rp_pi_sse_intrinsics_DOUBLE(const int64_t N0, DOUBL
             const SSE_FLOATS m_pimax = SSE_SET_FLOAT((DOUBLE) pimax);
             const SSE_FLOATS m_sqr_rpmax = m_rupp_sqr[nbin-1];
             const SSE_FLOATS m_sqr_rpmin = m_rupp_sqr[0];
-            const SSE_FLOATS m_inv_dpi    = SSE_SET_FLOAT(inv_dpi);
-            const SSE_FLOATS m_zero = SSE_SETZERO_FLOAT();
-            const SSE_FLOATS m_npibin     = SSE_SET_FLOAT((DOUBLE) npibin);
-            const SSE_FLOATS m_one    = SSE_SET_FLOAT((DOUBLE) 1);
+            const SSE_FLOATS m_inv_dpi = SSE_SET_FLOAT(inv_dpi);
+            const SSE_FLOATS m_inv_dpi_opp = SSE_SET_FLOAT(-inv_dpi);
+            const SSE_FLOATS m_pimin_invstep = SSE_SET_FLOAT(pimin_invstep);
+            const SSE_FLOATS m_npibin_p1 = SSE_SET_FLOAT((DOUBLE) npibin + 1);
 
             const SSE_FLOATS m_xdiff = SSE_SUBTRACT_FLOATS(m_x1, m_xpos);  //(x[j] - x0)
             const SSE_FLOATS m_ydiff = SSE_SUBTRACT_FLOATS(m_y1, m_ypos);  //(y[j] - y0)
@@ -873,7 +916,7 @@ static inline int countpairs_rp_pi_sse_intrinsics_DOUBLE(const int64_t N0, DOUBL
             if(SSE_TEST_COMPARISON(m_neg_pimax_mask) == 0) {
                 continue;
             }
-            m_zdiff = SSE_MAX_FLOATS(m_zdiff,SSE_SUBTRACT_FLOATS(m_zero,m_zdiff));//dz = fabs(dz) => dz = max(dz, -dz);
+            const SSE_FLOATS m_zdiff_abs = SSE_ABS_FLOAT(m_zdiff);//dz = fabs(dz) => dz = max(dz, -dz);
 
             const SSE_FLOATS m_sqr_xdiff = SSE_SQUARE_FLOAT(m_xdiff);
             const SSE_FLOATS m_sqr_ydiff = SSE_SQUARE_FLOAT(m_ydiff);
@@ -887,12 +930,12 @@ static inline int countpairs_rp_pi_sse_intrinsics_DOUBLE(const int64_t N0, DOUBL
                 //that implies the zdiff values are also monotonically increasing
                 //Therefore, if any of the zdiff values are >= pimax, then
                 //no future iteration in j can produce a zdiff value less than pimax.
-                const SSE_FLOATS m_mask_geq_pimax = SSE_COMPARE_FLOATS_GE(m_zdiff,m_pimax);
+                const SSE_FLOATS m_mask_geq_pimax = SSE_COMPARE_FLOATS_GE(m_zdiff_abs,m_pimax);
                 if(SSE_TEST_COMPARISON(m_mask_geq_pimax) > 0) {
                     j=N1;//but do not break since this chunk might contain valid pairs
                 }
 
-                SSE_FLOATS m_mask_pimax = SSE_COMPARE_FLOATS_LT(m_zdiff,m_pimax);
+                SSE_FLOATS m_mask_pimax = SSE_COMPARE_FLOATS_LT(m_zdiff_abs,m_pimax);
                 if(SSE_TEST_COMPARISON(m_mask_pimax) == 0) {
                     j=N1;
                     break;
@@ -927,7 +970,6 @@ static inline int countpairs_rp_pi_sse_intrinsics_DOUBLE(const int64_t N0, DOUBL
                 union_mweight.m_weights = sse_weight_func(&pair);
             }
 
-            const SSE_FLOATS m_pibin = SSE_MULTIPLY_FLOATS(m_zdiff,m_inv_dpi);
             SSE_FLOATS m_rpbin = SSE_SETZERO_FLOAT();
             //SSE_FLOATS m_all_ones  = SSE_CAST_INT_TO_FLOAT(SSE_SET_INT(-1));
             if (bin_type == BIN_LIN) {
@@ -947,10 +989,14 @@ static inline int countpairs_rp_pi_sse_intrinsics_DOUBLE(const int64_t N0, DOUBL
                     }
                 }
             }
-            const SSE_FLOATS m_npibin_p1 = SSE_ADD_FLOATS(m_npibin,m_one);
-            const SSE_FLOATS m_binproduct = SSE_ADD_FLOATS(SSE_MULTIPLY_FLOATS(m_rpbin,m_npibin_p1),m_pibin);
-            union_finalbin.m_ibin = SSE_TRUNCATE_FLOAT_TO_INT(m_binproduct);
+
+            /* Compute the 1-D index to the [rpbin, pibin] := rpbin*(npibin+1) + pibin */
+            m_rpbin = SSE_MULTIPLY_FLOATS(m_rpbin, m_npibin_p1);
             if(need_rpavg && need_weightavg) union_mDperp.m_Dperp = SSE_MULTIPLY_FLOATS(union_mDperp.m_Dperp, union_mweight.m_weights);
+
+            /* pibin := (int) dist_pi/dpi */
+            SSE_FLOATS m_pibin = SSE_FMA_ADD_TRUNCATE_FLOATS(m_zdiff, m_inv_dpi, m_pimin_invstep);
+            union_finalbin.m_ibin = SSE_TRUNCATE_FLOAT_TO_INT(SSE_ADD_FLOATS(m_rpbin, m_pibin));
 
             //update the histograms
 #if defined(__ICC) || defined(__INTEL_COMPILER)
@@ -966,9 +1012,24 @@ static inline int countpairs_rp_pi_sse_intrinsics_DOUBLE(const int64_t N0, DOUBL
                     weightavg[ibin] += union_mweight.weights[jj];
                 }
             }
+            if (autocorr == 1) {
+                m_pibin = SSE_FMA_ADD_TRUNCATE_FLOATS(m_zdiff, m_inv_dpi_opp, m_pimin_invstep);
+                union_finalbin.m_ibin = SSE_TRUNCATE_FLOAT_TO_INT(SSE_ADD_FLOATS(m_rpbin, m_pibin));
+    #if defined(__ICC) || defined(__INTEL_COMPILER)
+    #pragma unroll(SSE_NVEC)
+    #endif
+                for(int jj=0;jj<SSE_NVEC;jj++) {
+                    int ibin = union_finalbin.ibin[jj];
+                    npairs[ibin]++;
+                    if(need_rpavg) {
+                        rpavg[ibin] += union_mDperp.Dperp[jj];
+                    }
+                    if(need_weightavg){
+                        weightavg[ibin] += union_mweight.weights[jj];
+                    }
+                }
+            }
         }
-
-
         for(;j<N1;j++) {
 
             if(need_costheta) {
@@ -986,7 +1047,6 @@ static inline int countpairs_rp_pi_sse_intrinsics_DOUBLE(const int64_t N0, DOUBL
 
             if(dz <= -pimax) continue;
             if(dz >= pimax) break;
-            dz = FABS(dz);
 
             const DOUBLE r2 = dx*dx + dy*dy;
             if(r2 >= sqr_rpmax || r2 < sqr_rpmin) continue;
@@ -1003,9 +1063,6 @@ static inline int countpairs_rp_pi_sse_intrinsics_DOUBLE(const int64_t N0, DOUBL
                 pairweight = fallback_weight_func(&pair);
             }
 
-            int pibin = (int) (dz*inv_dpi);
-            pibin = pibin > npibin ? npibin:pibin;
-
             int kbin = 0;
             if (bin_type == BIN_LIN) {
                 kbin = (int) (r*inv_rpstep + rpmin_invstep);
@@ -1017,7 +1074,10 @@ static inline int countpairs_rp_pi_sse_intrinsics_DOUBLE(const int64_t N0, DOUBL
                     }
                 }//finding kbin
             }
-            const int ibin = kbin*(npibin+1) + pibin;
+
+            kbin *= npibin+1;
+            const DOUBLE pibin = dz * inv_dpi;
+            int ibin = kbin + (int) (pibin + pimin_invstep);
             npairs[ibin]++;
             if(need_rpavg) {
                 if(need_weightavg) r *= pairweight;
@@ -1025,6 +1085,12 @@ static inline int countpairs_rp_pi_sse_intrinsics_DOUBLE(const int64_t N0, DOUBL
             }
             if(need_weightavg){
                 weightavg[ibin] += pairweight;
+            }
+            if(autocorr == 1){
+                ibin = kbin + (int) (-pibin + pimin_invstep);
+                npairs[ibin]++;
+                if(need_rpavg) rpavg[ibin] += r;
+                if(need_weightavg) weightavg[ibin] += pairweight;
             }
         }
     }
@@ -1046,7 +1112,7 @@ static inline int countpairs_rp_pi_fallback_DOUBLE(const int64_t N0, DOUBLE *x0,
                                                    const DOUBLE closest_icell_xpos, const DOUBLE closest_icell_ypos, const DOUBLE closest_icell_zpos,
                                                    DOUBLE *rpavg, uint64_t *npairs,
                                                    DOUBLE *weightavg, const weight_method_t weight_method, const pair_weight_struct pair_weight,
-                                                   const bin_type_t bin_type)
+                                                   const bin_type_t bin_type, int autocorr)
 {
 
     if(N0 == 0 || N1 == 0) {
@@ -1067,6 +1133,9 @@ static inline int countpairs_rp_pi_fallback_DOUBLE(const int64_t N0, DOUBLE *x0,
         inv_rpstep = (nbin - 1)/(rpmax - rpmin);
         rpmin_invstep = 1 - rpmin*inv_rpstep; //trick to avoid adding one to (r - rmin)/rstep
     }
+
+    const DOUBLE inv_dpi = ((DOUBLE) npibin)/(2*pimax);
+    const DOUBLE pimin_invstep = pimax*inv_dpi;
 
     // A copy whose pointers we can advance
     weight_struct_DOUBLE local_w0 = {.weights={NULL}, .num_weights=0}, local_w1 = {.weights={NULL}, .num_weights=0};
@@ -1089,9 +1158,6 @@ static inline int countpairs_rp_pi_fallback_DOUBLE(const int64_t N0, DOUBLE *x0,
             norm1[i] = SQRT(x1[i]*x1[i] + y1[i]*y1[i] + z1[i]*z1[i]);
         }
     }
-
-    const DOUBLE dpi = pimax/npibin;
-    const DOUBLE inv_dpi = 1.0/dpi;
 
     /* naive implementation that is guaranteed to compile */
     const DOUBLE *zstart = z1, *zend = z1 + N1;
@@ -1192,27 +1258,21 @@ static inline int countpairs_rp_pi_fallback_DOUBLE(const int64_t N0, DOUBLE *x0,
 
             if(dz <= -pimax) continue;
             if(dz >= pimax) break;
-            dz = FABS(dz);
 
             const DOUBLE r2 = dx*dx + dy*dy ;
             if(r2 >= sqr_rpmax || r2 < sqr_rpmin) continue;
-
-            if(need_weightavg){
-                pair.dx.d = dx;
-                pair.dy.d = dy;
-                pair.dz.d = dz;
-            }
 
             DOUBLE r = ZERO, pairweight = ZERO;
             if(need_rpavg || bin_type == BIN_LIN) {
                 r = SQRT(r2);
             }
+
             if(need_weightavg){
+                pair.dx.d = dx;
+                pair.dy.d = dy;
+                pair.dz.d = dz;
                 pairweight = weight_func(&pair);
             }
-
-            int pibin = (int) (dz*inv_dpi);
-            pibin = pibin > npibin ? npibin:pibin;
 
             int kbin = 0;
             if (bin_type == BIN_LIN) {
@@ -1225,14 +1285,21 @@ static inline int countpairs_rp_pi_fallback_DOUBLE(const int64_t N0, DOUBLE *x0,
                     }
                 }//finding kbin
             }
-            const int ibin = kbin*(npibin+1) + pibin;
+            kbin *= npibin+1;
+
+            const DOUBLE pibin = dz * inv_dpi;
+            int ibin = kbin + (int) (pibin + pimin_invstep);
             npairs[ibin]++;
             if(need_rpavg) {
                 if(need_weightavg) r *= pairweight;
                 rpavg[ibin] += r;
             }
-            if(need_weightavg){
-                weightavg[ibin] += pairweight;
+            if(need_weightavg) weightavg[ibin] += pairweight;
+            if(autocorr == 1){
+                ibin = kbin + (int) (-pibin + pimin_invstep);
+                npairs[ibin]++;
+                if(need_rpavg) rpavg[ibin] += r;  // already weighted
+                if(need_weightavg) weightavg[ibin] += pairweight;
             }
         }
     }

@@ -157,13 +157,13 @@ int main(int argc, char **argv)
         gettimeofday(&t1,NULL);
         double pair_time = ADD_DIFF_TIME(t0,t1);
 #if 0
-        const DOUBLE dpi = pimax/(DOUBLE)results.npibin ;
+        const DOUBLE dpi = 2.*pimax/(DOUBLE)results.npibin ;
         const int npibin = results.npibin;
         for(int i=1;i<results.nbin;i++) {
             const double logrp = LOG10(results.rupp[i]);
             for(int j=0;j<npibin;j++) {
                 int index = i*(npibin+1) + j;
-                fprintf(stdout,"%10"PRIu64" %20.8lf %20.8lf  %20.8lf \n",results.npairs[index],results.rpavg[index],logrp,(j+1)*dpi);
+                fprintf(stdout,"%10"PRIu64" %20.8lf %20.8lf  %20.8lf \n",results.npairs[index],results.rpavg[index],logrp,(j+1)*dpi-pimax);
             }
         }
 #endif
@@ -204,13 +204,13 @@ int main(int argc, char **argv)
         gettimeofday(&t1,NULL);
         double pair_time = ADD_DIFF_TIME(t0,t1);
 #if 0
-        const DOUBLE dmu = mu_max/(DOUBLE)results.nmu_bins ;
+        const DOUBLE dmu = 2.*mu_max/(DOUBLE)results.nmu_bins ;
         const int nmubin = results.nmu_bins;
         for(int i=1;i<results.nsbin;i++) {
             const double log_supp = LOG10(results.supp[i]);
             for(int j=0;j<nmubin;j++) {
                 const int index = i*(nmubin+1) + j;
-                fprintf(stdout,"%10"PRIu64" %20.8lf %20.8lf  %20.8lf %20.8lf \n",results.npairs[index],results.savg[index],log_supp,(j+1)*dmu);
+                fprintf(stdout,"%10"PRIu64" %20.8lf %20.8lf  %20.8lf %20.8lf \n",results.npairs[index],results.savg[index],log_supp,(j+1)*dmu-mu_max);
             }
         }
 

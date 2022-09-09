@@ -270,13 +270,13 @@ int main(int argc, char *argv[])
     gettimeofday(&t1,NULL);
     double pair_time = ADD_DIFF_TIME(t0,t1);
 
-    const double dpi = pimax/(double)results.npibin ;
+    const double dpi = 2.*pimax/(double)results.npibin ;
     const int npibin = results.npibin;
     for(int i=1;i<results.nbin;i++) {
         const double logrp = LOG10(results.rupp[i]);
         for(int j=0;j<npibin;j++) {
             int index = i*(npibin+1) + j;
-            fprintf(stdout,"%e\t%e\t%e\t%12"PRIu64"\t%e\n",logrp, (j+1)*dpi, results.rpavg[index], results.npairs[index], results.weightavg[index]);
+            fprintf(stdout,"%e\t%e\t%e\t%12"PRIu64"\t%e\n",logrp, (j+1)*dpi-pimax, results.rpavg[index], results.npairs[index], results.weightavg[index]);
         }
     }
 

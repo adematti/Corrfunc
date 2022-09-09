@@ -275,18 +275,15 @@ ifeq ($(DO_CHECKS), 1)
         else
           # Apple clang/gcc does not support OpenMP
           ifeq (Apple, $(findstring Apple, $(CC_VERSION)))
-            #CLANG_OMP_AVAIL:= false
-            #export CLANG_OMP_WARNING_PRINTED ?= 0
-            #ifeq ($(CLANG_OMP_WARNING_PRINTED), 0)
-            #  $(warning $(ccmagenta)Compiler is Apple clang and does not support OpenMP$(ccreset))
-            #  $(info $(ccmagenta)If you want OpenMP support, please install clang with OpenMP support$(ccreset))
-            #  $(info $(ccmagenta)For homebrew, use $(ccgreen)"brew update && (brew outdated xctool || brew upgrade xctool) && brew tap homebrew/versions && brew install clang-omp"$(ccreset))
-            #  $(info $(ccmagenta)For Macports, use $(ccgreen)"sudo port install clang-3.8 +assertions +debug + openmp"$(ccreset))
-            #  export CLANG_OMP_WARNING_PRINTED := 1
-            #endif
-            CLANG_OMP_AVAIL:= true
-            CFLAGS += -Xclang -fopenmp
-            CLINK  += -lomp
+            CLANG_OMP_AVAIL:= false
+            export CLANG_OMP_WARNING_PRINTED ?= 0
+            ifeq ($(CLANG_OMP_WARNING_PRINTED), 0)
+              $(warning $(ccmagenta)Compiler is Apple clang and does not support OpenMP$(ccreset))
+              $(info $(ccmagenta)If you want OpenMP support, please install clang with OpenMP support$(ccreset))
+              $(info $(ccmagenta)For homebrew, use $(ccgreen)"brew update && (brew outdated xctool || brew upgrade xctool) && brew tap homebrew/versions && brew install clang-omp"$(ccreset))
+              $(info $(ccmagenta)For Macports, use $(ccgreen)"sudo port install clang-3.8 +assertions +debug + openmp"$(ccreset))
+              export CLANG_OMP_WARNING_PRINTED := 1
+            endif
             export APPLE_CLANG := 1
           else
             ## Need to do a version check clang >= 3.7 supports OpenMP. If it is Apple clang, then it doesn't support OpenMP.
@@ -337,12 +334,9 @@ ifeq ($(DO_CHECKS), 1)
         endif # CLANG_OMP_AVAIL is not 1
       endif # USE_OMP
     endif # CC is clang
-    ifeq ($(APPLE_CLANG),0)
-      CFLAGS += -march=native
-    endif
 
     CFLAGS += -funroll-loops
-    CFLAGS += -fno-strict-aliasing
+    CFLAGS += -march=native -fno-strict-aliasing
     CFLAGS += -Wformat=2  -Wpacked  -Wnested-externs -Wpointer-arith  -Wredundant-decls  -Wfloat-equal -Wcast-qual
     CFLAGS += -Wcast-align -Wmissing-declarations -Wmissing-prototypes  -Wnested-externs -Wstrict-prototypes  #-D_POSIX_C_SOURCE=2 -Wpadded -Wconversion
     CFLAGS += -Wno-unused-local-typedefs ## to suppress the unused typedef warning for the compile time assert for sizeof(struct config_options)
@@ -366,7 +360,6 @@ ifeq ($(DO_CHECKS), 1)
   # clang typically uses its own assembler, but if it is using the system assembler, this will also detect that.
   # See: https://github.com/manodeep/Corrfunc/issues/193
   GAS_BUG_DISABLE_AVX512 := $(shell $(CC) $(CFLAGS) -xc -Wa,-v -c /dev/null -o /dev/null 2>&1 | \grep -Ecm1 'GNU assembler version (2\.30|2\.31|2\.31\.1)')
-
   ifeq ($(GAS_BUG_DISABLE_AVX512),1)
     # Did the compiler support AVX-512 in the first place? Otherwise no need to disable it!
     CC_SUPPORTS_AVX512 := $(shell $(CC) $(CFLAGS) -dM -E - < /dev/null | \grep -Ecm1 __AVX512F__)
@@ -387,7 +380,6 @@ ifeq ($(DO_CHECKS), 1)
     endif
   endif
 
-  # AVX512 has not been tested, let us disable it for the moment
   CC_SUPPORTS_AVX512 := $(shell $(CC) $(CFLAGS) -dM -E - < /dev/null | \grep -Ecm1 __AVX512F__)
   ifeq ($(CC_SUPPORTS_AVX512),1)
     ifeq ($(shell test 0$(ICC_MAJOR_VER) -ge 019 -o -z "$(ICC_MAJOR_VER)"; echo $$?),0)
@@ -396,7 +388,8 @@ ifeq ($(DO_CHECKS), 1)
     else
       CFLAGS += -xCORE-AVX2
     endif
-    CFLAGS += -DGAS_BUG_DISABLE_AVX512
+    # AVX512 has not been tested, let us disable it for the moment
+    #CFLAGS += -DGAS_BUG_DISABLE_AVX512
   endif
 
   # All of the python/numpy checks follow

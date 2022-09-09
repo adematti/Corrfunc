@@ -229,15 +229,15 @@ int main(int argc, char *argv[])
     }
 
     int status = countpairs_mocks_s_mu(ND1,X1,Y1,Z1,
-                                  ND2,X2,Y2,Z2,
-                                  nthreads,
-                                  autocorr,
-                                  &bins,
-                                  mu_max,
-                                  nmu_bins,
-                                  &results,
-                                  &options,
-                                  &extra);
+                                      ND2,X2,Y2,Z2,
+                                      nthreads,
+                                      autocorr,
+                                      &bins,
+                                      mu_max,
+                                      nmu_bins,
+                                      &results,
+                                      &options,
+                                      &extra);
 
     free(X1);free(Y1);free(Z1);
     for(int w = 0; w < num_weights; w++){

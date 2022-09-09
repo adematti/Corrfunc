@@ -45,7 +45,7 @@ static inline int countpairs_s_mu_avx512_intrinsics_DOUBLE(const int64_t N0, DOU
     const int32_t need_savg = savg != NULL;
     const int32_t need_weightavg = weightavg != NULL;
     int32_t need_costheta = need_weightavg;
-    const DOUBLE sqr_smin=smin*smin, sqr_smax=smax*smax;
+    const DOUBLE sqr_smax=smax*smax;
     AVX512_FLOATS m_inv_sstep = AVX512_SETZERO_FLOAT();
     AVX512_FLOATS m_smin_invstep = AVX512_SETZERO_FLOAT();
     if (bin_type == BIN_LIN) {
@@ -196,12 +196,6 @@ static inline int countpairs_s_mu_avx512_intrinsics_DOUBLE(const int64_t N0, DOU
             const AVX512_FLOATS m_y1 = AVX512_MASKZ_LOAD_FLOATS_UNALIGNED(m_mask_left, localy1);
             const AVX512_FLOATS m_z1 = AVX512_MASKZ_LOAD_FLOATS_UNALIGNED(m_mask_left, localz1);
 
-            if(need_costheta) {
-                const AVX512_FLOATS m_norm1 = AVX512_MASKZ_LOAD_FLOATS_UNALIGNED(m_mask_left, norm1 + j);
-                pair.costheta.a512 = AVX512_MASKZ_ADD_FLOATS(m_mask_left, AVX512_MASKZ_ADD_FLOATS(AVX512_MASKZ_MULTIPLY_FLOATS(m_mask_left, m_xpos, m_x1), AVX512_MASKZ_MULTIPLY_FLOATS(m_mask_left, m_ypos, m_y1)), AVX512_MASKZ_MULTIPLY_FLOATS(m_mask_left, m_zpos, m_z1));
-                pair.costheta.a512 = AVX512_MASKZ_DIVIDE_FLOATS(m_mask_left, pair.costheta.a512, AVX512_MASKZ_MULTIPLY_FLOATS(m_mask_left, m_norm0, m_norm1));
-            }
-
             localx1 += AVX512_NVEC;//this might actually exceed the allocated range but we will never dereference that
             localy1 += AVX512_NVEC;
             localz1 += AVX512_NVEC;
@@ -223,8 +217,8 @@ static inline int countpairs_s_mu_avx512_intrinsics_DOUBLE(const int64_t N0, DOU
             const AVX512_FLOATS m_inv_dmu_opp = AVX512_SET_FLOAT(-inv_dmu);
             const AVX512_FLOATS m_mumin_invstep = AVX512_SET_FLOAT(mumin_invstep);
             const AVX512_FLOATS m_nmu_bins = AVX512_SET_FLOAT((DOUBLE) nmu_bins);
-            const AVX512_FLOATS m_zero = AVX_SETZERO_FLOAT();
-            const AVX512_FLOATS m_one = AVX_SET_FLOAT((DOUBLE) 1);
+            const AVX512_FLOATS m_zero = AVX512_SETZERO_FLOAT();
+            const AVX512_FLOATS m_one = AVX512_SET_FLOAT((DOUBLE) 1);
             const AVX512_FLOATS m_nmu_bins_p1 = AVX512_ADD_FLOATS(m_nmu_bins, m_one);
 
             const AVX512_FLOATS m_xdiff = AVX512_SUBTRACT_FLOATS(m_x1, m_xpos);  //(x1[j:j+NVEC-1] - x0)
@@ -265,8 +259,14 @@ static inline int countpairs_s_mu_avx512_intrinsics_DOUBLE(const int64_t N0, DOU
 
             /*m_mu := sqrt(dz^2/s2) (with masked elements set to mu_max */
             AVX512_FLOATS m_sqr_mu = AVX512_SETZERO_FLOAT();
-            const AVX512_FLOATS m_sqr_norm_s = AVX512_BLEND_FLOATS_WITH_MASK(s2, m_one, m_mask_szero); // to avoid division by 0
+            const AVX512_FLOATS m_sqr_norm_s = AVX512_BLEND_FLOATS_WITH_MASK(m_mask_szero, s2, m_one); // to avoid division by 0
             CHECK_AND_FAST_DIVIDE_AVX512(m_sqr_mu, m_sqr_zdiff, m_sqr_norm_s, m_mask_left, fast_divide_and_NR_steps);
+
+            if(need_costheta) {
+                const AVX512_FLOATS m_norm1 = AVX512_MASKZ_LOAD_FLOATS_UNALIGNED(m_mask_left, norm1 + j);
+                pair.costheta.a512 = AVX512_MASKZ_ADD_FLOATS(m_mask_left, AVX512_MASKZ_ADD_FLOATS(m_mask_left, AVX512_MASKZ_MULTIPLY_FLOATS(m_mask_left, m_xpos, m_x1), AVX512_MASKZ_MULTIPLY_FLOATS(m_mask_left, m_ypos, m_y1)), AVX512_MASKZ_MULTIPLY_FLOATS(m_mask_left, m_zpos, m_z1));
+                pair.costheta.a512 = AVX512_MASKZ_DIVIDE_FLOATS(m_mask_left, pair.costheta.a512, AVX512_MASKZ_MULTIPLY_FLOATS(m_mask_left, m_norm0, m_norm1));
+            }
 
             if(need_savg || bin_type == BIN_LIN) {
                 union_mDperp.m_Dperp = AVX512_MASKZ_SQRT_FLOAT(m_mask_left, s2);
@@ -291,7 +291,7 @@ static inline int countpairs_s_mu_avx512_intrinsics_DOUBLE(const int64_t N0, DOU
             }
             else {
                 for(int kbin=nsbin-1;kbin>=1;kbin--) {
-                    const AVX512_MASK m_bin_mask = AVX512_MASK_COMPARE_FLOATS(m_mask_left, s2, m_supp_sqr[kbin-1],_CMP_GE_OQ);
+                    const AVX512_MASK m_bin_mask = AVX512_MASK_COMPARE_FLOATS(m_mask_left, s2, m_supp_sqr[kbin-1], _CMP_GE_OQ);
                     m_sbin = AVX512_BLEND_FLOATS_WITH_MASK(m_bin_mask, m_sbin, AVX512_SET_FLOAT(kbin));
                     m_mask_left = AVX512_MASK_BITWISE_AND_NOT(m_bin_mask, m_mask_left);//ANDNOT(X, Y) -> NOT X AND Y
                     if(m_mask_left == 0) {
@@ -322,7 +322,7 @@ static inline int countpairs_s_mu_avx512_intrinsics_DOUBLE(const int64_t N0, DOU
                 }
             }
             if (autocorr == 1) {
-                m_mubin = AVX512_FMA_ADD_TRUNCATE_FLOATS(m_mu, m_inv_dmu, m_mumin_invstep);
+                m_mubin = AVX512_FMA_ADD_TRUNCATE_FLOATS(m_mu, m_inv_dmu_opp, m_mumin_invstep);
                 union_finalbin.m_ibin = AVX512_TRUNCATE_FLOAT_TO_INT(AVX512_MASK_ADD_FLOATS(m_nmu_bins, m_mask, m_sbin_linear_index, m_mubin));
 #if  __INTEL_COMPILER
 #pragma unroll(AVX512_NVEC)
@@ -584,7 +584,7 @@ static inline int countpairs_s_mu_avx_intrinsics_DOUBLE(const int64_t N0, DOUBLE
                 const AVX_FLOATS m_mu_mask = AVX_BITWISE_OR(m_mask_szero, AVX_COMPARE_FLOATS(m_sqr_zdiff, max_sqr_dz, _CMP_LT_OQ));
                 const AVX_FLOATS m_smax_mask = AVX_COMPARE_FLOATS(s2, m_sqr_smax, _CMP_LT_OQ);//check for s2 < sqr_smax
                 const AVX_FLOATS m_smin_mask = AVX_COMPARE_FLOATS(s2, m_sqr_smin, _CMP_GE_OQ);//check for s2 >= sqr_smin
-                const AVX_FLOATS m_s2_mask = AVX_BITWISE_AND(m_smax_mask,m_smin_mask);
+                const AVX_FLOATS m_s2_mask = AVX_BITWISE_AND(m_smax_mask, m_smin_mask);
 
                 //Create a combined mask by bitwise and of m1 and m_mask_left.
                 //This gives us the mask for all sqr_smin <= s2 < sqr_smax
@@ -1398,7 +1398,7 @@ static inline int countpairs_s_mu_fallback_DOUBLE(const int64_t N0, DOUBLE *x0, 
             if(autocorr == 1){
                 ibin = kbin + (int) (-mubin + mumin_invstep);
                 npairs[ibin]++;
-                if(need_savg) savg[ibin] += s;
+                if(need_savg) savg[ibin] += s;  // already weighted
                 if(need_weightavg) weightavg[ibin] += pairweight;
             }
         }

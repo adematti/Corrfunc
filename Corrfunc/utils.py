@@ -16,7 +16,7 @@ from contextlib import contextmanager
 import numpy as np
 
 
-__all__ = ['translate_isa_string_to_enum', 'translate_bin_type_string_to_enum',
+__all__ = ['translate_isa_string_to_enum', 'translate_bin_type_string_to_enum', 'translate_los_type_string_to_enum',
            'return_file_with_rbins', 'compute_nbins', 'gridlink_sphere', ]
 if sys.version_info[0] < 3:
     __all__ = [n.encode('ascii') for n in __all__]
@@ -123,23 +123,19 @@ def translate_isa_string_to_enum(isa):
     try:
         return enums[isa_upper]
     except KeyError:
-        print("Do not know instruction type = {0}".format(isa))
-        print("Valid instructions are {0}".format(enums.keys()))
-        raise
+        raise ValueError("Do not know instruction type = {}, valid instructions are {}".format(isa, enums.keys()))
 
 
 def translate_bin_type_string_to_enum(bin_type):
     """
     Helper function to convert an user-supplied string to the
-    underlying enum in the C-API. The extensions only have specific
-    implementations for AUTO and LIN. Any other
-    value will raise a ValueError.
+    underlying enum for binning type in the C-API.
 
     Parameters
     ------------
     bin_type: string
-       A string containing the desired instruction set. Valid values are
-       ['AUTO','CUSTOM','LIN']
+       A string containing the desired bin type. Valid values are
+       ['AUTO', 'CUSTOM', 'LIN'].
 
     Returns
     --------
@@ -172,9 +168,51 @@ def translate_bin_type_string_to_enum(bin_type):
     try:
         return enums[bin_type_upper]
     except KeyError:
-        print("Do not know bin type = {0}".format(bin_type))
-        print("Valid bin types are {0}".format(enums.keys()))
-        raise
+        raise ValueError("Do not know bin type = {}, valid bin types are {}".format(bin_type, enums.keys()))
+
+
+def translate_los_type_string_to_enum(los_type):
+    """
+    Helper function to convert an user-supplied string to the
+    underlying enum for line-of-sight type in the C-API.
+
+    Parameters
+    ------------
+    los_type: string
+       A string containing the desired line-of-sight. Valid values are
+       ['MIDPOINT', 'FIRSTPOINT']
+
+    Returns
+    --------
+    bin_type: integer
+       An integer corresponding to the desired line-of-sight type, as used in the
+       underlying C API. The enum used here should be defined *exactly* the
+       same way as the enum in ``utils/defs.h``.
+
+    """
+
+    msg = "Input to translate_los_type_string_to_enum must be "\
+          "of string type. Found type = {0}".format(type(los_type))
+    try:
+        if not isinstance(los_type, basestring):
+            raise TypeError(msg)
+    except NameError:
+        if not isinstance(los_type, str):
+            raise TypeError(msg)
+    valid_los_type = ['MIDPOINT', 'FIRSTPOINT']
+    los_type_upper = los_type.upper()
+    if los_type_upper not in valid_los_type:
+        msg = "Desired los type = {0} is not in the list of valid "\
+              "los types = {1}".format(bin_type, valid_bin_type)
+        raise ValueError(msg)
+
+    enums = {'MIDPOINT': 0,
+             'FIRSTPOINT': 1,
+             }
+    try:
+        return enums[los_type_upper]
+    except KeyError:
+        raise ValueError("Do not know los type = {}, valid los types are {}".format(los_type, enums.keys()))
 
 
 def compute_nbins(max_diff, binsize,

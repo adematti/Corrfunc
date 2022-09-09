@@ -212,12 +212,12 @@ int main(int argc, char **argv)
         double pair_time = ADD_DIFF_TIME(t0,t1);
 #if 0
         const int npibin = results.npibin;
-        const DOUBLE dpi = pimax/(DOUBLE)results.npibin ;
+        const DOUBLE dpi = 2.*pimax/(DOUBLE)results.npibin ;
         for(int i=1;i<results.nbin;i++) {
             const double logrp = LOG10(results.rupp[i]);
             for(int j=0;j<npibin;j++) {
                 int index = i*(npibin+1) + j;
-                fprintf(stdout,"%10"PRIu64" %20.8lf %20.8lf  %20.8lf \n",results.npairs[index],results.rpavg[index],logrp,(j+1)*dpi);
+                fprintf(stdout,"%10"PRIu64" %20.8lf %20.8lf  %20.8lf \n",results.npairs[index],results.rpavg[index],logrp,(j+1)*dpi-pimax);
             }
         }
 #endif
@@ -258,12 +258,12 @@ int main(int argc, char **argv)
         double pair_time = ADD_DIFF_TIME(t0,t1);
 #if 0
     double smin = results.supp[0];
-    const double dmu = mu_max/(double) nmu_bins;
+    const double dmu = 2.*mu_max/(double) nmu_bins;
     for(int i=1;i<results.nsbin;i++) {
         const double smax = results.supp[i];
         for(int j=0;j<nmu_bins;j++) {
             int index = i*(nmu_bins+1) + j;
-            fprintf(stdout,"%e\t%e\t%e\t%12"PRIu64"\t%e\n", smin, smax, (j+1)*dmu, results.npairs[index], results.weightavg[index]);
+            fprintf(stdout,"%e\t%e\t%e\t%12"PRIu64"\t%e\n", smin, smax, (j+1)*dmu-mu_max, results.npairs[index], results.weightavg[index]);
         }
         smin = smax;
     }

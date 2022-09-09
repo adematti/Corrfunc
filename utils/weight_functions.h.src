@@ -144,6 +144,7 @@ static inline AVX512_FLOATS avx512_inverse_bitwise_DOUBLE(pair_struct_DOUBLE *pa
                 ;
             }
             else {
+                DOUBLE *pair_weight = pair->pair_weight.weight;
                 for (int kbin=0;kbin<num-1;kbin++) {
                     if(costheta <= pair_sep[kbin+1]) { // ]min, max], as costheta instead of theta
                         DOUBLE frac = (costheta - pair_sep[kbin])/(pair_sep[kbin+1] - pair_sep[kbin]);

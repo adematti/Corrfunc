@@ -111,7 +111,9 @@ extern "C" {
 #define AVX512_MASK_FMA_ADD_FLOATS(X, MASK, Y, Z)                 _mm512_mask_fmadd_ps(X, MASK, Y, Z)
 #define AVX512_MASKZ_FMA_ADD_FLOATS(X, MASK, Y, Z)                _mm512_maskz_fmadd_ps(MASK, X, Y, Z)
 #define AVX512_FMA_ADD_TRUNCATE_FLOATS(X,Y,Z)                     _mm512_fmadd_round_ps(X, Y, Z, _MM_FROUND_TO_ZERO|_MM_FROUND_NO_EXC)
-#define AVX512_MASKZ_FMA_ADD_TRUNCATE_FLOATS(MASK, X,Y,Z)         _mm512_maskz_fmadd_round_ps(MASK, X, Y, Z, _MM_FROUND_TO_ZERO|_MM_FROUND_NO_EXC)
+//#define AVX512_MASKZ_FMA_ADD_TRUNCATE_FLOATS(MASK, X,Y,Z)         _mm512_maskz_fmadd_round_ps(MASK, X, Y, Z, _MM_FROUND_TO_ZERO|_MM_FROUND_NO_EXC)
+
+#define AVX512_MASKZ_FMA_ADD_TRUNCATE_FLOATS(MASK, X,Y,Z)         _mm512_roundscale_ps(_mm512_maskz_fmadd_round_ps(MASK, X, Y, Z, _MM_FROUND_TO_ZERO|_MM_FROUND_NO_EXC), _MM_FROUND_TO_ZERO)
 
   /* returns Z - XY*/
 #define AVX512_FNMA_ADD_FLOATS(X, Y, Z)                           _mm512_fnmadd_ps(X, Y, Z)
@@ -157,7 +159,7 @@ extern "C" {
 
 //Mask operations (new in AVX512)
 #define AVX512_MASK_COMPARE_FLOATS(M, X, Y, OP)                   _mm512_mask_cmp_ps_mask(M, X, Y, OP)
-#define AVX512_BLEND_FLOATS_WITH_MASK(MASK, FALSE,TRUE)           _mm512_mask_blend_ps(MASK, FALSE,TRUE)
+#define AVX512_BLEND_FLOATS_WITH_MASK(MASK, FALSE, TRUE)           _mm512_mask_blend_ps(MASK, FALSE, TRUE)
 #define AVX512_BLEND_INTS_WITH_MASK(MASK, FALSE, TRUE)            _mm512_mask_blend_epi32(MASK, FALSE, TRUE)
 
 //Trig
@@ -248,7 +250,11 @@ extern "C" {
 #define AVX512_MASK_SUBTRACT_FLOATS(FALSEVALS, MASK, X,Y)         _mm512_mask_sub_pd(FALSEVALS, MASK, X,Y)
 #define AVX512_MASKZ_SUBTRACT_FLOATS(MASK, X,Y)                   _mm512_maskz_sub_pd(MASK, X,Y)
 #define AVX512_FMA_ADD_TRUNCATE_FLOATS(X,Y,Z)                     _mm512_fmadd_round_pd(X, Y, Z, _MM_FROUND_TO_ZERO|_MM_FROUND_NO_EXC)
-#define AVX512_MASKZ_FMA_ADD_TRUNCATE_FLOATS(MASK, X,Y,Z)         _mm512_maskz_fmadd_round_pd(MASK, X, Y, Z, _MM_FROUND_TO_ZERO|_MM_FROUND_NO_EXC)
+//#define AVX512_MASKZ_FMA_ADD_TRUNCATE_FLOATS(MASK, X,Y,Z)         _mm512_maskz_fmadd_round_pd(MASK, X, Y, Z, _MM_FROUND_TO_ZERO|_MM_FROUND_NO_EXC)
+//#define AVX512_MASKZ_FMA_ADD_TRUNCATE_FLOATS(MASK, X,Y,Z)         _mm512_maskz_fmadd_round_ps(MASK, X, Y, Z, _MM_FROUND_TO_ZERO|_MM_FROUND_NO_EXC)
+// This rounding is only necessary because the rounding is supposed to happen during the FMA, but doesn't for some reason
+// https://github.com/manodeep/Corrfunc/pull/258#issuecomment-942479146
+#define AVX512_MASKZ_FMA_ADD_TRUNCATE_FLOATS(MASK, X,Y,Z)         _mm512_roundscale_pd(_mm512_maskz_fmadd_round_pd(MASK, X, Y, Z, _MM_FROUND_TO_ZERO|_MM_FROUND_NO_EXC), _MM_FROUND_TO_ZERO)
 
 /* returns Z + XY*/
 #define AVX512_FMA_ADD_FLOATS(X,Y,Z)                              _mm512_fmadd_pd(X,Y,Z)
@@ -296,7 +302,7 @@ extern "C" {
 
 #define AVX512_SET_FLOAT(X)                                       _mm512_set1_pd(X)
 
-#define AVX512_BLEND_FLOATS_WITH_MASK(MASK, FALSEVALUE,TRUEVALUE) _mm512_mask_blend_pd(MASK, FALSEVALUE,TRUEVALUE)
+#define AVX512_BLEND_FLOATS_WITH_MASK(MASK, FALSEVALUE, TRUEVALUE) _mm512_mask_blend_pd(MASK, FALSEVALUE, TRUEVALUE)
 
 #if defined(__AVX512VL__)
 #define AVX512_BLEND_INTS_WITH_MASK(MASK, FALSE,TRUE)             _mm256_mask_blend_epi32(MASK, FALSE,TRUE)
@@ -337,7 +343,7 @@ extern "C" {
 #endif //DOUBLE_PREC
 
 //Take the opposite of X if S is negative
-#define AVX512_SIGNED_FLOATS(X, S)           AVX512_BLEND_FLOATS_WITH_MASK(X, AVX512_OPPOSITE_FLOAT(X), AVX512_COMPARE_FLOATS(S, AVX512_SETZERO_FLOAT(), _CMP_LT_OQ))
+#define AVX512_SIGNED_FLOATS(X, S)           AVX512_BLEND_FLOATS_WITH_MASK(AVX512_COMPARE_FLOATS(S, AVX512_SETZERO_FLOAT(), _CMP_LT_OQ), X, AVX512_OPPOSITE_FLOAT(X))
 
 #ifndef  __INTEL_COMPILER
 #include "fast_acos.h"

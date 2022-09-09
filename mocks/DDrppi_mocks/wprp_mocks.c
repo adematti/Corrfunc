@@ -47,7 +47,7 @@ int main(int argc, char *argv[])
     int ndat ;
     double *logrp1,*ravg1,*pi1,*D1D2,*D1R2,*D2R1,*R1R2 ;
     /*---Corrfunc-variables----------------*/
-    int npibin,indx,npimax ;
+    int npibin,indx,npimin,npimax;
     double dpi ;
     double fN1,fN2,*xirppi,*wp,*logrp,*rpavg,*DDtot ;
 
@@ -72,16 +72,16 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
-    pimax=40. ;
+    pimax = 40. ;
     if(argc>10) sscanf(argv[10],"%lf",&pimax) ;
 
     /*----------------------------------------------------*/
 
-    npibin = 40 ;
-    dpi = 1. ;
-    npimax = (int)(pimax/dpi) ;
-    if(npibin < npimax)
-        npibin = npimax;
+    npibin = 80;
+    dpi = 1.;
+
+    npimax = (int)(pimax/dpi + npibin / 2);
+    npimin = (int)(-pimax/dpi + npibin / 2);
 
 
     /*---Read-D1D2-file-----------------------------------*/
@@ -168,10 +168,12 @@ int main(int argc, char *argv[])
     for(i=0;i<nrpbin;i++) {
         logrp[i] = logrp1[indx] ;
         for(j=0;j<npibin;j++) {
-            wp[i] += 2.*dpi*xirppi[indx] ;
-            rpavg[i] += D1D2[indx]*ravg1[indx] ;
-            DDtot[i] += D1D2[indx] ;
-            indx++ ;
+            if(j>npimin && j<npimax) {
+                wp[i] += dpi*xirppi[indx];
+                rpavg[i] += D1D2[indx]*ravg1[indx];
+                DDtot[i] += D1D2[indx];
+            }
+            indx++;
         }
         if(DDtot[i]>0)
             rpavg[i] /= DDtot[i] ;

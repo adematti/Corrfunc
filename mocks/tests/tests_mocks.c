@@ -117,13 +117,13 @@ int test_DDrppi_mocks(const char *correct_outputfile)
             free_results_mocks(&results);
             return EXIT_FAILURE;
         }
-        const double dpi = pimax/(double)results.npibin ;
+        const double dpi = 2.*pimax/(double)results.npibin ;
         const int npibin = results.npibin;
         for(int i=1;i<results.nbin;i++) {
             const double logrp = log10(results.rupp[i]);
             for(int j=0;j<npibin;j++) {
                 int index = i*(npibin+1) + j;
-                fprintf(fp,"%10"PRIu64" %20.8lf %20.8lf  %20.8lf %20.8lf \n",results.npairs[index],results.rpavg[index],logrp,(j+1)*dpi, results.weightavg[index]);
+                fprintf(fp,"%10"PRIu64" %20.8lf %20.8lf  %20.8lf %20.8lf \n",results.npairs[index],results.rpavg[index],logrp,(j+1)*dpi-pimax, results.weightavg[index]);
             }
         }
         fclose(fp);

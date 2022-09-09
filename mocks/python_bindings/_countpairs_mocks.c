@@ -1544,10 +1544,11 @@ static PyObject *countpairs_countpairs_rp_pi_mocks(PyObject *self, PyObject *arg
         "sep_pair_weights",
         "attrs_pair_weights",
         "bin_type",
+        "los_type",
         NULL
     };
 
-    if ( ! PyArg_ParseTupleAndKeywords(args, kwargs, "iiO!diO!O!O!|OO!O!O!ObbbbbbhbbbisO!O!OI", kwlist,
+    if ( ! PyArg_ParseTupleAndKeywords(args, kwargs, "iiO!diO!O!O!|OO!O!O!ObbbbbbhbbbisO!O!OII", kwlist,
                                        &autocorr,&nthreads,
                                        &PyArray_Type,&bins_obj,
                                        &pimax,&npibins,
@@ -1572,8 +1573,8 @@ static PyObject *countpairs_countpairs_rp_pi_mocks(PyObject *self, PyObject *arg
                                        &PyArray_Type,&pair_weight_obj,
                                        &PyArray_Type,&sep_pair_weight_obj,
                                        &attrs_pair_weight,
-                                       &(options.bin_type))
-
+                                       &(options.bin_type),
+                                       &(options.los_type))
          ) {
 
         PyObject_Print(kwargs, stdout, 0);
@@ -1751,30 +1752,17 @@ static PyObject *countpairs_countpairs_rp_pi_mocks(PyObject *self, PyObject *arg
         Py_RETURN_NONE;
     }
 
-
-#if 0
-    /* Output pairs*/
-    for(int i=1;i<results.nbin;i++) {
-        const double logrp = LOG10(results.rupp[i]);
-        for(int j=0;j<npibin;j++) {
-            const int index = i*(npibin+1) + j;
-            fprintf(stdout,"%10"PRIu64" %20.8lf %20.8lf  %20.8lf \n",results.npairs[index],results.rpavg[index],logrp,(j+1)*dpi);
-        }
-    }
-#endif
-
-
     /* Build the output list */
     PyObject *ret = PyList_New(0);//create an empty list
     double rlow=results.rupp[0];
-    const double dpi = pimax/(double)results.npibin;
+    const double dpi = 2.*pimax/(double)results.npibin;
 
     for(int i=1;i<results.nbin;i++) {
         for(int j=0;j<results.npibin;j++) {
             const int bin_index = i*(results.npibin + 1) + j;
             const double rpavg = results.rpavg[bin_index];
             const double weight_avg = results.weightavg[bin_index];
-            PyObject *item = Py_BuildValue("(ddddkd)",rlow,results.rupp[i],rpavg,(j+1)*dpi,results.npairs[bin_index], weight_avg);
+            PyObject *item = Py_BuildValue("(ddddkd)",rlow,results.rupp[i],rpavg,(j+1)*dpi-pimax,results.npairs[bin_index], weight_avg);
             PyList_Append(ret, item);
             Py_XDECREF(item);
         }
@@ -2063,19 +2051,6 @@ static PyObject *countpairs_countpairs_s_mu_mocks(PyObject *self, PyObject *args
     if(status != EXIT_SUCCESS) {
         Py_RETURN_NONE;
     }
-
-
-#if 0
-    /* Output pairs*/
-    for(int i=1;i<results.nbin;i++) {
-        const double logrp = LOG10(results.rupp[i]);
-        for(int j=0;j<npibin;j++) {
-            const int index = i*(npibin+1) + j;
-            fprintf(stdout,"%10"PRIu64" %20.8lf %20.8lf  %20.8lf \n",results.npairs[index],results.rpavg[index],logrp,(j+1)*dpi);
-        }
-    }
-#endif
-
 
     /* Build the output list */
     PyObject *ret = PyList_New(0);//create an empty list

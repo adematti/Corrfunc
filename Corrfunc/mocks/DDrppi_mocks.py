@@ -23,7 +23,7 @@ def DDrppi_mocks(autocorr, nthreads, binfile, pimax, npibins,
                  zbin_refine_factor=1, max_cells_per_dim=100,
                  copy_particles=True, enable_min_sep_opt=True,
                  c_api_timer=False, isa='fastest',
-                 weight_type=None, bin_type='custom',
+                 weight_type=None, bin_type='custom', los_type='midpoint',
                  pair_weights=None, sep_pair_weights=None, attrs_pair_weights=None):
     """
     Calculate the 2-D pair-counts corresponding to the projected correlation
@@ -74,15 +74,12 @@ def DDrppi_mocks(autocorr, nthreads, binfile, pimax, npibins,
     pimax : double
         A double-precision value for the maximum separation along
         the Z-dimension.
-
-        Distances along the :math:`\\pi` direction are binned with unit
-        depth. For instance, if ``pimax=40``, then 40 bins will be created
-        along the ``pi`` direction. Only pairs with ``0 <= dz < pimax``
-        are counted (no equality).
+        Note: pairs with :math:`-\\pi_{max} < \\pi < \\pi_{max}`
+        (exclusive on both ends) are counted.
 
     npibins : int
         The number of linear ``pi`` bins, with the bins ranging from
-        from (0, :math:`\\pi_{max}`)
+        from (:math:`-\\pi_{max}`, :math:`\\pi_{max}`).
 
     X1/Y1/Z1 : array_like, real (float/double)
         The array of X/Y/Z positions for the first set of points.
@@ -196,6 +193,11 @@ def DDrppi_mocks(autocorr, nthreads, binfile, pimax, npibins,
         ``rtol = 1e-05`` *and* ``atol = 1e-08`` (relative and absolute tolerance)
         of ``np.linspace(binfile[0], binfile[-1], len(binfile))``.
 
+    los_type : string, case-insensitive (default ``midpoint``)
+        Choice of line-of-sight :math:`d`:
+        - "midpoint": :math:`d = \hat{r_{1} + r_{2}}`
+        - "firstpoint": :math:`d = \hat{r_{1}}`
+
     pair_weights : array-like, optional. Default: None.
         Array of pair weights.
 
@@ -304,7 +306,7 @@ def DDrppi_mocks(autocorr, nthreads, binfile, pimax, npibins,
         raise ImportError(msg)
 
     import numpy as np
-    from Corrfunc.utils import translate_isa_string_to_enum, translate_bin_type_string_to_enum,\
+    from Corrfunc.utils import translate_isa_string_to_enum, translate_bin_type_string_to_enum, translate_los_type_string_to_enum,\
                                get_edges, convert_to_native_endian, sys_pipes, process_weights
     from future.utils import bytes_to_native_str
 
@@ -344,6 +346,7 @@ def DDrppi_mocks(autocorr, nthreads, binfile, pimax, npibins,
 
     integer_isa = translate_isa_string_to_enum(isa)
     integer_bin_type = translate_bin_type_string_to_enum(bin_type)
+    integer_los_type = translate_los_type_string_to_enum(los_type)
     rbinfile = get_edges(binfile)
     with sys_pipes():
         extn_results = DDrppi_extn(autocorr, nthreads,
@@ -360,7 +363,9 @@ def DDrppi_mocks(autocorr, nthreads, binfile, pimax, npibins,
                                    enable_min_sep_opt=enable_min_sep_opt,
                                    c_api_timer=c_api_timer,
                                    isa=integer_isa,
-                                   bin_type=integer_bin_type, **kwargs)
+                                   bin_type=integer_bin_type,
+                                   los_type=integer_los_type,
+                                   **kwargs)
     if extn_results is None:
         msg = "RuntimeError occurred"
         raise RuntimeError(msg)

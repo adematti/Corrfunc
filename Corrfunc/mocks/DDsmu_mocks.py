@@ -71,11 +71,9 @@ def DDsmu_mocks(autocorr, nthreads, binfile, mumax, nmubins,
     mumax : double. Must be in range [0.0, 1.0]
         A double-precision value for the maximum cosine of the angular
         separation from the line of sight (LOS). Here, ``mu`` is defined as
-        the angle between ``s`` and ``l``. If :math:`v_1` and :math:`v_2`
-        represent the vectors to each point constituting the pair, then
-        :math:`s := v_1 - v_2` and :math:`l := 1/2 (v_1 + v_2)`.
+        the angle between ``s`` and ``l``.
 
-        Note: Pairs with :math:`-\\mu_{max} < \\mu < \\mu_{max}`
+        Note: pairs with :math:`-\\mu_{max} < \\mu < \\mu_{max}`
         (exclusive on both ends) are counted.
 
     nmubins : int
@@ -235,7 +233,7 @@ def DDsmu_mocks(autocorr, nthreads, binfile, mumax, nmubins,
         raise ImportError(msg)
 
     import numpy as np
-    from Corrfunc.utils import translate_isa_string_to_enum, translate_bin_type_string_to_enum,\
+    from Corrfunc.utils import translate_isa_string_to_enum, translate_bin_type_string_to_enum, translate_los_type_string_to_enum,\
                                get_edges, convert_to_native_endian, sys_pipes, process_weights
     from future.utils import bytes_to_native_str
 
@@ -288,7 +286,7 @@ def DDsmu_mocks(autocorr, nthreads, binfile, mumax, nmubins,
 
     integer_isa = translate_isa_string_to_enum(isa)
     integer_bin_type = translate_bin_type_string_to_enum(bin_type)
-    integer_los_type = {'midpoint':0, 'firstpoint':1}[los_type.lower()]
+    integer_los_type = translate_los_type_string_to_enum(los_type)
     sbinfile = get_edges(binfile)
     with sys_pipes():
         extn_results = DDsmu_extn(autocorr, nthreads,

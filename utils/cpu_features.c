@@ -60,7 +60,9 @@ int runtime_instrset_detect(void)
     iset = AVX2;                                           // 8: AVX2 supported
 
     cpuid(abcd, 0xD);                                      // call cpuid leaf 0xD for feature flags
-    if ((abcd[0] & 0x60) != 0x60)   return iset;           // no AVX512
+    //if ((abcd[0] & 0x60) != 0x60)   return iset;           // no AVX512
+    //Disabling AVX512 for now
+    return iset;
     iset = AVX512F;                                        // 9: AVX512F supported
     return iset;
 }

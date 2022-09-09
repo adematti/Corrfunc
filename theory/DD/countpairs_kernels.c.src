@@ -159,11 +159,6 @@ static inline int countpairs_avx512_intrinsics_DOUBLE(const int64_t N0, DOUBLE *
             const AVX512_FLOATS m_x1 = AVX512_MASKZ_LOAD_FLOATS_UNALIGNED(m_mask_left, localx1);
             const AVX512_FLOATS m_y1 = AVX512_MASKZ_LOAD_FLOATS_UNALIGNED(m_mask_left, localy1);
             const AVX512_FLOATS m_z1 = AVX512_MASKZ_LOAD_FLOATS_UNALIGNED(m_mask_left, localz1);
-            if(need_costheta) {
-                const AVX512_FLOATS m_norm1 = AVX512_MASKZ_LOAD_FLOATS_UNALIGNED(m_mask_left, norm1 + j);
-                pair.costheta.a512 = AVX512_MASKZ_ADD_FLOATS(m_mask_left, AVX512_MASKZ_ADD_FLOATS(AVX512_MASKZ_MULTIPLY_FLOATS(m_mask_left, m_x1, m_xpos), AVX512_MASKZ_MULTIPLY_FLOATS(m_mask_left, m_y1, m_ypos)), AVX512_MASKZ_MULTIPLY_FLOATS(m_mask_left, m_z1, m_zpos));
-                pair.costheta.a512 = AVX512_MASKZ_DIVIDE_FLOATS(m_mask_left, pair.costheta.a512, AVX512_MASKZ_MULTIPLY_FLOATS(m_mask_left, m_norm1, m_norm0));
-            }
 
             union int16 union_rpbin;
             union float16 union_mDperp;
@@ -221,6 +216,12 @@ static inline int countpairs_avx512_intrinsics_DOUBLE(const int64_t N0, DOUBLE *
             m_mask_left = AVX512_MASK_COMPARE_FLOATS(m_rpmax_mask, r2, m_sqr_rpmin, _CMP_GE_OQ);
             if(m_mask_left == 0) {
                 continue;
+            }
+
+            if(need_costheta) {
+                const AVX512_FLOATS m_norm1 = AVX512_MASKZ_LOAD_FLOATS_UNALIGNED(m_mask_left, norm1 + j);
+                pair.costheta.a512 = AVX512_MASKZ_ADD_FLOATS(m_mask_left, AVX512_MASKZ_ADD_FLOATS(m_mask_left, AVX512_MASKZ_MULTIPLY_FLOATS(m_mask_left, m_x1, m_xpos), AVX512_MASKZ_MULTIPLY_FLOATS(m_mask_left, m_y1, m_ypos)), AVX512_MASKZ_MULTIPLY_FLOATS(m_mask_left, m_z1, m_zpos));
+                pair.costheta.a512 = AVX512_MASKZ_DIVIDE_FLOATS(m_mask_left, pair.costheta.a512, AVX512_MASKZ_MULTIPLY_FLOATS(m_mask_left, m_norm1, m_norm0));
             }
 
             if(need_rpavg || bin_type == BIN_LIN) {
