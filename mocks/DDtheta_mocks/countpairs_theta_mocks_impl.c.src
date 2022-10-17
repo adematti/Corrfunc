@@ -225,27 +225,27 @@ static inline int countpairs_theta_mocks_brute_force_DOUBLE(const int64_t N0, DO
     if(options->c_api_timer) {
         gettimeofday(&t0, NULL);
     }
-
-    uint64_t *npairs = (uint64_t *) my_calloc(sizeof(uint64_t), nthetabin);
+    int ntotbins = nthetabin + 1;
+    uint64_t *npairs = (uint64_t *) my_calloc(sizeof(uint64_t), ntotbins);
     DOUBLE *thetaavg = NULL;
     if(options->need_avg_sep){
-        thetaavg = (DOUBLE *) my_calloc(sizeof(DOUBLE), nthetabin);
+        thetaavg = (DOUBLE *) my_calloc(sizeof(DOUBLE), ntotbins);
     }
     DOUBLE *weightavg = NULL;
     if(need_weightavg) {
-        weightavg = (DOUBLE *) my_calloc(sizeof(DOUBLE), nthetabin);
+        weightavg = (DOUBLE *) my_calloc(sizeof(DOUBLE), ntotbins);
     }
 
     /*---Gridlink-variables----------------*/
 #if defined(_OPENMP)
-    uint64_t **all_npairs = (uint64_t **) matrix_calloc(sizeof(uint64_t), numthreads, nthetabin);
+    uint64_t **all_npairs = (uint64_t **) matrix_calloc(sizeof(uint64_t), numthreads, ntotbins);
     DOUBLE **all_thetaavg = NULL;
     if(options->need_avg_sep){
-        all_thetaavg = (DOUBLE **) matrix_calloc(sizeof(DOUBLE),numthreads,nthetabin);
+        all_thetaavg = (DOUBLE **) matrix_calloc(sizeof(DOUBLE), numthreads, ntotbins);
     }
     DOUBLE **all_weightavg = NULL;
     if(need_weightavg) {
-        all_weightavg = (DOUBLE **) matrix_calloc(sizeof(DOUBLE),numthreads,nthetabin);
+        all_weightavg = (DOUBLE **) matrix_calloc(sizeof(DOUBLE), numthreads, ntotbins);
     }
 #endif //USE_OMP
 
@@ -282,8 +282,8 @@ static inline int countpairs_theta_mocks_brute_force_DOUBLE(const int64_t N0, DO
 #endif//USE_OMP
 
         DOUBLE *tmp_thetaavg = NULL, *tmp_weightavg = NULL;
-        if(options->need_avg_sep) tmp_thetaavg = (DOUBLE *) malloc(sizeof(DOUBLE)*nthetabin);
-        if(need_weightavg) tmp_weightavg = (DOUBLE *) malloc(sizeof(DOUBLE)*nthetabin);
+        if(options->need_avg_sep) tmp_thetaavg = (DOUBLE *) malloc(sizeof(DOUBLE)*ntotbins);
+        if(need_weightavg) tmp_weightavg = (DOUBLE *) malloc(sizeof(DOUBLE)*ntotbins);
 
 #if defined(_OPENMP)
 #pragma omp for schedule(dynamic)
@@ -326,10 +326,10 @@ static inline int countpairs_theta_mocks_brute_force_DOUBLE(const int64_t N0, DO
                     }
 
                     if(options->need_avg_sep) {
-                        for(int k=0;k<nthetabin;k++) tmp_thetaavg[k] = 0.;
+                        for(int k=0;k<ntotbins;k++) tmp_thetaavg[k] = 0.;
                     }
                     if(need_weightavg) {
-                        for(int k=0;k<nthetabin;k++) tmp_weightavg[k] = 0.;
+                        for(int k=0;k<ntotbins;k++) tmp_weightavg[k] = 0.;
                     }
 
                     int status = countpairs_theta_mocks_function_DOUBLE(block_size1, &x0[i], &y0[i], &z0[i], &this_weights0,
@@ -345,10 +345,10 @@ static inline int countpairs_theta_mocks_brute_force_DOUBLE(const int64_t N0, DO
                     abort_status |= status;
 
                     if(options->need_avg_sep) {
-                        for(int k=0;k<nthetabin;k++) this_thetaavg[k] += tmp_thetaavg[k];
+                        for(int k=0;k<ntotbins;k++) this_thetaavg[k] += tmp_thetaavg[k];
                     }
                     if(need_weightavg) {
-                        for(int k=0;k<nthetabin;k++) this_weightavg[k] += tmp_weightavg[k];
+                        for(int k=0;k<ntotbins;k++) this_weightavg[k] += tmp_weightavg[k];
                     }
                 } //N1 loop
             } //abort_status condition
@@ -431,6 +431,7 @@ int countpairs_theta_mocks_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1,
 
     double *theta_upp = bins->edges;
     int nthetabin = bins->nedges;
+    int ntotbins = nthetabin + 1;
     double thetamin=bins->edges[0], thetamax=bins->edges[bins->nedges-1];
     if( ! (thetamin >= 0.0 && thetamax > 0.0 && thetamin < thetamax && thetamax <= 180.0 && nthetabin >= 1) ) {
         fprintf(stderr,"Error: Could not setup with theta bins correctly. (thetamin = %lf, thetamax = %lf, with nbins = %d). Expected positive rmin/rmax with thetamax > "
@@ -442,12 +443,12 @@ int countpairs_theta_mocks_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1,
     //prepare results
     //Pack in the results
     results->nbin = nthetabin;
-    results->npairs = my_calloc(sizeof(*(results->npairs)), nthetabin);
-    results->theta_upp = my_malloc(sizeof(*(results->theta_upp)), nthetabin);
-    results->theta_avg = my_calloc(sizeof(*(results->theta_avg)), nthetabin);
-    results->weightavg = my_calloc(sizeof(*(results->weightavg)), nthetabin);
+    results->npairs = my_calloc(sizeof(*(results->npairs)), ntotbins);
+    results->theta_upp = my_malloc(sizeof(*(results->theta_upp)), ntotbins);
+    results->theta_avg = my_calloc(sizeof(*(results->theta_avg)), ntotbins);
+    results->weightavg = my_calloc(sizeof(*(results->weightavg)), ntotbins);
     if(results->npairs == NULL || results->theta_upp == NULL || results->theta_avg == NULL || results->weightavg == NULL) {
-        fprintf(stderr,"Error: Could not allocate memory for %d nbins to hold the results of the pair-counting\n", nthetabin);
+        fprintf(stderr,"Error: Could not allocate memory for %d nbins to hold the results of the pair-counting\n", ntotbins);
         free_results_countpairs_theta(results);
         return EXIT_FAILURE;
     }
@@ -893,25 +894,25 @@ int countpairs_theta_mocks_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1,
         return EXIT_FAILURE;
     }
 
-    uint64_t *npairs = (uint64_t *) my_calloc(sizeof(uint64_t), nthetabin);
+    uint64_t *npairs = (uint64_t *) my_calloc(sizeof(uint64_t), ntotbins);
     DOUBLE *thetaavg = NULL;
     if(options->need_avg_sep){
-        thetaavg = (DOUBLE *) my_calloc(sizeof(DOUBLE), nthetabin);
+        thetaavg = (DOUBLE *) my_calloc(sizeof(DOUBLE), ntotbins);
     }
     DOUBLE *weightavg = NULL;
     if(need_weightavg) {
-        weightavg = (DOUBLE *) my_calloc(sizeof(DOUBLE), nthetabin);
+        weightavg = (DOUBLE *) my_calloc(sizeof(DOUBLE), ntotbins);
     }
 
 #if defined(_OPENMP)
-    uint64_t **all_npairs = (uint64_t **) matrix_calloc(sizeof(uint64_t), numthreads, nthetabin);
+    uint64_t **all_npairs = (uint64_t **) matrix_calloc(sizeof(uint64_t), numthreads, ntotbins);
     DOUBLE **all_thetaavg = NULL;
     if(options->need_avg_sep) {
-        all_thetaavg = (DOUBLE **) matrix_calloc(sizeof(DOUBLE),numthreads,nthetabin);
+        all_thetaavg = (DOUBLE **) matrix_calloc(sizeof(DOUBLE), numthreads, ntotbins);
     }
     DOUBLE **all_weightavg = NULL;
     if(need_weightavg) {
-      all_weightavg = (DOUBLE **) matrix_calloc(sizeof(DOUBLE),numthreads,nthetabin);
+      all_weightavg = (DOUBLE **) matrix_calloc(sizeof(DOUBLE), numthreads, ntotbins);
     }
 #endif
 
@@ -941,8 +942,8 @@ int countpairs_theta_mocks_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1,
 #endif//USE_OMP
 
         DOUBLE *tmp_thetaavg = NULL, *tmp_weightavg = NULL;
-        if(options->need_avg_sep) tmp_thetaavg = (DOUBLE *) malloc(sizeof(DOUBLE)*nthetabin);
-        if(need_weightavg) tmp_weightavg = (DOUBLE *) malloc(sizeof(DOUBLE)*nthetabin);
+        if(options->need_avg_sep) tmp_thetaavg = (DOUBLE *) malloc(sizeof(DOUBLE)*ntotbins);
+        if(need_weightavg) tmp_weightavg = (DOUBLE *) malloc(sizeof(DOUBLE)*ntotbins);
 
 #if defined(_OPENMP)
 #pragma omp for schedule(dynamic)
@@ -1002,10 +1003,10 @@ int countpairs_theta_mocks_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1,
                 abort_status |= status;
 
                 if(options->need_avg_sep) {
-                    for(int j=0;j<nthetabin;j++) this_thetaavg[j] += tmp_thetaavg[j];
+                    for(int j=0;j<ntotbins;j++) this_thetaavg[j] += tmp_thetaavg[j];
                 }
                 if(need_weightavg) {
-                    for(int j=0;j<nthetabin;j++) this_weightavg[j] += tmp_weightavg[j];
+                    for(int j=0;j<ntotbins;j++) this_weightavg[j] += tmp_weightavg[j];
                 }
 
             }//abort-status

@@ -153,6 +153,7 @@ int countpairs_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z1,
      ************************/
     double *rupp = bins->edges;
     int nrpbin = bins->nedges;
+    int ntotbins = nrpbin + 1;
     double rpmin=bins->edges[0], rpmax=bins->edges[bins->nedges-1];
     if( ! (rpmin >= 0.0 && rpmax > 0.0 && rpmin < rpmax && nrpbin > 0)) {
         fprintf(stderr,"Error: Could not setup with r bins correctly. (rmin = %lf, rmax = %lf, with nbins = %d). "
@@ -164,10 +165,10 @@ int countpairs_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z1,
 
     //Pack in the results
     results->nbin = nrpbin;
-    results->npairs = my_calloc(sizeof(*(results->npairs)), nrpbin);
-    results->rupp = my_malloc(sizeof(*(results->rupp)), nrpbin);
-    results->rpavg = my_calloc(sizeof(*(results->rpavg)), nrpbin);
-    results->weightavg = my_calloc(sizeof(*(results->weightavg)), nrpbin);
+    results->npairs = my_calloc(sizeof(*(results->npairs)), ntotbins);
+    results->rupp = my_malloc(sizeof(*(results->rupp)), ntotbins);
+    results->rpavg = my_calloc(sizeof(*(results->rpavg)), ntotbins);
+    results->weightavg = my_calloc(sizeof(*(results->weightavg)), ntotbins);
     if(results->npairs == NULL || results->rupp == NULL ||
        results->rpavg == NULL || results->weightavg == NULL) {
         free_results(results);
@@ -367,27 +368,27 @@ int countpairs_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z1,
         return EXIT_FAILURE;
     }
 
-    uint64_t *npairs = (uint64_t *) my_calloc(sizeof(uint64_t), nrpbin);
+    uint64_t *npairs = (uint64_t *) my_calloc(sizeof(uint64_t), ntotbins);
     DOUBLE *rpavg = NULL;
     if(options->need_avg_sep){
-        rpavg = (DOUBLE *) my_calloc(sizeof(DOUBLE), nrpbin);
+        rpavg = (DOUBLE *) my_calloc(sizeof(DOUBLE), ntotbins);
     }
     DOUBLE *weightavg = NULL;
     if(need_weightavg) {
-        weightavg = (DOUBLE *) my_calloc(sizeof(DOUBLE), nrpbin);
+        weightavg = (DOUBLE *) my_calloc(sizeof(DOUBLE), ntotbins);
     }
 
 #if defined(_OPENMP)
-    uint64_t **all_npairs = (uint64_t **) matrix_calloc(sizeof(uint64_t), numthreads, nrpbin);
+    uint64_t **all_npairs = (uint64_t **) matrix_calloc(sizeof(uint64_t), numthreads, ntotbins);
 
     DOUBLE **all_rpavg = NULL;
     if(options->need_avg_sep) {
-        all_rpavg = (DOUBLE **) matrix_calloc(sizeof(DOUBLE),numthreads,nrpbin);
+        all_rpavg = (DOUBLE **) matrix_calloc(sizeof(DOUBLE), numthreads, ntotbins);
     }
 
     DOUBLE **all_weightavg = NULL;
     if(need_weightavg) {
-        all_weightavg = (DOUBLE **) matrix_calloc(sizeof(DOUBLE),numthreads,nrpbin);
+        all_weightavg = (DOUBLE **) matrix_calloc(sizeof(DOUBLE), numthreads, ntotbins);
     }
 
     if(all_npairs == NULL ||
@@ -442,8 +443,8 @@ int countpairs_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z1,
 #endif//USE_OMP
 
       DOUBLE *tmp_rpavg = NULL, *tmp_weightavg = NULL;
-      if(options->need_avg_sep) tmp_rpavg = (DOUBLE *) malloc(sizeof(DOUBLE)*nrpbin);
-      if(need_weightavg) tmp_weightavg = (DOUBLE *) malloc(sizeof(DOUBLE)*nrpbin);
+      if(options->need_avg_sep) tmp_rpavg = (DOUBLE *) malloc(sizeof(DOUBLE)*ntotbins);
+      if(need_weightavg) tmp_weightavg = (DOUBLE *) malloc(sizeof(DOUBLE)*ntotbins);
 
 #if defined(_OPENMP)
 #pragma omp for schedule(dynamic)

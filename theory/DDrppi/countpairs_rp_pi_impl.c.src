@@ -172,9 +172,9 @@ int countpairs_rp_pi_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z
     results->npibin = npibin;
     results->pimax = pimax;
     results->npairs = my_calloc(sizeof(uint64_t), totnbins);
-    results->rupp = my_malloc(sizeof(double)  , nrpbin);
-    results->rpavg = my_calloc(sizeof(double)  , totnbins);
-    results->weightavg = my_calloc(sizeof(double)  , totnbins);
+    results->rupp = my_malloc(sizeof(double), nrpbin);
+    results->rpavg = my_calloc(sizeof(double), totnbins);
+    results->weightavg = my_calloc(sizeof(double), totnbins);
     if(results->npairs == NULL || results->rupp == NULL ||
        results->rpavg == NULL || results->weightavg == NULL) {
         free_results_rp_pi(results);
