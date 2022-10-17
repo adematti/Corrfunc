@@ -629,7 +629,7 @@ int countpairs_rp_pi_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z
             }
         }
     }
-    free(npairs); free(rpavg), free(weightavg);
+    free(npairs); free(rpavg); free(weightavg);
 
     /* reset interrupt handlers to default */
     RESET_INTERRUPT_HANDLERS();

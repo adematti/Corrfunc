@@ -1142,7 +1142,7 @@ int countpairs_theta_mocks_DOUBLE(const int64_t ND1, DOUBLE *ra1, DOUBLE *dec1,
             results->weightavg[i] = weightavg[i];
         }
     }
-    free(npairs); free(thetaavg), free(weightavg);
+    free(npairs); free(thetaavg); free(weightavg);
 
     /* reset interrupt handlers to default */
     RESET_INTERRUPT_HANDLERS();

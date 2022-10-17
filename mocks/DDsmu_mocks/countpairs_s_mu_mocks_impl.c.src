@@ -611,7 +611,7 @@ int countpairs_mocks_s_mu_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUB
             }
         }
     }
-    free(npairs); free(savg), free(weightavg);
+    free(npairs); free(savg); free(weightavg);
 
     /* reset interrupt handlers to default */
     RESET_INTERRUPT_HANDLERS();

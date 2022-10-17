@@ -399,7 +399,7 @@ int countpairs_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z1,
         }
         matrix_free((void **)all_npairs, numthreads);
         if(options->need_avg_sep) {
-            matrix_free((void **)all_rpavg, numthreads);
+            matrix_free((void **) all_rpavg, numthreads);
         }
         if(need_weightavg) {
             matrix_free((void**) all_weightavg, numthreads);
@@ -642,7 +642,7 @@ int countpairs_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z1,
         }
     }
 
-    free(npairs); free(rpavg), free(weightavg);
+    free(npairs); free(rpavg); free(weightavg);
 
     /* reset interrupt handlers to default */
     RESET_INTERRUPT_HANDLERS();
