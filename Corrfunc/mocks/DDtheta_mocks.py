@@ -123,7 +123,7 @@ def DDtheta_mocks(autocorr, nthreads, binfile,
         Boolean flag to control output of informational messages
 
     output_thetaavg : boolean (default false)
-        Boolean flag to output the average ``\theta`` for each bin. Code will
+        Boolean flag to output the average ``\\theta`` for each bin. Code will
         run slower if you set this flag.
 
         If you are calculating in single-precision, ``thetaavg`` will
@@ -446,7 +446,7 @@ def find_fastest_DDtheta_mocks_bin_refs(autocorr, nthreads, binfile,
         Boolean flag to control output of informational messages
 
     output_thetaavg : boolean (default false)
-        Boolean flag to output the average ``\theta`` for each bin. Code will
+        Boolean flag to output the average ``\\theta`` for each bin. Code will
         run slower if you set this flag.
 
         If you are calculating in single-precision, ``thetaavg`` will

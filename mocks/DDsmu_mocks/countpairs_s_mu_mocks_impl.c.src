@@ -37,6 +37,7 @@ void interrupt_handler_countpairs_s_mu_mocks_DOUBLE(int signo)
     interrupt_status_DDsmu_mocks_DOUBLE = EXIT_FAILURE;
 }
 
+
 countpairs_mocks_func_ptr_DOUBLE countpairs_s_mu_mocks_driver_DOUBLE(const struct config_options *options)
 {
 
@@ -226,6 +227,26 @@ int countpairs_mocks_s_mu_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUB
         options->fast_divide_and_NR_steps = 0;
     }
 
+<<<<<<< HEAD
+=======
+    //Check inputs
+    if(ND1 == 0 || (autocorr == 0 && ND2 == 0)) {
+        return EXIT_SUCCESS;
+    }
+
+    //Check inputs
+    int status1 = check_ra_dec_cz_s_mu_DOUBLE(ND1, ra1, dec1, czD1, options->is_comoving_dist);
+    if(status1 != EXIT_SUCCESS) {
+        return status1;
+    }
+    if(autocorr==0) {
+        int status2 = check_ra_dec_cz_s_mu_DOUBLE(ND2, ra2, dec2, czD2, options->is_comoving_dist);
+        if(status2 != EXIT_SUCCESS) {
+            return status2;
+        }
+    }
+
+>>>>>>> d59774ea8042e27926d8de5838b29644a1dbd76f
 #if defined(_OPENMP)
     omp_set_num_threads(numthreads);
 #else

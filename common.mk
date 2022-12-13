@@ -37,7 +37,7 @@ OPT += -DUSE_OMP
 ### You should NOT edit below this line
 DISTNAME:=Corrfunc
 MAJOR:=2
-MINOR:=4
+MINOR:=5
 PATCHLEVEL:=0
 VERSION:=$(MAJOR).$(MINOR).$(PATCHLEVEL)
 ABI_COMPAT_VERSION:=$(MAJOR).0
@@ -192,9 +192,8 @@ ifeq ($(DO_CHECKS), 1)
   ifeq (USE_GSL,$(findstring USE_GSL,$(OPT)))
     GSL_FOUND := $(shell gsl-config --version 2>/dev/null)
     ifndef GSL_FOUND
-      $(error $(ccred)Error:$(ccreset) GSL not found in path - please install GSL before installing, or unset USE_GSL $(DISTNAME).$(VERSION) $(ccreset))
+      $(error $(ccred)Error:$(ccreset) GSL not found in path - please install GSL before installing $(DISTNAME).$(VERSION) $(ccreset))
     endif
-    CFLAGS += -DUSE_GSL
     GSL_CFLAGS := $(shell gsl-config --cflags)
     GSL_LIBDIR := $(shell gsl-config --prefix)/lib
     GSL_LINK   := $(shell gsl-config --libs) -Xlinker -rpath -Xlinker $(GSL_LIBDIR)
@@ -354,12 +353,11 @@ ifeq ($(DO_CHECKS), 1)
     CLINK += -lm
   endif #not icc
 
-  # The GNU Assembler (GAS) has an AVX-512 bug in versions 2.30 to 2.31.1
-  # So we turn off AVX-512 if the compiler reports it is using one of these versions.
-  # This works for gcc and icc.
-  # clang typically uses its own assembler, but if it is using the system assembler, this will also detect that.
+  # The GNU Assembler (GAS) has an AVX-512 bug in some versions (originally 2.30 to 2.31.1)
+  # So we compile a test program and check the assembly for the correct output.
   # See: https://github.com/manodeep/Corrfunc/issues/193
-  GAS_BUG_DISABLE_AVX512 := $(shell $(CC) $(CFLAGS) -xc -Wa,-v -c /dev/null -o /dev/null 2>&1 | \grep -Ecm1 'GNU assembler version (2\.30|2\.31|2\.31\.1)')
+  GAS_BUG_DISABLE_AVX512 := $(shell echo 'vmovaps 64(,%rax), %zmm0' | $(CC) $(CFLAGS) -xassembler -c - -oa.out 2>/dev/null && objdump -dw a.out | \grep -q 'vmovaps 0x40(,%rax,1),%zmm0'; RET=$$?; rm -f a.out; echo $$RET)
+
   ifeq ($(GAS_BUG_DISABLE_AVX512),1)
     # Did the compiler support AVX-512 in the first place? Otherwise no need to disable it!
     CC_SUPPORTS_AVX512 := $(shell $(CC) $(CFLAGS) -dM -E - < /dev/null | \grep -Ecm1 __AVX512F__)
