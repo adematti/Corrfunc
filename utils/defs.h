@@ -139,7 +139,7 @@ struct config_options
     los_type_t los_type; /* line-of-sight type */
 
     /* Reserving to maintain ABI compatibility for the future */
-    uint8_t reserved[OPTIONS_HEADER_SIZE - 33*sizeof(char) - sizeof(size_t) - 11*sizeof(double) - 3*sizeof(int)
+    uint8_t reserved[OPTIONS_HEADER_SIZE - 33*sizeof(char) - sizeof(size_t) - 4*sizeof(double) - 3*sizeof(int)
                      - sizeof(uint16_t) - 16*sizeof(uint8_t) - sizeof(bin_type_t) - sizeof(los_type_t) - sizeof(struct api_cell_timings *) - sizeof(int64_t)
                      ];
 };

@@ -12,45 +12,6 @@ from Corrfunc.tests.common import (generate_isa_and_nthreads_combos,
                                    maxthreads)
 
 
-
-@pytest.mark.parametrize('isa,nthreads', generate_isa_and_nthreads_combos())
-def test_DD(gals_Mr19, isa, nthreads):
-    from Corrfunc.theory import DD
-
-    boxsize = 420.
-    binfile = pjoin(dirname(abspath(__file__)),
-                     "../../theory/tests/", "bins")
-    autocorr = 1
-    periodic = 1
-
-    x, y, z, w = gals_Mr19
-    for size in [0, None]:
-        results_DD = DD(autocorr, nthreads, binfile,
-                        x[:size], y[:size], z[:size],
-                        weights1=w[:size], weight_type='pair_product',
-                        periodic=periodic, boxsize=boxsize,
-                        output_ravg=True, verbose=True,
-                        isa=isa)
-        if size == 0:
-            for name in ['npairs', 'weightavg', 'ravg']: assert np.allclose(results_DD[name], 0.)
-        if size is None:
-            file_ref = pjoin(dirname(abspath(__file__)),
-                            "../../theory/tests/", "Mr19_DD_periodic")
-            check_against_reference(results_DD, file_ref,
-                                    ravg_name='ravg', ref_cols=(0, 4, 1))
-
-    results_DD = DD(autocorr, nthreads, binfile, x, y, z,
-                            weights1=w, weight_type='pair_product',
-                            periodic=periodic, boxsize=boxsize,
-                            output_ravg=True, verbose=True,
-                            isa=isa)
-
-    file_ref = pjoin(dirname(abspath(__file__)),
-                    "../../theory/tests/", "Mr19_DD_periodic")
-    check_against_reference(results_DD, file_ref,
-                            ravg_name='ravg', ref_cols=(0, 4, 1))
-
-
 @pytest.mark.parametrize('funcname', ['DD', 'DDrppi', 'DDsmu'])
 def test_boxsize(gals_Mr19, funcname, isa='fastest', nthreads=maxthreads()):
     '''Test the non-cubic and periodic boxsize features
@@ -71,7 +32,7 @@ def test_boxsize(gals_Mr19, funcname, isa='fastest', nthreads=maxthreads()):
     periodic = 1
     pimax = 40.0
     mu_max = 0.5
-    nmu_bins = 10
+    nmu_bins = 11
 
     x, y, z, w = gals_Mr19
     args = [autocorr, nthreads, binfile, x, y, z]
@@ -80,8 +41,8 @@ def test_boxsize(gals_Mr19, funcname, isa='fastest', nthreads=maxthreads()):
                   verbose=True, isa=isa)
 
     if funcname == 'DDrppi':
-        args.insert(2, pimax)
         kwargs['output_rpavg'] = True
+        args[3:3] = (pimax, int(pimax))
         ravg_name = 'rpavg'
     elif funcname == 'DDsmu':
         kwargs['output_savg'] = True
@@ -241,7 +202,7 @@ def test_brute(autocorr, binref, min_sep_opt, maxcells, boxsize, funcname,
         bins = np.linspace(0.01, 2*boxsize.max(), 20)
     pimax = np.floor(0.49*boxsize.min())
     mu_max = 0.5
-    nmu_bins = 10
+    nmu_bins = 11
     func = getattr(Corrfunc.theory, funcname)
 
     # two clouds of width eps*boxsize
@@ -253,10 +214,12 @@ def test_brute(autocorr, binref, min_sep_opt, maxcells, boxsize, funcname,
     # Compute the pairwise distance between particles with broadcasting.
     # Broadcasting (npts,1,3) against (npts,3) yields (npts,npts,3),
     # which is the array of all npts^2 (x,y,z) differences.
-    pdiff = np.abs(pos[:, np.newaxis] - pos)
+    pdiff = pos[:, np.newaxis] - pos
     if periodic:
         mask = pdiff >= boxsize/2
         pdiff -= mask*boxsize
+        mask = pdiff <= - boxsize/2
+        pdiff += mask*boxsize
 
     args = [autocorr, nthreads, bins, pos[:, 0], pos[:, 1], pos[:, 2]]
     kwargs = dict(periodic=periodic, isa=isa, boxsize=boxsize,
@@ -268,10 +231,10 @@ def test_brute(autocorr, binref, min_sep_opt, maxcells, boxsize, funcname,
 
     if funcname == 'DDrppi':
         # Compute rp^2 = dx^2 + dy^2, and pi = abs(dz)
-        args.insert(2, pimax)
+        args[3:3] = (pimax, int(pimax))
         sqr_rpdiff = (pdiff[:, :, :2]**2).sum(axis=-1).reshape(-1)
-        pidiff = np.abs(pdiff[:, :, 2]).reshape(-1)
-        pibins = np.linspace(0., pimax, int(pimax)+1)
+        pidiff = pdiff[:, :, 2].reshape(-1)
+        pibins = np.linspace(-pimax, pimax, int(pimax)+1)
         brutecounts, _, _ = np.histogram2d(sqr_rpdiff, pidiff,
                                            bins=(bins**2, pibins))
         brutecounts = brutecounts.reshape(-1)  # corrfunc flattened convention
@@ -280,8 +243,8 @@ def test_brute(autocorr, binref, min_sep_opt, maxcells, boxsize, funcname,
         args[3:3] = (mu_max, nmu_bins)
         sdiff = np.sqrt((pdiff**2).sum(axis=-1).reshape(-1))
         sdiff[sdiff == 0.] = np.inf  # don't divide by 0
-        mu = np.abs(pdiff[:, :, 2]).reshape(-1) / sdiff
-        mubins = np.linspace(0, mu_max, nmu_bins+1)
+        mu = pdiff[:, :, 2].reshape(-1) / sdiff
+        mubins = np.linspace(-mu_max, mu_max, nmu_bins+1)
         brutecounts, _, _ = np.histogram2d(sdiff, mu,
                                            bins=(bins, mubins))
         brutecounts = brutecounts.reshape(-1)  # corrfunc flattened convention
@@ -301,6 +264,43 @@ def test_brute(autocorr, binref, min_sep_opt, maxcells, boxsize, funcname,
 
     assert np.all(results['npairs'] == brutecounts)
 
+
+@pytest.mark.parametrize('isa,nthreads', generate_isa_and_nthreads_combos())
+def test_DD(gals_Mr19, isa, nthreads):
+    from Corrfunc.theory import DD
+
+    boxsize = 420.
+    binfile = pjoin(dirname(abspath(__file__)),
+                     "../../theory/tests/", "bins")
+    autocorr = 1
+    periodic = 1
+
+    x, y, z, w = gals_Mr19
+    for size in [0, None]:
+        results_DD = DD(autocorr, nthreads, binfile,
+                        x[:size], y[:size], z[:size],
+                        weights1=w[:size], weight_type='pair_product',
+                        periodic=periodic, boxsize=boxsize,
+                        output_ravg=True, verbose=True,
+                        isa=isa)
+        if size == 0:
+            for name in ['npairs', 'weightavg', 'ravg']: assert np.allclose(results_DD[name], 0.)
+        if size is None:
+            file_ref = pjoin(dirname(abspath(__file__)),
+                            "../../theory/tests/", "Mr19_DD_periodic")
+            check_against_reference(results_DD, file_ref,
+                                    ravg_name='ravg', ref_cols=(0, 4, 1))
+
+    results_DD = DD(autocorr, nthreads, binfile, x, y, z,
+                            weights1=w, weight_type='pair_product',
+                            periodic=periodic, boxsize=boxsize,
+                            output_ravg=True, verbose=True,
+                            isa=isa)
+
+    file_ref = pjoin(dirname(abspath(__file__)),
+                    "../../theory/tests/", "Mr19_DD_periodic")
+    check_against_reference(results_DD, file_ref,
+                            ravg_name='ravg', ref_cols=(0, 4, 1))
 
 
 @pytest.mark.parametrize('isa,nthreads', generate_isa_and_nthreads_combos())
