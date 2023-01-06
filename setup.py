@@ -504,12 +504,12 @@ def setup_packages():
     # Now the lib + associated header files have been generated
     # and put in lib/ and include/
     # This step must run after ``make install``
-    dirs_patterns = {'theory/tests/data': ['*.ff', '*.txt',
-                                              '*.txt.gz', '*.dat'],
-                     'mocks/tests/data': ['*.ff', '*.txt',
-                                             '*.txt.gz', '*.dat'],
-                     'theory/tests': ['Mr19*', 'bins*', 'cmass*'],
-                     'mocks/tests': ['Mr19*', 'bins*', 'angular_bins*'],
+    dirs_patterns = {#'theory/tests/data': ['*.ff', '*.txt',
+                     #                         '*.txt.gz', '*.dat'],
+                     #'mocks/tests/data': ['*.ff', '*.txt',
+                     #                        '*.txt.gz', '*.dat'],
+                     #'theory/tests': ['Mr19*', 'bins*', 'cmass*'],
+                     #'mocks/tests': ['Mr19*', 'bins*', 'angular_bins*'],
                      'include': ['count*.h'],
                      'lib': ['libcount*.a']
                      }
