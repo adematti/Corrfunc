@@ -372,22 +372,23 @@ ifeq ($(DO_CHECKS), 1)
       CFLAGS += -DGAS_BUG_DISABLE_AVX512
 
       ifneq ($(GAS_BUG_WARNING_PRINTED),1)
-        $(warning $(ccred)DISABLING AVX-512 SUPPORT DUE TO GNU ASSEMBLER BUG. UPGRADE TO BINUTILS >=2.32 TO FIX THIS.$(ccreset))
+        $(warning $(ccred)DISABLING AVX-512 SUPPORT DUE TO GNU ASSEMBLER BUG. UPGRADE TO BINUTILS >= 2.32 TO FIX THIS.$(ccreset))
       endif
       export GAS_BUG_WARNING_PRINTED := 1
     endif
   endif
 
-  CC_SUPPORTS_AVX512 := $(shell $(CC) $(CFLAGS) -dM -E - < /dev/null | \grep -Ecm1 __AVX512F__)
-  ifeq ($(CC_SUPPORTS_AVX512),1)
-    ifeq ($(shell test 0$(ICC_MAJOR_VER) -ge 019 -o -z "$(ICC_MAJOR_VER)"; echo $$?),0)
-      # If gcc, clang, or new icc, we can use this
-      CFLAGS += -mno-avx512f
-    else
-      CFLAGS += -xCORE-AVX2
+  # Check if using clang on Apple with M1/M1 Max/M2 etc
+  # if so, remove -march=native from CFLAGS and
+  # then add -mcpu=apple-m1 -mtune=apple-m1
+  ARCH := $(shell uname -m)
+  ifeq ($(ARCH), arm64)
+    ifeq ($(UNAME), Darwin)
+      ifeq (clang,$(findstring clang,$(CC)))
+        CFLAGS := $(filter-out -march=native, $(CFLAGS))
+        CFLAGS += -mtune=apple-m1 -mcpu=apple-m1
+      endif
     endif
-    # AVX512 has not been tested, let us disable it for the moment
-    #CFLAGS += -DGAS_BUG_DISABLE_AVX512
   endif
 
   # All of the python/numpy checks follow
@@ -446,8 +447,8 @@ ifeq ($(DO_CHECKS), 1)
       endif
 
       ifneq ($(COMPILE_PYTHON_EXT), 0)
-  PYTHON_INCL := $(shell $(PYTHON) -c "from __future__ import print_function; import sysconfig; flags = set(['-I' + sysconfig.get_path('include'),'-I' + sysconfig.get_path('platinclude')]); print(' '.join(flags));")
-        PYTHON_INCL:=$(patsubst -I%,-isystem%, $(PYTHON_INCL))
+        PYTHON_INCL := $(shell $(PYTHON) -c "from __future__ import print_function; import sysconfig; flags = set(['-I' + sysconfig.get_path('include'),'-I' + sysconfig.get_path('platinclude')]); print(' '.join(flags));")
+        PYTHON_INCL := $(patsubst -I%,-isystem%, $(PYTHON_INCL))
 
         # NUMPY is available -> next step should not fail
         # That's why we are not checking if the NUMPY_INCL_FLAG is defined.

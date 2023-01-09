@@ -82,9 +82,9 @@ int get_max_usable_isa(void)
             iset = AVX512F;
             break;
 #elif defined(GAS_BUG_DISABLE_AVX512)
-            fprintf(stderr, "[Warning] AVX512F is disabled due to a GNU Assembler bug.  Upgrade to binutils >= 2.32 to fix this.\n");
+            fprintf(stderr, "[Warning] AVX512F is disabled due to a GNU Assembler bug. Upgrade to binutils >= 2.32 to fix this.\n");
 #else
-            fprintf(stderr, "[Warning] The CPU supports AVX512F but the compiler does not.  Can you try another compiler?\n");
+            fprintf(stderr, "[Warning] The CPU supports AVX512F but the compiler does not. Can you try another compiler?\n");
 #endif
             // fall through
         case AVX2:
@@ -92,7 +92,7 @@ int get_max_usable_isa(void)
             iset = AVX2;
             break;
 #else
-            fprintf(stderr, "[Warning] The CPU supports AVX2 but the compiler does not.  Can you try another compiler?\n");
+            fprintf(stderr, "[Warning] The CPU supports AVX2 but the compiler does not. Can you try another compiler?\n");
 #endif
             // fall through
         case AVX:
@@ -100,7 +100,7 @@ int get_max_usable_isa(void)
             iset = AVX;
             break;
 #else
-            fprintf(stderr, "[Warning] The CPU supports AVX but the compiler does not.  Can you try another compiler?\n");
+            fprintf(stderr, "[Warning] The CPU supports AVX but the compiler does not. Can you try another compiler?\n");
 #endif
             // fall through
         case SSE42:
@@ -108,7 +108,7 @@ int get_max_usable_isa(void)
             iset = SSE42;
             break;
 #else
-            fprintf(stderr, "[Warning] The CPU supports SSE4.2 but the compiler does not.  Can you try another compiler?\n");
+            fprintf(stderr, "[Warning] The CPU supports SSE4.2 but the compiler does not. Can you try another compiler?\n");
 #endif
             // fall through
         case SSE4:
@@ -116,7 +116,7 @@ int get_max_usable_isa(void)
             iset = SSE4;
             break;
 #else
-            fprintf(stderr, "[Warning] The CPU supports SSE4.1 but the compiler does not.  Can you try another compiler?\n");
+            fprintf(stderr, "[Warning] The CPU supports SSE4.1 but the compiler does not. Can you try another compiler?\n");
 #endif
             // fall through
         case SSSE3:
@@ -124,7 +124,7 @@ int get_max_usable_isa(void)
             iset = SSSE3;
             break;
 #else
-            fprintf(stderr, "[Warning] The CPU supports SSSE3 but the compiler does not.  Can you try another compiler?\n");
+            fprintf(stderr, "[Warning] The CPU supports SSSE3 but the compiler does not. Can you try another compiler?\n");
 #endif
             // fall through
         case SSE3:
@@ -132,7 +132,7 @@ int get_max_usable_isa(void)
             iset = SSE3;
             break;
 #else
-            fprintf(stderr, "[Warning] The CPU supports SSE3 but the compiler does not.  Can you try another compiler?\n");
+            fprintf(stderr, "[Warning] The CPU supports SSE3 but the compiler does not. Can you try another compiler?\n");
 #endif
             // fall through
         case SSE2:
@@ -140,7 +140,7 @@ int get_max_usable_isa(void)
             iset = SSE2;
             break;
 #else
-            fprintf(stderr, "[Warning] The CPU supports SSE2 but the compiler does not.  Can you try another compiler?\n");
+            fprintf(stderr, "[Warning] The CPU supports SSE2 but the compiler does not. Can you try another compiler?\n");
 #endif
             // fall through
         case SSE:
@@ -148,7 +148,7 @@ int get_max_usable_isa(void)
             iset = SSE;
             break;
 #else
-            fprintf(stderr, "[Warning] The CPU supports SSE but the compiler does not.  Can you try another compiler?\n");
+            fprintf(stderr, "[Warning] The CPU supports SSE but the compiler does not. Can you try another compiler?\n");
 #endif
             // fall through
         case FALLBACK:

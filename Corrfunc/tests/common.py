@@ -60,8 +60,8 @@ def generate_isa_and_nthreads_combos(extra_isa=None):
     all_isa = ['fallback', 'sse42', 'avx', 'avx512f']
     if extra_isa:
         all_isa += extra_isa
-    combos += [(isa,mx) for isa in all_isa]
-    combos += [('fastest',n) for n in all_nthreads]
+    combos += [(isa, mx) for isa in all_isa]
+    combos += [('fastest', n) for n in all_nthreads]
 
     return combos
 
