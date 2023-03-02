@@ -33,8 +33,6 @@ extern "C" {
 
     extern countpairs_mocks_func_ptr_DOUBLE countpairs_bessel_mocks_driver_DOUBLE(const struct config_options *options) __attribute__((warn_unused_result));
 
-    extern void spherical_bessel_legendre_DOUBLE(const polearray *bins, const DOUBLE s, const DOUBLE mu, const DOUBLE mu2, const DOUBLE weight, DOUBLE *poles);
-
     extern int countpairs_mocks_bessel_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE  *Z1,
                                               const int64_t ND2, DOUBLE *X2, DOUBLE *Y2, DOUBLE *Z2,
                                               const int numthreads,

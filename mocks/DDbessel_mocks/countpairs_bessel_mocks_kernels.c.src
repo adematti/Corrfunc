@@ -24,7 +24,7 @@
 #include "weight_functions_DOUBLE.h"
 
 
-inline DOUBLE spherical_bessel(const DOUBLE x, const int ell) {
+static inline DOUBLE spherical_bessel(const DOUBLE x, const int ell) {
 
     DOUBLE absx = ABS(x);
     DOUBLE x2;
@@ -63,7 +63,7 @@ inline DOUBLE spherical_bessel(const DOUBLE x, const int ell) {
 }
 
 
-inline DOUBLE legendre(const DOUBLE x, const int ell) {
+static inline DOUBLE legendre(const DOUBLE x, const int ell) {
 
     DOUBLE x2;
     switch (ell) {
@@ -90,7 +90,7 @@ inline DOUBLE legendre(const DOUBLE x, const int ell) {
 }
 
 
-inline void spherical_bessel_legendre_DOUBLE(const polearray *bins, const DOUBLE s, const DOUBLE mu, const DOUBLE mu2, const DOUBLE weight, DOUBLE *poles) {
+static inline void spherical_bessel_legendre_DOUBLE(const polearray *bins, const DOUBLE s, const DOUBLE mu, const DOUBLE mu2, const DOUBLE weight, DOUBLE *poles) {
 
     const int *ells = bins->ells;
     const int nells = bins->nells;
@@ -109,7 +109,7 @@ inline void spherical_bessel_legendre_DOUBLE(const polearray *bins, const DOUBLE
 }
 
 /*
-inline void spherical_bessel_legendre_DOUBLE(const polearray *bins, const DOUBLE s, const DOUBLE mu, const DOUBLE mu2, const DOUBLE weight, DOUBLE *poles) {
+static inline void spherical_bessel_legendre_DOUBLE(const polearray *bins, const DOUBLE s, const DOUBLE mu, const DOUBLE mu2, const DOUBLE weight, DOUBLE *poles) {
 
     const int *ells = bins->ells;
     const int nells = bins->nells;
