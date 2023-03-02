@@ -34,9 +34,14 @@ typedef enum {
 } isa;  //name for instruction sets -> corresponds to the return values for functions in cpu_features.c
 
 
-static inline void cpuid (int output[4], int functionnumber) {	
-#if defined(__GNUC__) || defined(__clang__)              // use inline assembly, Gnu/AT&T syntax
+static inline void cpuid (int output[4], int functionnumber) {
+#if defined(__clang__)
+   output[0] = 0;
+   output[1] = 0;
+   output[2] = 0;
+   output[3] = 0;
 
+#elif defined(__GNUC__)              // use inline assembly, Gnu/AT&T syntax
    int a, b, c, d;
    __asm("cpuid" : "=a"(a),"=b"(b),"=c"(c),"=d"(d) : "a"(functionnumber),"c"(0) );
    output[0] = a;
@@ -61,14 +66,16 @@ static inline void cpuid (int output[4], int functionnumber) {
 }
 
 // Define interface to xgetbv instruction
-static inline int64_t xgetbv (int ctr) {	
-#if (defined (__INTEL_COMPILER) && __INTEL_COMPILER >= 1200) //Intel compiler supporting _xgetbv intrinsic
-    return _xgetbv(ctr);                                   // intrinsic function for XGETBV
+static inline int64_t xgetbv (int ctr) {
+#if defined(__clang__)
+   return 0;
+#elif (defined (__INTEL_COMPILER) && __INTEL_COMPILER >= 1200) //Intel compiler supporting _xgetbv intrinsic
+   return _xgetbv(ctr);                                   // intrinsic function for XGETBV
 #elif defined(__GNUC__)                                    // use inline assembly, Gnu/AT&T syntax
    uint32_t a, d;
    __asm("xgetbv" : "=a"(a),"=d"(d) : "c"(ctr) : );
    return a | (((uint64_t) d) << 32);
-#else  
+#else
    uint32_t a, d;
     __asm {
         mov ecx, ctr
