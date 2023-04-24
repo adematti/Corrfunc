@@ -196,19 +196,19 @@ def test_brute(autocorr, binref, min_sep_opt, maxcells, boxsize, funcname,
     eps = 0.2  # as a fraction of boxsize
     boxsize = np.array(boxsize)
     if periodic:
-        bins = np.linspace(0.01, 0.49*boxsize.min(), 20)
+        bins = np.linspace(0.01, 0.49 * boxsize.min(), 20)
     else:
         # non-periodic has no upper limit on Rmax
-        bins = np.linspace(0.01, 2*boxsize.max(), 20)
-    pimax = np.floor(0.49*boxsize.min())
+        bins = np.linspace(0.01, 2 * boxsize.max(), 20)
+    pimax = np.floor(0.49 * boxsize.min())
     mu_max = 0.5
     nmu_bins = 11
     func = getattr(Corrfunc.theory, funcname)
 
     # two clouds of width eps*boxsize
     pos = np.random.uniform(low=-eps, high=eps,
-                            size=(npts, 3))*boxsize
-    pos[npts//2:] += boxsize/2.  # second cloud is in center of box
+                            size=(npts, 3)) * boxsize
+    pos[npts // 2:] += boxsize / 2.  # second cloud is in center of box
     pos %= boxsize
 
     # Compute the pairwise distance between particles with broadcasting.
@@ -216,10 +216,10 @@ def test_brute(autocorr, binref, min_sep_opt, maxcells, boxsize, funcname,
     # which is the array of all npts^2 (x,y,z) differences.
     pdiff = pos[:, np.newaxis] - pos
     if periodic:
-        mask = pdiff >= boxsize/2
-        pdiff -= mask*boxsize
-        mask = pdiff <= - boxsize/2
-        pdiff += mask*boxsize
+        mask = pdiff >= boxsize / 2
+        pdiff -= mask * boxsize
+        mask = pdiff <= - boxsize / 2
+        pdiff += mask * boxsize
 
     args = [autocorr, nthreads, bins, pos[:, 0], pos[:, 1], pos[:, 2]]
     kwargs = dict(periodic=periodic, isa=isa, boxsize=boxsize,
@@ -244,7 +244,7 @@ def test_brute(autocorr, binref, min_sep_opt, maxcells, boxsize, funcname,
         sdiff = np.sqrt((pdiff**2).sum(axis=-1).reshape(-1))
         sdiff[sdiff == 0.] = np.inf  # don't divide by 0
         mu = pdiff[:, :, 2].reshape(-1) / sdiff
-        mubins = np.linspace(-mu_max, mu_max, nmu_bins+1)
+        mubins = np.linspace(-mu_max, mu_max, nmu_bins + 1)
         brutecounts, _, _ = np.histogram2d(sdiff, mu,
                                            bins=(bins, mubins))
         brutecounts = brutecounts.reshape(-1)  # corrfunc flattened convention

@@ -15,7 +15,7 @@ from Corrfunc.tests.common import maxthreads
 
 def _allclose(a, b, ravg_name=None):
     toret = True
-    for name in ['npairs','weightavg',ravg_name]:
+    for name in ['npairs', 'weightavg', ravg_name]:
         if name == 'npairs':
             ac = np.all(a[name] == b[name])
         else:
@@ -85,7 +85,7 @@ def linbins():
     return binfile
 
 
-@pytest.mark.parametrize('isa', ['fallback','sse42','avx','avx512f'])
+@pytest.mark.parametrize('isa', ['fallback', 'sse42', 'avx', 'avx512f'])
 def test_linear_binning_mocks_DDrppi(points_mock, linbins, isa, nthreads, autocorr=True, pimax=40.0):
     from Corrfunc.mocks import DDrppi_mocks
     x, y, z, w = points_mock['data']
@@ -97,7 +97,7 @@ def test_linear_binning_mocks_DDrppi(points_mock, linbins, isa, nthreads, autoco
                     isa=isa, ravg_name='rpavg')
 
 
-@pytest.mark.parametrize('isa', ['fallback','sse42','avx','avx512f'])
+@pytest.mark.parametrize('isa', ['fallback', 'sse42', 'avx', 'avx512f'])
 def test_linear_binning_mocks_DDsmu(points_mock, linbins, isa, nthreads, autocorr=True, periodic=True, nmu_bins=11, mu_max=1.0):
     from Corrfunc.mocks import DDsmu_mocks
     x, y, z, w = points_mock['data']
@@ -109,7 +109,7 @@ def test_linear_binning_mocks_DDsmu(points_mock, linbins, isa, nthreads, autocor
                     isa=isa, ravg_name='savg')
 
 
-@pytest.mark.parametrize('isa', ['fallback','sse42','avx','avx512f'])
+@pytest.mark.parametrize('isa', ['fallback', 'sse42', 'avx', 'avx512f'])
 def test_linear_binning_mocks_DDtheta(points_mock_rdcz, linbins, isa, nthreads, autocorr=True):
     from Corrfunc.mocks import DDtheta_mocks
     ra, dec, cz, w = points_mock_rdcz['data']
@@ -121,7 +121,7 @@ def test_linear_binning_mocks_DDtheta(points_mock_rdcz, linbins, isa, nthreads, 
                     verbose=True, isa=isa, ravg_name='thetaavg')
 
 
-@pytest.mark.parametrize('isa', ['fallback','sse42','avx','avx512f'])
+@pytest.mark.parametrize('isa', ['fallback', 'sse42', 'avx', 'avx512f'])
 def test_linear_binning_theory_DD(points, linbins, isa, nthreads, autocorr=True, periodic=True):
     from Corrfunc.theory import DD
     x, y, z, w = points['data']
@@ -132,7 +132,7 @@ def test_linear_binning_theory_DD(points, linbins, isa, nthreads, autocorr=True,
                     output_ravg=True, ravg_name='ravg')
 
 
-@pytest.mark.parametrize('isa', ['fallback','sse42','avx','avx512f'])
+@pytest.mark.parametrize('isa', ['fallback', 'sse42', 'avx', 'avx512f'])
 def test_linear_binning_theory_DDrppi(points, linbins, isa, nthreads, autocorr=True, periodic=True, pimax=40.):
     from Corrfunc.theory import DDrppi
     x, y, z, w = points['data']
@@ -145,7 +145,7 @@ def test_linear_binning_theory_DDrppi(points, linbins, isa, nthreads, autocorr=T
                     output_rpavg=True, ravg_name='rpavg')
 
 
-@pytest.mark.parametrize('isa', ['fallback','sse42','avx','avx512f'])
+@pytest.mark.parametrize('isa', ['fallback', 'sse42', 'avx', 'avx512f'])
 def test_linear_binning_theory_DDsmu(points, linbins, isa, nthreads, autocorr=True, periodic=True,
                                       mu_max=0.5, nmu_bins=11):
     from Corrfunc.theory import DDsmu
@@ -160,7 +160,7 @@ def test_linear_binning_theory_DDsmu(points, linbins, isa, nthreads, autocorr=Tr
                     ravg_name='savg')
 
 
-@pytest.mark.parametrize('isa', ['fallback','sse42','avx','avx512f'])
+@pytest.mark.parametrize('isa', ['fallback', 'sse42', 'avx', 'avx512f'])
 def test_linear_binning_theory_wp(points, linbins, isa, nthreads, autocorr=True, periodic=True, pimax=40.):
     from Corrfunc.theory import wp
     x, y, z, w = points['data']
@@ -172,7 +172,7 @@ def test_linear_binning_theory_wp(points, linbins, isa, nthreads, autocorr=True,
                     output_rpavg=True, ravg_name='rpavg')
 
 
-@pytest.mark.parametrize('isa', ['fallback','sse42','avx','avx512f'])
+@pytest.mark.parametrize('isa', ['fallback', 'sse42', 'avx', 'avx512f'])
 def test_linear_binning_theory_xi(points, linbins, isa, nthreads, autocorr=True, periodic=True):
     from Corrfunc.theory import xi
     x, y, z, w = points['data']
