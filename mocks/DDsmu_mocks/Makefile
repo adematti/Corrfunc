@@ -5,7 +5,7 @@ INSTALL_BIN_DIR := $(ROOT_DIR)/bin
 UTILS_DIR := $(ROOT_DIR)/utils
 IO_DIR := $(ROOT_DIR)/io
 
-GSL_REQUIRED := true
+GSL_REQUIRED := false
 include $(ROOT_DIR)/mocks.options $(ROOT_DIR)/common.mk
 
 LIBNAME := countpairs_s_mu_mocks
@@ -28,9 +28,9 @@ INCL     := countpairs_s_mu_mocks_kernels_float.c countpairs_s_mu_mocks_kernels_
             $(UTILS_DIR)/cellarray_mocks_float.h $(UTILS_DIR)/cellarray_mocks_double.h $(UTILS_DIR)/cellarray_mocks.h.src \
             $(UTILS_DIR)/cell_pair_float.h $(UTILS_DIR)/cell_pair_double.h $(UTILS_DIR)/cell_pair.h.src \
             $(UTILS_DIR)/progressbar.h $(UTILS_DIR)/cpu_features.h \
-	    $(UTILS_DIR)/utils.h $(UTILS_DIR)/function_precision.h $(UTILS_DIR)/avx512_calls.h $(UTILS_DIR)/avx_calls.h $(UTILS_DIR)/defs.h \
+	        $(UTILS_DIR)/utils.h $(UTILS_DIR)/function_precision.h $(UTILS_DIR)/avx512_calls.h $(UTILS_DIR)/avx_calls.h $(UTILS_DIR)/defs.h \
             $(UTILS_DIR)/weight_functions_double.h $(UTILS_DIR)/weight_functions_float.h $(UTILS_DIR)/weight_functions.h.src \
-	    $(UTILS_DIR)/weight_defs_double.h $(UTILS_DIR)/weight_defs_float.h $(UTILS_DIR)/weight_defs.h.src
+	        $(UTILS_DIR)/weight_defs_double.h $(UTILS_DIR)/weight_defs_float.h $(UTILS_DIR)/weight_defs.h.src
 
 TARGETOBJS:=$(TARGETSRC:.c=.o)
 LIBOBJS:=$(LIBSRC:.c=.o)

@@ -261,7 +261,7 @@ int main(int argc, char *argv[])
         const double log_supp = LOG10(results.supp[i]);
         for(int j=0;j<nmubin;j++) {
             const int index = i*(nmubin+1) + j;
-            fprintf(stdout,"%10"PRIu64" %20.8lf %20.8lf  %20.8lf %20.8lf \n",results.npairs[index],results.savg[index],log_supp,(j+1)*dmu-mu_max, results.weightavg[index]);
+            fprintf(stdout,"%10"PRIu64" %20.8lf %20.8lf  %20.8lf %20.8lf \n",results.npairs[index],results.savg[index],log_supp,(j+1)*dmu-mu_max,results.weightavg[index]);
         }
     }
 

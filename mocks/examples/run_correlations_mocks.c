@@ -26,7 +26,6 @@
 /* Library proto-types + struct definitions in the ../..//include directory */
 #include "countpairs_rp_pi_mocks.h"
 #include "countpairs_s_mu_mocks.h"
-#include "countpairs_theta_mocks.h"
 #include "countspheres_mocks.h"
 
 #ifndef MAXLEN
@@ -38,8 +37,8 @@ void Printhelp(void);
 void Printhelp(void)
 {
     fprintf(stderr,ANSI_COLOR_RED "=========================================================================\n") ;
-    fprintf(stderr,"   --- run_correlations_mocks file format binfile boxsize Nthreads \n") ;
-    fprintf(stderr,"   --- Measure the auto-correlation functions DD(r), DD(rp, pi) and wp(rp) for a single file\n");
+    fprintf(stderr,"   --- run_correlations_mocks file format binfile boxsize numthreads\n") ;
+    fprintf(stderr,"   --- Measure the auto-correlation functions DD(r), DD(rp,pi) and vpf(r) for a single file\n");
     fprintf(stderr,"     * file         = name of data file\n") ;
     fprintf(stderr,"     * format       = format of data file  (a=ascii, f=fast-food)\n") ;
     fprintf(stderr,"     * binfile      = name of ascii file containing the r-bins (rmin rmax for each bin)\n") ;
@@ -57,21 +56,21 @@ int main(int argc, char **argv)
     char file[MAXLEN];
     char fileformat[MAXLEN];
     char binfile[MAXLEN];
-    DOUBLE *ra1=NULL,*dec1=NULL,*cz1=NULL;
+    DOUBLE *X1=NULL,*Y1=NULL,*Z1=NULL;
     struct timeval t0,t1;
     DOUBLE pimax;
-    int nthreads=4;
     int nmu_bins;
     DOUBLE mu_max;
+    int nthreads=4;
 
     struct config_options options = get_config_options();
     options.verbose=1;
     options.periodic=0;
     options.need_avg_sep=1;
-    options.float_type = sizeof(*ra1);
+    options.float_type = sizeof(*X1);
 
 #if defined(_OPENMP)
-    const char argnames[][30]={"file", "format", "binfile", "pimax", "mu_max", "nmu_bins", "Nthreads"};
+    const char argnames[][30]={"file", "format", "binfile", "pimax", "mu_max", "nmu_bins", "numthreads"};
 #else
     const char argnames[][30]={"file", "format", "binfile", "pimax", "mu_max", "nmu_bins"};
 #endif
@@ -96,7 +95,7 @@ int main(int argc, char **argv)
 #endif
         }
     } else {
-        my_snprintf(file, MAXLEN, "%s", "../tests/data/Mr19_mock_northonly.rdcz.txt");
+        my_snprintf(file, MAXLEN, "%s", "../tests/data/Mr19_mock_northonly.xyz.txt");
         my_snprintf(fileformat, MAXLEN, "%s","a");
         my_snprintf(binfile, MAXLEN,"%s","../tests/bins");
         pimax=40.0;
@@ -121,12 +120,12 @@ int main(int argc, char **argv)
     read_binfile(binfile, &bins);
 
     //Read-in the data
-    const int64_t ND1 = read_positions(file,fileformat,sizeof(*ra1),3, &ra1, &dec1, &cz1);
+    const int64_t ND1 = read_positions(file,fileformat,sizeof(*X1),3, &X1, &Y1, &Z1);
 
     int autocorr=1;
-    DOUBLE *ra2 = ra1;
-    DOUBLE *dec2 = dec1;
-    DOUBLE *cz2 = cz1;
+    DOUBLE *X2 = X1;
+    DOUBLE *Y2 = Y1;
+    DOUBLE *Z2 = Z1;
     int64_t ND2 = ND1;
 
     //Do the DD(rp, pi) counts
@@ -141,8 +140,8 @@ int main(int argc, char **argv)
 #endif
 
         results_countpairs_mocks results;
-        int status = countpairs_mocks(ND1,ra1,dec1,cz1,
-                                      ND2,ra2,dec2,cz2,
+        int status = countpairs_mocks(ND1,X1,Y1,Z1,
+                                      ND2,X2,Y2,Z2,
                                       nthreads,
                                       autocorr,
                                       &bins,
@@ -188,8 +187,8 @@ int main(int argc, char **argv)
 #endif
 
         results_countpairs_mocks_s_mu results;
-        int status = countpairs_mocks_s_mu(ND1,ra1,dec1,cz1,
-                                           ND2,ra2,dec2,cz2,
+        int status = countpairs_mocks_s_mu(ND1,X1,Y1,Z1,
+                                           ND2,X2,Y2,Z2,
                                            nthreads,
                                            autocorr,
                                            &bins,
@@ -221,48 +220,6 @@ int main(int argc, char **argv)
         free_results_mocks_s_mu(&results);
     }
 
-
-    //Do the DD(theta) counts
-    {
-        gettimeofday(&t0,NULL);
-#if defined(_OPENMP)
-        fprintf(stderr,ANSI_COLOR_MAGENTA "Command-line for running equivalent w(theta) calculation would be:\n `%s %s %s %s %s %s %d'" ANSI_COLOR_RESET "\n",
-                "../DDtheta_mocks/DDtheta_mocks",file,fileformat,file,fileformat,binfile,nthreads);
-#else
-        fprintf(stderr,ANSI_COLOR_MAGENTA "Command-line for running equivalent w(theta) calculation would be:\n `%s %s %s %s %s %s '" ANSI_COLOR_RESET "\n",
-                "../DDtheta_mocks/DDtheta_mocks",file,fileformat,file,fileformat,binfile);
-#endif
-
-        results_countpairs_theta results;
-        options.fast_acos=1;//over-ride Makefile option
-        int status = countpairs_theta_mocks(ND1,ra1,dec1,
-                                            ND2,ra2,dec2,
-                                            nthreads,
-                                            autocorr,
-                                            &bins,
-                                            &results,
-                                            &options, NULL);
-        if(status != EXIT_SUCCESS) {
-            return status;
-        }
-        gettimeofday(&t1,NULL);
-        DOUBLE pair_time = ADD_DIFF_TIME(t0,t1);
-
-#if 0
-        /*---Output-Pairs-------------------------------------*/
-        DOUBLE theta_low = results.theta_upp[0];
-        for(int i=1;i<results.nbin;i++) {
-            fprintf(stdout,"%10"PRIu64" %20.8lf %20.8lf %20.8lf \n",results.npairs[i],results.theta_avg[i],theta_low,results.theta_upp[i]);
-            theta_low=results.theta_upp[i];
-        }
-#endif
-        fprintf(stderr,ANSI_COLOR_GREEN "Done wtheta. Ngalaxies = %12"PRId64" Time taken = %8.2lf seconds" ANSI_COLOR_RESET "\n", ND1, pair_time);
-
-        //free the result structure
-        free_results_countpairs_theta(&results);
-    }
-
-
     //Do the VPF
     {
         gettimeofday(&t0,NULL);
@@ -279,7 +236,7 @@ int main(int argc, char **argv)
                 "../vpf_mocks/vpf_mocks",rmax,nbin,nc,num_pN,0.0,file,fileformat,"junk","junkformat",centers_file);
 
         results_countspheres_mocks results;
-        int status = countspheres_mocks(ND1, ra1, dec1, cz1,
+        int status = countspheres_mocks(ND1, X1, Y1, Z1,
                                         Nran, xran, yran, zran,
                                         threshold_neighbors,
                                         rmax, nbin, nc,
@@ -313,7 +270,7 @@ int main(int argc, char **argv)
 
 
 
-    free(ra1);free(dec1);free(cz1);
+    free(X1);free(Y1);free(Z1);
     free_binarray(&bins);
     return EXIT_SUCCESS;
 }
