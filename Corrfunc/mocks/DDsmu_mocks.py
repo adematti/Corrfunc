@@ -23,7 +23,7 @@ def DDsmu_mocks(autocorr, nthreads, binfile, mumax, nmubins,
                 copy_particles=True, enable_min_sep_opt=True,
                 c_api_timer=False, isa='fastest',
                 weight_type=None, bin_type='custom', los_type='midpoint',
-                pair_weights=None, sep_pair_weights=None, attrs_pair_weights=None):
+                pair_weights=None, sep_pair_weights=None, attrs_pair_weights=None, attrs_selection=None):
     """
     Calculate the 2-D pair-counts corresponding to the redshift-space correlation
     function, :math:`\\xi(s, \\mu)`. The pairs are counted in bins of
@@ -208,6 +208,11 @@ def DDsmu_mocks(autocorr, nthreads, binfile, mumax, nmubins,
         the tuple of (offset to be added to the bitwise counts,
         default weight value if denominator is zero).
 
+    attrs_selection : dict. Default=None.
+        To select pairs to be counted, provide mapping between the quantity (str)
+        and the interval (tuple of floats),
+        e.g. ``{'rp': (0., 20.)}`` to select pairs with 'rp' between 0 and 20.
+
     Returns
     -------
     results : Numpy structured array
@@ -279,7 +284,7 @@ def DDsmu_mocks(autocorr, nthreads, binfile, mumax, nmubins,
     # Passing None parameters breaks the parsing code, so avoid this
     kwargs = {}
     for k in ['weights1', 'weights2', 'weight_type', 'X2', 'Y2', 'Z2',
-              'pair_weights', 'sep_pair_weights', 'attrs_pair_weights']:
+              'pair_weights', 'sep_pair_weights', 'attrs_pair_weights', 'attrs_selection']:
         v = locals()[k]
         if v is not None:
             kwargs[k] = v

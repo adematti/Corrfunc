@@ -98,7 +98,8 @@ static inline void spherical_bessel_legendre_DOUBLE(const polearray *bins, const
 
     for (int ill=0; ill<nells; ill++) {
         const int ell = ells[ill];
-        DOUBLE leg = legendre(mu, ell);
+        DOUBLE leg = 0.;
+        if (mu > -1.1) leg += legendre(mu, ell);
         if (mu2 > -1.1) leg += legendre(mu2, ell);
         leg *= weight * (2*ell + 1);
         for (int imode=0; imode<bins->nedges; imode++) {
@@ -143,7 +144,7 @@ static inline int countpairs_mocks_bessel_fallback_DOUBLE(const int64_t N0, DOUB
                                                           const DOUBLE min_xdiff, const DOUBLE min_ydiff, const DOUBLE min_zdiff,
                                                           const DOUBLE closest_icell_xpos, const DOUBLE closest_icell_ypos, const DOUBLE closest_icell_zpos,
                                                           DOUBLE *poles, const weight_method_t weight_method, const pair_weight_struct pair_weight,
-                                                          const los_type_t los_type, const int autocorr)
+                                                          const selection_struct selection, const los_type_t los_type, const int autocorr)
 {
     /*----------------- FALLBACK CODE --------------------*/
     /* implementation that is guaranteed to compile */
@@ -275,36 +276,50 @@ static inline int countpairs_mocks_bessel_fallback_DOUBLE(const int64_t N0, DOUB
             const DOUBLE sqr_s = perpx*perpx + perpy*perpy + perpz*perpz;
 
             DOUBLE s = ZERO;
-            DOUBLE mu = ZERO, mu2 = -2.;
+            DOUBLE mu = -2., mu2 = -2.;
             if (sqr_s <= 0.) {
+                mu = ZERO;
                 if (autocorr == 1) mu2 = ZERO;
+                if((selection.selection_type & RP_SELECTION) && ((0. < selection.rpmin_sqr) || (0. >= selection.rpmax_sqr))) continue;
             }
             else if (los_type == MIDPOINT_LOS) {
                 const DOUBLE s_dot_l = parx*perpx + pary*perpy + parz*perpz;
                 const DOUBLE sqr_l = parx*parx + pary*pary + parz*parz;
-                const DOUBLE sqr_mu = s_dot_l * s_dot_l/(sqr_l * sqr_s);
+                const DOUBLE sqr_mu = s_dot_l * s_dot_l / (sqr_l * sqr_s);
                 if (sqr_mu >= sqr_mumax) continue;
+                if (selection.selection_type & RP_SELECTION) {
+                    const DOUBLE sqr_rp = (1. - sqr_mu) * sqr_s;
+                    if ((sqr_rp < selection.rpmin_sqr) || (sqr_rp >= selection.rpmax_sqr)) continue;
+                }
                 mu = SIGNED(SQRT(sqr_mu), s_dot_l);
                 if (autocorr == 1) mu2 = -mu;
                 s = SQRT(sqr_s);
             }
             else {
                 const DOUBLE s_dot_l = xhat0*perpx + yhat0*perpy + zhat0*perpz;
-                const DOUBLE sqr_mu = s_dot_l * s_dot_l/sqr_s;
+                const DOUBLE sqr_mu = s_dot_l * s_dot_l / sqr_s;
+                int skip_mu = (sqr_mu >= sqr_mumax);
+                if (selection.selection_type & RP_SELECTION) {
+                    const DOUBLE sqr_rp = (1. - sqr_mu) * sqr_s;
+                    if ((sqr_rp < selection.rpmin_sqr) || (sqr_rp >= selection.rpmax_sqr)) skip_mu = 1;
+                }
                 if (autocorr == 1) {
                     const DOUBLE s_dot_l2 = xhat1[localj]*perpx + yhat1[localj]*perpy + zhat1[localj]*perpz;
-                    const DOUBLE sqr_mu2 = s_dot_l2 * s_dot_l2/sqr_s;
-                    const int skip_mu = (sqr_mu >= sqr_mumax);
-                    const int skip_mu2 = (sqr_mu2 >= sqr_mumax);
+                    const DOUBLE sqr_mu2 = s_dot_l2 * s_dot_l2 / sqr_s;
+                    int skip_mu2 = (sqr_mu2 >= sqr_mumax);
+                    if (selection.selection_type & RP_SELECTION) {
+                        const DOUBLE sqr_rp = (1. - sqr_mu2) * sqr_s;
+                        if ((sqr_rp < selection.rpmin_sqr) || (sqr_rp >= selection.rpmax_sqr)) skip_mu2 = 1;
+                    }
                     if (skip_mu && skip_mu2) continue;
                     s = SQRT(sqr_s);
-                    mu = s_dot_l/s;
-                    mu2 = - s_dot_l2/s;
+                    if (!skip_mu) mu = s_dot_l / s;
+                    if (!skip_mu2) mu2 = - s_dot_l2 / s;
                 }
                 else {
-                    if (sqr_mu >= sqr_mumax) continue;
+                    if (skip_mu) continue;
                     s = SQRT(sqr_s);
-                    mu = s_dot_l/s;
+                    mu = s_dot_l / s;
                 }
             }
             DOUBLE pairweight = 1.0;

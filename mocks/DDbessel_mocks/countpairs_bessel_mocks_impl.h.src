@@ -29,7 +29,7 @@ extern "C" {
                                                     const DOUBLE min_xdiff, const DOUBLE min_ydiff, const DOUBLE min_zdiff,
                                                     const DOUBLE closest_icell_xpos, const DOUBLE closest_icell_ypos, const DOUBLE closest_icell_zpos,
                                                     DOUBLE *poles, const weight_method_t weight_method, const pair_weight_struct pair_weight,
-                                                    const los_type_t los_type, const int autocorr);
+                                                    const selection_struct selection, const los_type_t los_type, const int autocorr);
 
     extern countpairs_mocks_func_ptr_DOUBLE countpairs_bessel_mocks_driver_DOUBLE(const struct config_options *options) __attribute__((warn_unused_result));
 

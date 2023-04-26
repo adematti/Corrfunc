@@ -49,9 +49,22 @@ struct api_cell_timings
 #define MAX_FAST_DIVIDE_NR_STEPS  3
 #define OPTIONS_HEADER_SIZE     1024
 #define BOXSIZE_NOTGIVEN (-2.)
+#define RP_SQR_NOTGIVEN (-2.)
 
 typedef enum {BIN_AUTO, BIN_LIN, BIN_CUSTOM} bin_type_t; // type of weighting to apply
 typedef enum {MIDPOINT_LOS, FIRSTPOINT_LOS} los_type_t;
+typedef enum {
+    NONE_SELECTION=0,
+    RP_SELECTION=1
+} selection_type_t;
+
+
+typedef struct {
+    selection_type_t selection_type;
+    double rpmin_sqr;
+    double rpmax_sqr;
+} selection_struct;
+
 
 struct config_options
 {
@@ -70,6 +83,7 @@ struct config_options
     };
     double boxsize_y;
     double boxsize_z;
+    selection_struct selection;
 
     /* Measures the time spent in the C API while accessed from python.
        Enabled when the flag c_timer is set
@@ -137,9 +151,10 @@ struct config_options
     };
     bin_type_t bin_type; /* binning type, allow significant speed-up with higher number of linear bins */
     los_type_t los_type; /* line-of-sight type */
+    //selection_struct selection;
 
     /* Reserving to maintain ABI compatibility for the future */
-    uint8_t reserved[OPTIONS_HEADER_SIZE - 33*sizeof(char) - sizeof(size_t) - 4*sizeof(double) - 3*sizeof(int)
+    uint8_t reserved[OPTIONS_HEADER_SIZE - 33*sizeof(char) - sizeof(size_t) - 4*sizeof(double) - 3*sizeof(int) - sizeof(selection_struct)
                      - sizeof(uint16_t) - 16*sizeof(uint8_t) - sizeof(bin_type_t) - sizeof(los_type_t) - sizeof(struct api_cell_timings *) - sizeof(int64_t)
                      ];
 };
@@ -198,10 +213,17 @@ static inline void reset_bin_refine_factors(struct config_options *options)
 }
 
 
+static inline int set_selection_struct(selection_struct* selection_st, selection_type_t selection_type, const double rpmin, const double rpmax) {
+    selection_st->selection_type = selection_type;
+    selection_st->rpmin_sqr = rpmin * rpmin;
+    selection_st->rpmax_sqr = rpmax * rpmax;
+    return EXIT_SUCCESS;
+}
+
 
 static inline void set_max_cells(struct config_options *options, const int max)
 {
-    if(max <=0) {
+    if(max <= 0) {
         fprintf(stderr,"Warning: Max. cells per dimension was requested to be set to "
                 "a negative number = %d...returning\n", max);
         return;
@@ -306,7 +328,7 @@ static inline struct config_options get_config_options(void)
 #endif
 
 #ifdef FAST_ACOS
-    options.fast_acos=1;
+    options.fast_acos = 1;
 #endif
 
 #ifdef COPY_PARTICLES
@@ -330,6 +352,8 @@ static inline struct config_options get_config_options(void)
     /*Setup the binning options */
     reset_max_cells(&options);
     reset_bin_refine_factors(&options);
+    set_selection_struct(&(options.selection), NONE_SELECTION, 0, 0);
+
     return options;
 }
 
@@ -371,8 +395,6 @@ typedef enum {
   NUM_WEIGHT_TYPE
 } weight_method_t; // type of weighting to apply
 
-/* Gives the number of weight arrays required by the given weighting method
-*/
 
 static inline void copy_weight_struct(weight_struct *weight_st0, const weight_struct *weight_st1) {
     weight_st0->num_weights = weight_st1->num_weights;
@@ -531,7 +553,7 @@ static inline int set_polearray(polearray *bins, double* edges, int nedges, int*
     }
     for (int ii=0; ii<bins->nedges; ii++) {
         bins->edges[ii] = edges[ii];
-        if (ii > 0 && bins->edges[ii] < bins->edges[ii-1]) {
+        if ((ii > 0) && (bins->edges[ii] < bins->edges[ii-1])) {
             fprintf(stderr,"input bins must be sorted\n");
             return EXIT_FAILURE;
         }
@@ -608,6 +630,7 @@ static inline struct extra_options get_extra_options(const weight_method_t weigh
     set_weight_struct(&(extra.weights0), weight_method, NULL, -1);
     set_weight_struct(&(extra.weights1), weight_method, NULL, -1);
     set_pair_weight_struct(&(extra.pair_weight), NULL, NULL, 0, 1, 0.);
+    //set_selection_struct(&(extra.selection), NONE_SELECTION, -1., -1.);
 
     return extra;
 }

@@ -948,19 +948,19 @@ finally:
 }
 
 
-static int check_pair_weight(PyObject *module, pair_weight_struct *pair_weight_st, PyObject *sep_obj, PyObject *weight_obj, size_t element_size, PyObject *weight_attrs)
+static int check_pair_weight(PyObject *module, pair_weight_struct *pair_weight_st, PyObject *sep_obj, PyObject *weight_obj, size_t element_size, PyObject *attrs_pair_weight_obj)
 {
     int status = EXIT_SUCCESS;
     char msg[1024];
     pair_weight_st->noffset = 1;
     pair_weight_st->default_value = 0.;
-    if (weight_attrs != NULL) {
-        if (!PySequence_Check(weight_attrs)) {
+    if (attrs_pair_weight_obj != NULL) {
+        if (!PySequence_Check(attrs_pair_weight_obj)) {
             snprintf(msg, 1024, "Please input tuple/list of weight attributes");
             return EXIT_FAILURE;
         }
-        pair_weight_st->noffset = PyLong_AsLong(PySequence_Fast_GET_ITEM(weight_attrs,0));
-        pair_weight_st->default_value = PyFloat_AsDouble(PySequence_Fast_GET_ITEM(weight_attrs,1));
+        pair_weight_st->noffset = PyLong_AsLong(PySequence_Fast_GET_ITEM(attrs_pair_weight_obj,0));
+        pair_weight_st->default_value = PyFloat_AsDouble(PySequence_Fast_GET_ITEM(attrs_pair_weight_obj,1));
         if (PyErr_Occurred() != NULL) {
           snprintf(msg, 1024, "Please provide tuple of integers (noffset, default_value) as weight attributes");
           return EXIT_FAILURE;
@@ -1015,6 +1015,36 @@ except:
 finally:
     Py_XDECREF(sep);
     Py_XDECREF(weight);
+    return status;
+}
+
+
+static int check_selection(PyObject *module, selection_struct *selection_st, PyObject *attrs_selection_obj)
+{
+    int status = EXIT_SUCCESS;
+    char msg[1024];
+    if (attrs_selection_obj != NULL) {
+        if (!PyDict_Check(attrs_selection_obj)) {
+            snprintf(msg, 1024, "Please input dict of name: limits (tuple)");
+            return EXIT_FAILURE;
+        }
+        PyObject *key, *value;
+        Py_ssize_t pos = 0;
+        while (PyDict_Next(attrs_selection_obj, &pos, &key, &value)) {
+            if (PyUnicode_CompareWithASCIIString(key, "rp") == 0) {
+                set_selection_struct(selection_st, RP_SELECTION, PyFloat_AsDouble(PySequence_Fast_GET_ITEM(value, 0)), PyFloat_AsDouble(PySequence_Fast_GET_ITEM(value, 1)));
+            }
+            else {
+                snprintf(msg, 1024, "ERROR: Found unknown key in attrs_selection_obj\n");
+                goto except;
+            }
+        }
+    }
+    goto finally;
+except:
+    countpairs_mocks_error_out(module, msg);
+    return EXIT_FAILURE;
+finally:
     return status;
 }
 
@@ -1204,7 +1234,7 @@ static PyObject *countpairs_countpairs_bessel_mocks(PyObject *self, PyObject *ar
     double rmax=0.0;
     double mumax=1.0;
     char *weighting_method_str = NULL;
-    PyObject *pair_weight_obj=NULL, *sep_pair_weight_obj=NULL, *attrs_pair_weight=NULL;
+    PyObject *pair_weight_obj=NULL, *sep_pair_weight_obj=NULL, *attrs_pair_weight_obj=NULL, *attrs_selection_obj=NULL;
 
     static char *kwlist[] = {
         "autocorr",
@@ -1235,11 +1265,12 @@ static PyObject *countpairs_countpairs_bessel_mocks(PyObject *self, PyObject *ar
         "pair_weights",
         "sep_pair_weights",
         "attrs_pair_weights",
+        "attrs_selection",
         "los_type",
         NULL
     };
 
-    if ( ! PyArg_ParseTupleAndKeywords(args, kwargs, "iiO!O!dddO!O!O!|OO!O!O!ObbbbhbbbisO!O!OI", kwlist,
+    if ( ! PyArg_ParseTupleAndKeywords(args, kwargs, "iiO!O!dddO!O!O!|OO!O!O!ObbbbhbbbisO!O!OOI", kwlist,
                                        &autocorr,&nthreads,
                                        &PyArray_Type,&bins_obj,
                                        &PyArray_Type,&ells_obj,
@@ -1262,7 +1293,8 @@ static PyObject *countpairs_countpairs_bessel_mocks(PyObject *self, PyObject *ar
                                        &weighting_method_str,
                                        &PyArray_Type,&pair_weight_obj,
                                        &PyArray_Type,&sep_pair_weight_obj,
-                                       &attrs_pair_weight,
+                                       &attrs_pair_weight_obj,
+                                       &attrs_selection_obj,
                                        &(options.los_type))
 
          ) {
@@ -1396,12 +1428,12 @@ static PyObject *countpairs_countpairs_bessel_mocks(PyObject *self, PyObject *ar
 
         if (weights2_obj != NULL) wstatus = check_weights(module, weights2_obj, &(extra.weights1), extra.weight_method, ND2, element_size);
     }
-    wstatus = check_pair_weight(module, &(extra.pair_weight), sep_pair_weight_obj, pair_weight_obj, element_size, attrs_pair_weight);
+    wstatus = check_pair_weight(module, &(extra.pair_weight), sep_pair_weight_obj, pair_weight_obj, element_size, attrs_pair_weight_obj);
 
     if(wstatus != EXIT_SUCCESS) {
         Py_RETURN_NONE;
     }
-    if (extra.weights0.num_weights < extra.weights0.num_integer_weights+3) {
+    if (extra.weights0.num_weights < extra.weights0.num_integer_weights + 3) {
         char msg[1024];
         snprintf(msg, 1024, "TypeError: In %s: found %d < %d + 3 weights; pass positions arrays as weights", __FUNCTION__, extra.weights0.num_weights, extra.weights0.num_integer_weights);
         countpairs_mocks_error_out(module, msg);
@@ -1411,6 +1443,12 @@ static PyObject *countpairs_countpairs_bessel_mocks(PyObject *self, PyObject *ar
     if (input_weighting_method == NONE) {
         extra.weights0.num_weights = 3;
         if (autocorr == 0) extra.weights1.num_weights = 3;
+    }
+
+    wstatus = check_selection(module, &(options.selection), attrs_selection_obj);
+
+    if(wstatus != EXIT_SUCCESS) {
+        Py_RETURN_NONE;
     }
 
     polearray bins;
@@ -1512,7 +1550,7 @@ static PyObject *countpairs_countpairs_rp_pi_mocks(PyObject *self, PyObject *arg
     double pimax;
     int npibins;
     char *weighting_method_str = NULL;
-    PyObject *pair_weight_obj=NULL, *sep_pair_weight_obj=NULL, *attrs_pair_weight=NULL;
+    PyObject *pair_weight_obj=NULL, *sep_pair_weight_obj=NULL, *attrs_pair_weight_obj=NULL;
 
     static char *kwlist[] = {
         "autocorr",
@@ -1572,7 +1610,7 @@ static PyObject *countpairs_countpairs_rp_pi_mocks(PyObject *self, PyObject *arg
                                        &weighting_method_str,
                                        &PyArray_Type,&pair_weight_obj,
                                        &PyArray_Type,&sep_pair_weight_obj,
-                                       &attrs_pair_weight,
+                                       &attrs_pair_weight_obj,
                                        &(options.bin_type),
                                        &(options.los_type))
          ) {
@@ -1709,7 +1747,7 @@ static PyObject *countpairs_countpairs_rp_pi_mocks(PyObject *self, PyObject *arg
 
         if (weights2_obj != NULL) wstatus = check_weights(module, weights2_obj, &(extra.weights1), extra.weight_method, ND2, element_size);
     }
-    wstatus = check_pair_weight(module, &(extra.pair_weight), sep_pair_weight_obj, pair_weight_obj, element_size, attrs_pair_weight);
+    wstatus = check_pair_weight(module, &(extra.pair_weight), sep_pair_weight_obj, pair_weight_obj, element_size, attrs_pair_weight_obj);
 
     if(wstatus != EXIT_SUCCESS) {
         Py_RETURN_NONE;
@@ -1811,7 +1849,7 @@ static PyObject *countpairs_countpairs_s_mu_mocks(PyObject *self, PyObject *args
     int nmu_bins=10;
     double mu_max=1.0;
     char *weighting_method_str = NULL;
-    PyObject *pair_weight_obj=NULL, *sep_pair_weight_obj=NULL, *attrs_pair_weight=NULL;
+    PyObject *pair_weight_obj=NULL, *sep_pair_weight_obj=NULL, *attrs_pair_weight_obj=NULL, *attrs_selection_obj=NULL;
 
     static char *kwlist[] = {
         "autocorr",
@@ -1842,12 +1880,13 @@ static PyObject *countpairs_countpairs_s_mu_mocks(PyObject *self, PyObject *args
         "pair_weights",
         "sep_pair_weights",
         "attrs_pair_weights",
+        "attrs_selection",
         "bin_type",
         "los_type",
         NULL
     };
 
-    if ( ! PyArg_ParseTupleAndKeywords(args, kwargs, "iiO!diO!O!O!|OO!O!O!ObbbbbbhbbbisO!O!OII", kwlist,
+    if ( ! PyArg_ParseTupleAndKeywords(args, kwargs, "iiO!diO!O!O!|OO!O!O!ObbbbbbhbbbisO!O!OOII", kwlist,
                                        &autocorr,&nthreads,
                                        &PyArray_Type,&bins_obj,
                                        &mu_max,&nmu_bins,
@@ -1871,7 +1910,8 @@ static PyObject *countpairs_countpairs_s_mu_mocks(PyObject *self, PyObject *args
                                        &weighting_method_str,
                                        &PyArray_Type,&pair_weight_obj,
                                        &PyArray_Type,&sep_pair_weight_obj,
-                                       &attrs_pair_weight,
+                                       &attrs_pair_weight_obj,
+                                       &attrs_selection_obj,
                                        &(options.bin_type),
                                        &(options.los_type))
 
@@ -2009,11 +2049,18 @@ static PyObject *countpairs_countpairs_s_mu_mocks(PyObject *self, PyObject *args
 
         if (weights2_obj != NULL) wstatus = check_weights(module, weights2_obj, &(extra.weights1), extra.weight_method, ND2, element_size);
     }
-    wstatus = check_pair_weight(module, &(extra.pair_weight), sep_pair_weight_obj, pair_weight_obj, element_size, attrs_pair_weight);
+    wstatus = check_pair_weight(module, &(extra.pair_weight), sep_pair_weight_obj, pair_weight_obj, element_size, attrs_pair_weight_obj);
 
     if(wstatus != EXIT_SUCCESS) {
         Py_RETURN_NONE;
     }
+
+    wstatus = check_selection(module, &(options.selection), attrs_selection_obj);
+
+    if(wstatus != EXIT_SUCCESS) {
+        Py_RETURN_NONE;
+    }
+
     binarray bins;
     wstatus = check_binarray(module, &bins, bins_obj);
 
@@ -2094,7 +2141,7 @@ static PyObject *countpairs_countpairs_theta_mocks(PyObject *self, PyObject *arg
 
     int nthreads=1;
     char *weighting_method_str = NULL;;
-    PyObject *pair_weight_obj=NULL, *sep_pair_weight_obj=NULL, *attrs_pair_weight=NULL;
+    PyObject *pair_weight_obj=NULL, *sep_pair_weight_obj=NULL, *attrs_pair_weight_obj=NULL;
 
     int autocorr=0;
     struct config_options options = get_config_options();
@@ -2162,7 +2209,7 @@ static PyObject *countpairs_countpairs_theta_mocks(PyObject *self, PyObject *arg
                                        &weighting_method_str,
                                        &PyArray_Type,&pair_weight_obj,
                                        &PyArray_Type,&sep_pair_weight_obj,
-                                       &attrs_pair_weight,
+                                       &attrs_pair_weight_obj,
                                        &(options.bin_type))
 
          ) {
@@ -2287,7 +2334,7 @@ static PyObject *countpairs_countpairs_theta_mocks(PyObject *self, PyObject *arg
         thetaD2 = PyArray_DATA((PyArrayObject *) y2_array);
         if (weights2_obj != NULL) wstatus = check_weights(module, weights2_obj, &(extra.weights1), extra.weight_method, ND2, element_size);
     }
-    wstatus = check_pair_weight(module, &(extra.pair_weight), sep_pair_weight_obj, pair_weight_obj, element_size, attrs_pair_weight);
+    wstatus = check_pair_weight(module, &(extra.pair_weight), sep_pair_weight_obj, pair_weight_obj, element_size, attrs_pair_weight_obj);
 
     if(wstatus != EXIT_SUCCESS) {
         Py_RETURN_NONE;

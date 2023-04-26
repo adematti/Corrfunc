@@ -32,7 +32,7 @@ extern "C" {
                                                     const DOUBLE closest_icell_xpos, const DOUBLE closest_icell_ypos, const DOUBLE closest_icell_zpos,
                                                     DOUBLE *savg, uint64_t *npairs,
                                                     DOUBLE *weightavg, const weight_method_t weight_method, const pair_weight_struct pair_weight,
-                                                    const bin_type_t bin_type, const los_type_t los_type, const int autocorr);
+                                                    const selection_struct selection, const bin_type_t bin_type, const los_type_t los_type, const int autocorr);
 
     extern countpairs_mocks_func_ptr_DOUBLE countpairs_s_mu_mocks_driver_DOUBLE(const struct config_options *options) __attribute__((warn_unused_result));
 
