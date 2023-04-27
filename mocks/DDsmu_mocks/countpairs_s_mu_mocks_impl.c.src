@@ -559,7 +559,11 @@ int countpairs_mocks_s_mu_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUB
         /* Is the min. requested separation 0.0 ?*/
         /* The comparison is '<=' rather than '==' only to silence
            the compiler  */
-        if(supp[0] <= 0.0) {
+        int with_auto_pairs = (supp[0] <= 0.0);
+        if (options->selection.selection_type & RP_SELECTION) {
+            with_auto_pairs &= (options->selection.rpmin_sqr <= 0.);
+        }
+        if(with_auto_pairs) {
             /* Then, add all the self-pairs. This ensures that
                a cross-correlation with two identical datasets
                produces the same result as the auto-correlation  */
