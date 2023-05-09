@@ -43,8 +43,6 @@ int countpairs_mocks_bessel(const int64_t ND1, void * restrict X1, void * restri
                             struct extra_options *extra)
 {
 
-
-
     if( ! (options->float_type == sizeof(float) || options->float_type == sizeof(double))){
         fprintf(stderr,"ERROR: In %s> Can only handle doubles or floats. Got an array of size = %zu\n",
             __FUNCTION__, options->float_type);

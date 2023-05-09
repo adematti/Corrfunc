@@ -15,7 +15,7 @@
 #if defined(USE_GSL)
 #include <gsl/gsl_sf.h>
 #else
-#define MAX_ELL 4
+#define MAX_ELL 9
 #endif
 
 #include "function_precision.h"
@@ -24,48 +24,9 @@
 #include "weight_functions_DOUBLE.h"
 
 
-static inline DOUBLE spherical_bessel(const DOUBLE x, const int ell) {
-
-    DOUBLE absx = ABS(x);
-    DOUBLE x2;
-    const DOUBLE threshold_even = 4e-2;
-    const DOUBLE threshold_odd = 2e-2;
-    switch (ell) {
-        case 0:
-            if (absx < threshold_even) {
-                x2 = x * x;
-                return 1 - x2 / 6 + (x2 * x2) / 120;
-            }
-            return SIN(x) / x;
-        case 2:
-            x2 = x * x;
-            if (absx < threshold_even) return x2 / 15 - (x2 * x2) / 210;
-            return (3 / x2 - 1) * SIN(x) / x - 3 * COS(x) / x2;
-        case 4:
-            x2 = x * x;
-            DOUBLE x4 = x2 * x2;
-            if (absx < threshold_even) return x4 / 945;
-            return 5 * (2 * x2 - 21) * COS(x) / x4 + (x4 - 45 * x2 + 105) * SIN(x) / (x * x4);
-        case 1:
-            if (absx < threshold_odd) return x / 3 - x * x * x / 30;
-            return SIN(x) / (x * x) - COS(x) / x;
-        case 3:
-            if (absx < threshold_odd) return x * x * x / 105;
-            x2 = x * x;
-            return (x2 - 15) * COS(x) / (x * x2) - 3 * (2 * x2 - 5) * SIN(x) / (x2 * x2);
-        default:
-#if defined(USE_GSL)
-            return gsl_sf_bessel_jl(ell, (double) x);
-#else
-            return 0.;
-#endif
-    }
-}
-
-
 static inline DOUBLE legendre(const DOUBLE x, const int ell) {
 
-    DOUBLE x2;
+    DOUBLE x2, x4, x6;
     switch (ell) {
         case 0:
             return 1.;
@@ -75,10 +36,30 @@ static inline DOUBLE legendre(const DOUBLE x, const int ell) {
         case 4:
             x2 = x * x;
             return (35 * x2 * x2 - 30 * x2 + 3) / 8;
+        case 6:
+            x2 = x * x;
+            x4 = x2 * x2;
+            return (231 * x2 * x4 - 315 * x4 + 105 * x2 - 5) / 16;
+        case 8:
+            x2 = x * x;
+            x4 = x2 * x2;
+            return (6435 * x4 * x4 - 12012 * x4 * x2 + 6930 * x4 - 1260 * x2 + 35) / 128;
         case 1:
             return x;
         case 3:
             return (5 * x * x - 3) * x / 2;
+        case 5:
+            x2 = x * x;
+            return (63 * x2 * x2 - 70 * x2 + 15) * x / 8;
+        case 7:
+            x2 = x * x;
+            x4 = x2 * x2;
+            return (429 * x4 * x2 - 693 * x4 + 315 * x2 - 35) * x / 16;
+        case 9:
+            x2 = x * x;
+            x4 = x2 * x2;
+            x6 = x4 * x2;
+            return (12155 * x6 * x2 - 25740 * x6 + 18018 * x4 - 4620 * x2 + 315) * x / 128;
         default:
 #if defined(USE_GSL)
             return gsl_sf_legendre_Pl(ell, (double) x);
@@ -90,11 +71,10 @@ static inline DOUBLE legendre(const DOUBLE x, const int ell) {
 }
 
 
-static inline void spherical_bessel_legendre_DOUBLE(const polearray *bins, const DOUBLE s, const DOUBLE mu, const DOUBLE mu2, const DOUBLE weight, DOUBLE *poles) {
+static inline void legendre_DOUBLE(const polearray *bins, const DOUBLE mu, const DOUBLE mu2, const DOUBLE weight, DOUBLE *poles) {
 
     const int *ells = bins->ells;
     const int nells = bins->nells;
-    const double *modes = bins->edges;
 
     for (int ill=0; ill<nells; ill++) {
         const int ell = ells[ill];
@@ -102,53 +82,29 @@ static inline void spherical_bessel_legendre_DOUBLE(const polearray *bins, const
         if (mu > -1.1) leg += legendre(mu, ell);
         if (mu2 > -1.1) leg += legendre(mu2, ell);
         leg *= weight * (2 * ell + 1);
-        for (int imode=0; imode<bins->nedges; imode++) {
-            const DOUBLE bessel = spherical_bessel(s*modes[imode], ell);
-            poles[imode * bins->nells + ill] += bessel * leg;
-        }
+        poles[ill] += leg;
     }
 }
 
-/*
-static inline void spherical_bessel_legendre_DOUBLE(const polearray *bins, const DOUBLE s, const DOUBLE mu, const DOUBLE mu2, const DOUBLE weight, DOUBLE *poles) {
 
-    const int *ells = bins->ells;
-    const int nells = bins->nells;
-    const int ellmax = ells[nells-1];
-    double result_bessel[ellmax+1], result_legendre_tmp[ellmax+1], result_legendre[nells];
-
-    gsl_sf_legendre_Pl_array(ellmax, (double) mu, result_legendre_tmp);
-    for (int ill=0; ill<nells; ill++) result_legendre[ill] = result_legendre_tmp[ells[ill]];
-    if (mu2 > -1.1) { //autocorr
-        gsl_sf_legendre_Pl_array(ellmax, (double) mu2, result_legendre_tmp);
-        for (int ill=0; ill<nells; ill++) result_legendre[ill] += result_legendre_tmp[ells[ill]];
-    }
-    for (int ill=0; ill<nells; ill++) result_legendre[ill] *= weight * (2*ells[ill] + 1);
-
-    const double *modes = bins->edges;
-    for (int imode=0; imode<bins->nedges; imode++) {
-        gsl_sf_bessel_jl_array(ellmax, (double) (s*modes[imode]), result_bessel);
-        for (int ill=0; ill<nells; ill++) {
-            poles[imode * bins->nells + ill] += result_bessel[ells[ill]] * result_legendre[ill];
-            //poles[imode * bins->nells + ill] += result_legendre[ill];
-        }
-    }
-}
-*/
-
-
-static inline int countpairs_mocks_bessel_fallback_DOUBLE(const int64_t N0, DOUBLE *x0, DOUBLE *y0, DOUBLE *z0, const weight_struct_DOUBLE *weights0,
-                                                          const int64_t N1, DOUBLE *x1, DOUBLE *y1, DOUBLE *z1, const weight_struct_DOUBLE *weights1,
-                                                          const int same_cell,
-                                                          const polearray *bins, const DOUBLE rmin, const DOUBLE rmax, const DOUBLE mumax,
-                                                          const DOUBLE min_xdiff, const DOUBLE min_ydiff, const DOUBLE min_zdiff,
-                                                          const DOUBLE closest_icell_xpos, const DOUBLE closest_icell_ypos, const DOUBLE closest_icell_zpos,
-                                                          DOUBLE *poles, const weight_method_t weight_method, const pair_weight_struct pair_weight,
-                                                          const selection_struct selection, const los_type_t los_type, const int autocorr)
+static inline int countpairs_mocks_leg_fallback_DOUBLE(const int64_t N0, DOUBLE *x0, DOUBLE *y0, DOUBLE *z0, const weight_struct_DOUBLE *weights0,
+                                                       const int64_t N1, DOUBLE *x1, DOUBLE *y1, DOUBLE *z1, const weight_struct_DOUBLE *weights1,
+                                                       const int same_cell,
+                                                       const polearray *bins, const DOUBLE rmin, const DOUBLE rmax, const DOUBLE mumax,
+                                                       const DOUBLE min_xdiff, const DOUBLE min_ydiff, const DOUBLE min_zdiff,
+                                                       const DOUBLE closest_icell_xpos, const DOUBLE closest_icell_ypos, const DOUBLE closest_icell_zpos,
+                                                       DOUBLE *savg, uint64_t *npairs, DOUBLE *weightavg, DOUBLE *poles, const weight_method_t weight_method, const pair_weight_struct pair_weight,
+                                                       const selection_struct selection, const bin_type_t bin_type, const los_type_t los_type, const int autocorr)
 {
     /*----------------- FALLBACK CODE --------------------*/
     /* implementation that is guaranteed to compile */
     const DOUBLE sqr_rmin=rmin*rmin, sqr_rmax=rmax*rmax, sqr_mumax=mumax*mumax;
+    const DOUBLE sqr_smin=bins->edges[0] * bins->edges[0], sqr_smax=bins->edges[bins->nedges - 1] * bins->edges[bins->nedges - 1];
+    DOUBLE inv_sstep=0., smin_invstep=0.;
+    if (bin_type == BIN_LIN) {
+        inv_sstep = (bins->nedges - 1)/(bins->edges[bins->nedges - 1] - bins->edges[0]);
+        smin_invstep = 1 - bins->edges[0] * inv_sstep; //trick to avoid adding one to (r - rmin)/rstep
+    }
     // A copy whose pointers we can advance
     weight_struct_DOUBLE local_w0 = {.weights={NULL}, .num_weights=0},
                          local_w1 = {.weights={NULL}, .num_weights=0};
@@ -275,6 +231,8 @@ static inline int countpairs_mocks_bessel_fallback_DOUBLE(const int64_t N0, DOUB
             const DOUBLE perpx = localxpos1 - localxpos0, perpy = localypos1 - localypos0, perpz = localzpos1 - localzpos0;
             const DOUBLE sqr_s = perpx*perpx + perpy*perpy + perpz*perpz;
 
+            if(sqr_s >= sqr_smax || sqr_s < sqr_smin) continue;
+
             DOUBLE s = ZERO;
             DOUBLE mu = -2., mu2 = -2.;
             if (sqr_s <= 0.) {
@@ -335,7 +293,21 @@ static inline int countpairs_mocks_bessel_fallback_DOUBLE(const int64_t N0, DOUB
 
                 pairweight = weight_func(&pair);
             }
-            spherical_bessel_legendre_DOUBLE(bins, s, mu, mu2, pairweight, poles);
+
+            int kbin = 0;
+            if (bin_type == BIN_LIN) {
+                kbin = (int) (s*inv_sstep + smin_invstep);
+            }
+            else {
+                for(kbin=bins->nedges-1;kbin>=1;kbin--) {
+                    if(s >= bins->edges[kbin-1]) break;
+                }//finding kbin
+            }
+            int np = ((int) (mu > -1.1)) + ((int) (mu2 > -1.1));
+            savg[kbin] += s * pairweight * np;
+            weightavg[kbin] += pairweight * np;
+            npairs[kbin] += np;
+            legendre_DOUBLE(bins, mu, mu2, pairweight, &(poles[kbin * bins->nells]));
         }//j loop over second set of particles
     }//i loop over first set of particles
 

@@ -3,28 +3,28 @@
 
 """
 Python wrapper around the C extension for the pair counter in
-``mocks/DDbessel``. This python wrapper is :py:mod:`Corrfunc.mocks.DDbessel_mocks`
+``mocks/DDleg``. This python wrapper is :py:mod:`Corrfunc.mocks.DDleg_mocks`
 """
 
 from __future__ import (division, print_function, absolute_import,
                         unicode_literals)
 
 __author__ = ('Arnaud de Mattia')
-__all__ = ('DDbessel_mocks', )
+__all__ = ('DDleg_mocks', )
 
 
-def DDbessel_mocks(autocorr, nthreads, binfile, ells, rmin, rmax, mumax,
-                   X1, Y1, Z1, XP1=None, YP1=None, ZP1=None, weights1=None,
-                   X2=None, Y2=None, Z2=None, XP2=None, YP2=None, ZP2=None, weights2=None,
-                   verbose=False,
-                   xbin_refine_factor=2, ybin_refine_factor=2,
-                   zbin_refine_factor=1, max_cells_per_dim=100,
-                   copy_particles=True, enable_min_sep_opt=True,
-                   c_api_timer=False, isa='fastest',
-                   weight_type=None, los_type='midpoint',
-                   pair_weights=None, sep_pair_weights=None, attrs_pair_weights=None, attrs_selection=None):
+def DDleg_mocks(autocorr, nthreads, binfile, ells, rmin, rmax, mumax,
+                X1, Y1, Z1, XP1=None, YP1=None, ZP1=None, weights1=None,
+                X2=None, Y2=None, Z2=None, XP2=None, YP2=None, ZP2=None, weights2=None,
+                verbose=False,
+                xbin_refine_factor=2, ybin_refine_factor=2,
+                zbin_refine_factor=1, max_cells_per_dim=100,
+                copy_particles=True, enable_min_sep_opt=True,
+                c_api_timer=False, isa='fastest',
+                weight_type=None, bin_type='custom', los_type='midpoint',
+                pair_weights=None, sep_pair_weights=None, attrs_pair_weights=None, attrs_selection=None):
     """
-    Calculate the power spectrum multipoles, :math:`P_{\\ell}`.
+    Calculate the pair counts multipoles.
 
     If ``weights`` are provided, the resulting power spectrum is weighted.
     The weighting scheme depends on ``weight_type``.
@@ -137,6 +137,22 @@ def DDbessel_mocks(autocorr, nthreads, binfile, ells, rmin, rmax, mumax,
     weight_type : string, optional. Default: None.
         The type of weighting to apply. One of ["pair_product", "inverse_bitwise", None].
 
+    bin_type : string, case-insensitive (default ``custom``)
+        Set to ``lin`` for speed-up in case of linearly-spaced bins.
+        In this case, the bin number for a pair separated by ``s`` is given by
+        ``(s - binfile[0])/(binfile[-1] - binfile[0])*(len(binfile) - 1)``,
+        i.e. only the first and last bins of input ``binfile`` are considered.
+        Then setting ``output_savg`` is virtually costless.
+        For non-linear binning, set to ``custom``.
+        In the vast majority of cases, bin_type='linear' will yield identical
+        results to custom linear binning but with higher performance.
+        In a few rare cases where a pair falls on a bin boundary,
+        'linear' and custom linear may disagree on which bin the pair falls into
+        due to finite floating point precision.
+        ``auto`` will choose linear binning if input ``binfile`` is within
+        ``rtol = 1e-05`` *and* ``atol = 1e-08`` (relative and absolute tolerance)
+        of ``np.linspace(binfile[0], binfile[-1], len(binfile))``.
+
     los_type : string, case-insensitive (default ``midpoint``)
         Choice of line-of-sight :math:`d`:
         - "midpoint": :math:`d = \\hat{r_{1} + r_{2}}`
@@ -161,21 +177,21 @@ def DDbessel_mocks(autocorr, nthreads, binfile, ells, rmin, rmax, mumax,
     Returns
     -------
     results : numpy structured array
-        A numpy structured array containing [ell, mode, pole].
+        A numpy structured array containing [ell, s, pole].
 
     api_time : float, optional
         Only returned if ``c_api_timer`` is set.  ``api_time`` measures only
         the time spent within the C library and ignores all python overhead.
     """
     try:
-        from Corrfunc._countpairs_mocks import countpairs_bessel_mocks as DDbessel_extn
+        from Corrfunc._countpairs_mocks import countpairs_leg_mocks as DDleg_extn
     except ImportError as exc:
-        msg = "Could not import the C extension for bessel "\
+        msg = "Could not import the C extension for leg "\
               "pair counter."
         raise ImportError(msg) from exc
 
     import numpy as np
-    from Corrfunc.utils import translate_isa_string_to_enum, translate_los_type_string_to_enum,\
+    from Corrfunc.utils import translate_isa_string_to_enum, translate_bin_type_string_to_enum, translate_los_type_string_to_enum,\
                                get_edges, convert_to_native_endian, sys_pipes, process_weights
     from future.utils import bytes_to_native_str
 
@@ -238,11 +254,12 @@ def DDbessel_mocks(autocorr, nthreads, binfile, ells, rmin, rmax, mumax,
 
     ells = np.asarray(ells, dtype='i4').ravel()
     integer_isa = translate_isa_string_to_enum(isa)
+    integer_bin_type = translate_bin_type_string_to_enum(bin_type)
     integer_los_type = translate_los_type_string_to_enum(los_type)
     binfile = get_edges(binfile)
 
     with sys_pipes():
-        extn_results = DDbessel_extn(autocorr, nthreads,
+        extn_results = DDleg_extn(autocorr, nthreads,
                                      binfile, ells, rmin, rmax, mumax,
                                      X1, Y1, Z1,
                                      verbose=verbose,
@@ -254,6 +271,7 @@ def DDbessel_mocks(autocorr, nthreads, binfile, ells, rmin, rmax, mumax,
                                      enable_min_sep_opt=enable_min_sep_opt,
                                      c_api_timer=c_api_timer,
                                      isa=integer_isa,
+                                     bin_type=integer_bin_type,
                                      los_type=integer_los_type,
                                      **kwargs)
 
@@ -264,14 +282,14 @@ def DDbessel_mocks(autocorr, nthreads, binfile, ells, rmin, rmax, mumax,
         extn_results, api_time = extn_results
 
     results_dtype = np.dtype([(bytes_to_native_str(b'ells'), np.int32),
-                              (bytes_to_native_str(b'modes'), np.float64),
+                              (bytes_to_native_str(b'savg'), np.float64),
                               (bytes_to_native_str(b'poles'), np.float64)])
 
     nbin = len(extn_results)
     results = np.zeros(nbin, dtype=results_dtype)
     for ii, r in enumerate(extn_results):
         results['ells'][ii] = r[0]
-        results['modes'][ii] = r[1]
+        results['savg'][ii] = r[1]
         results['poles'][ii] = r[2]
 
     if not c_api_timer:

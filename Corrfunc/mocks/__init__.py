@@ -9,9 +9,11 @@ from __future__ import (division, print_function, absolute_import,
                         unicode_literals)
 
 __author__ = ('Manodeep Sinha')
-__all__ = ("DDbessel_mocks", "DDrppi_mocks", "DDtheta_mocks", "vpf_mocks", "DDsmu_mocks" )
+__all__ = ("DDleg_mocks", "DDbessel_mocks", "DDrppi_mocks", "DDtheta_mocks", "vpf_mocks", "DDsmu_mocks")
 
 import sys
+
+from .DDleg_mocks import DDleg_mocks
 from .DDbessel_mocks import DDbessel_mocks
 from .DDrppi_mocks import DDrppi_mocks
 from .DDtheta_mocks import DDtheta_mocks

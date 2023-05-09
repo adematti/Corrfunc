@@ -9,7 +9,7 @@ from __future__ import (division, print_function, absolute_import,
                         unicode_literals)
 
 __author__ = ('Manodeep Sinha')
-__all__ = ('DD', 'DDrppi', 'wp', 'xi', 'vpf', 'DDsmu',)
+__all__ = ('DD', 'DDrppi', 'wp', 'xi', 'vpf', 'DDsmu')
 
 import sys
 

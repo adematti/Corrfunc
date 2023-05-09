@@ -11,6 +11,27 @@ from Corrfunc.tests.common import generate_isa_and_nthreads_combos
 
 
 @pytest.mark.parametrize('isa,nthreads', generate_isa_and_nthreads_combos())
+def test_DDleg_mocks(gals_Mr19, isa, nthreads):
+    from Corrfunc.mocks import DDleg_mocks
+
+    binfile = np.linspace(0.1, 0.3, 21)
+    autocorr = 1
+    ells = (0, 2, 4)
+
+    x, y, z, w = gals_Mr19
+    for size in [0, 100]:
+        results_DDleg_mocks = DDleg_mocks(autocorr, nthreads,
+                                          binfile, ells,
+                                          0., 1., 1.,
+                                          x[:size], y[:size], z[:size], weights1=w[:size],
+                                          weight_type='pair_product',
+                                          verbose=True,
+                                          isa=isa)
+        if size == 0:
+            for name in ['poles']: assert np.allclose(results_DDleg_mocks[name], 0.)
+
+
+@pytest.mark.parametrize('isa,nthreads', generate_isa_and_nthreads_combos())
 def test_DDbessel_mocks(gals_Mr19, isa, nthreads):
     from Corrfunc.mocks import DDbessel_mocks
 
@@ -29,7 +50,6 @@ def test_DDbessel_mocks(gals_Mr19, isa, nthreads):
                                                 isa=isa)
         if size == 0:
             for name in ['poles']: assert np.allclose(results_DDbessel_mocks[name], 0.)
-
 
 
 @pytest.mark.parametrize('isa,nthreads', generate_isa_and_nthreads_combos())
