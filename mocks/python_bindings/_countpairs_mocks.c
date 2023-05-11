@@ -1014,6 +1014,8 @@ static int check_pair_weight(PyObject *module, pair_weight_struct *pair_weight_s
     goto finally;
 except:
     countpairs_mocks_error_out(module, msg);
+    Py_XDECREF(sep);
+    Py_XDECREF(weight);
     return EXIT_FAILURE;
 finally:
     Py_XDECREF(sep);
@@ -1116,8 +1118,6 @@ static int64_t check_dims_and_datatype_ra_dec(PyObject *module, PyArrayObject *x
       countpairs_mocks_error_out(module, msg);
       return -1;
     }
-
-
     /* Return the size of each element of the data object */
     if(x_type == NPY_FLOAT) {
       *element_size = sizeof(float);
@@ -1228,8 +1228,8 @@ static PyObject *countpairs_countpairs_leg_mocks(PyObject *self, PyObject *args,
     options.copy_particles = 1;
     options.c_api_timer = 0;
     int8_t xbin_ref=options.bin_refine_factors[0],
-        ybin_ref=options.bin_refine_factors[1],
-        zbin_ref=options.bin_refine_factors[2];
+           ybin_ref=options.bin_refine_factors[1],
+           zbin_ref=options.bin_refine_factors[2];
 
     int autocorr=1;
     int nthreads=4;
@@ -1546,8 +1546,8 @@ static PyObject *countpairs_countpairs_bessel_mocks(PyObject *self, PyObject *ar
     options.copy_particles = 1;
     options.c_api_timer = 0;
     int8_t xbin_ref=options.bin_refine_factors[0],
-        ybin_ref=options.bin_refine_factors[1],
-        zbin_ref=options.bin_refine_factors[2];
+           ybin_ref=options.bin_refine_factors[1],
+           zbin_ref=options.bin_refine_factors[2];
 
     int autocorr=1;
     int nthreads=4;

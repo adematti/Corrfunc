@@ -1270,6 +1270,8 @@ static int check_pair_weight(PyObject *module, pair_weight_struct *pair_weight_s
     goto finally;
 except:
     countpairs_error_out(module, msg);
+    Py_XDECREF(sep);
+    Py_XDECREF(weight);
     return EXIT_FAILURE;
 finally:
     Py_XDECREF(sep);
