@@ -28,6 +28,9 @@
 #include "countpairs_s_mu_mocks_impl_DOUBLE.h"
 #include "countpairs_s_mu_mocks_kernels_DOUBLE.c"
 
+#ifdef GPU
+#include "countpairs_s_mu_mocks_gpu.h"
+#endif
 
 int interrupt_status_DDsmu_mocks_DOUBLE=EXIT_SUCCESS;
 
@@ -116,6 +119,11 @@ countpairs_mocks_func_ptr_DOUBLE countpairs_s_mu_mocks_driver_DOUBLE(const struc
 
     if(options->verbose){
         // Must be ordered low to high, since higher ISA may be aliased to lower ones
+#ifdef GPU
+        if (options->use_gpu) {
+            fprintf(stderr,"Using GPU kernel\n");
+        } else
+#endif
         if(function_dispatch == fallback_index){
             fprintf(stderr,"Using fallback kernel\n");
         } else if(function_dispatch == sse_index){
@@ -150,6 +158,8 @@ int countpairs_mocks_s_mu_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUB
                 __FUNCTION__, sizeof(DOUBLE), options->float_type);
         return EXIT_FAILURE;
     }
+
+    bool use_gpu = (bool)options->use_gpu;
 
 
     /***********************
@@ -403,6 +413,27 @@ int countpairs_mocks_s_mu_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUB
         init_my_progressbar(num_cell_pairs, &interrupted);
     }
 
+#ifdef GPU
+    //declare GPU arrays here - there's no real penalty if use_gpu is false, they never get allocated
+    DOUBLE *gpu_X1, *gpu_Y1, *gpu_Z1;
+    DOUBLE *gpu_X2, *gpu_Y2, *gpu_Z2;
+    DOUBLE *gpu_W1, *gpu_W2;
+
+    DOUBLE *gpu_min_dx, *gpu_min_dy; //min_dz not needed for GPU kernel
+
+    DOUBLE *gpu_savg;
+    DOUBLE *gpu_weightavg, *gpu_supp_sqr;
+
+    int *gpu_same_cell;
+    int64_t *gpu_icell0, *gpu_icell1;
+    int *gpu_np0, *gpu_np1;
+    int *gpu_start_idx0, *gpu_start_idx1;
+
+    uint8_t nw1 = (extra->weights0).num_weights;
+    uint8_t nw2 = (extra->weights1).num_weights;
+
+    int *gpu_npairs;
+#endif
 
 #if defined(_OPENMP)
 #pragma omp parallel shared(numdone, abort_status, interrupt_status_DDsmu_mocks_DOUBLE)
@@ -417,6 +448,11 @@ int countpairs_mocks_s_mu_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUB
         if(need_weightavg) {
             this_weightavg = all_weightavg[tid];
         }
+/*
+#ifdef GPU
+        setCudaDevice(tid);
+#endif
+*/
 #else
         uint64_t *this_npairs = npairs;
         DOUBLE *this_savg = savg;
@@ -427,45 +463,138 @@ int countpairs_mocks_s_mu_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUB
         if(options->need_avg_sep) tmp_savg = (DOUBLE *) malloc(sizeof(DOUBLE)*totnbins);
         if(need_weightavg) tmp_weightavg = (DOUBLE *) malloc(sizeof(DOUBLE)*totnbins);
 
+#ifdef GPU
+        if (use_gpu) {
+                //gpu_print_cuda_error();
+                gpu_allocate_mocks_DOUBLE(&gpu_X1, &gpu_Y1, &gpu_Z1, ND1);
+                gpu_allocate_mocks_DOUBLE(&gpu_X2, &gpu_Y2, &gpu_Z2, ND2);
+                gpu_allocate_mins_DOUBLE(&gpu_min_dx, &gpu_min_dy, num_cell_pairs);
+                gpu_allocate_cell_luts(&gpu_same_cell, &gpu_icell0, &gpu_icell1, num_cell_pairs);
+                gpu_allocate_lattice_luts(&gpu_np0, &gpu_start_idx0, totncells);
+                gpu_allocate_lattice_luts(&gpu_np1, &gpu_start_idx1, totncells);
+                if (nw1 > 0) gpu_allocate_weights_DOUBLE(&gpu_W1, ND1, nw1);
+                if (nw2 > 0) gpu_allocate_weights_DOUBLE(&gpu_W2, ND2, nw2);
+
+                gpu_allocate_outputs_DOUBLE(&gpu_savg, &gpu_npairs, totnbins);
+                if (need_weightavg) gpu_allocate_weight_output_DOUBLE(&gpu_weightavg, totnbins);
+                gpu_allocate_supp_sqr_DOUBLE(&gpu_supp_sqr, nsbin);
+
+                for (int i = 0; i < nsbin; i++) gpu_supp_sqr[i] = supp_sqr[i];
+
+                //loop over cell pairs and populate GPU arrays
+                int64_t tcount = 0; //thread count
+                int64_t icell1, icell2;
+                int64_t maxc = 0, minc = 0;
+                int64_t this_count = 0;
+                for(int64_t icellpair=0;icellpair<num_cell_pairs;icellpair++) {
+                        struct cell_pair_DOUBLE *this_cell_pair = &all_cell_pairs[icellpair];
+                        gpu_min_dx[icellpair] = this_cell_pair->min_dx;
+                        gpu_min_dy[icellpair] = this_cell_pair->min_dy;
+                        //gpu_min_dz[icellpair] = this_cell_pair->min_dz;
+                        gpu_same_cell[icellpair] = (int)this_cell_pair->same_cell;
+                        icell1 = this_cell_pair->cellindex1;
+                        icell2 = this_cell_pair->cellindex2;
+                        gpu_icell0[icellpair] = icell1;
+                        gpu_icell1[icellpair] = icell2;
+                        //thread count is total number of inner loop iterations
+                        this_count = (&lattice1[icell1])->nelements * (&lattice2[icell2])->nelements;
+                        tcount += this_count;
+                        if (this_count > maxc) maxc= this_count;
+                        if (minc == 0 || this_count < minc) minc = this_count;
+                }
+
+                //loop over lattices and populate LUTs
+                int pcount1 = 0, pcount2 = 0;
+                int64_t i1 = 0, i2 = 0;
+                for (int64_t icell = 0; icell<totncells; icell++) {
+                        gpu_np0[icell] = (&lattice1[icell])->nelements;
+                        gpu_np1[icell] = (&lattice2[icell])->nelements;
+                        gpu_start_idx0[icell] = pcount1;
+                        gpu_start_idx1[icell] = pcount2;
+                        pcount1 += (&lattice1[icell])->nelements;
+                        pcount2 += (&lattice2[icell])->nelements;
+                        const cellarray_mocks_DOUBLE *first = &lattice1[icell];
+                        const cellarray_mocks_DOUBLE *second = &lattice2[icell];
+                        //loop over elements in first, second cells
+                        for (int i_first = 0; i_first < first->nelements; i_first++) {
+                                //loop over weights if nw1 > 0 and copy them
+                                for (int i_w = 0; i_w < nw1; i_w++) {
+                                    gpu_W1[i1*nw1+i_w] = first->weights.weights[i_w][i_first];
+                                }
+                                gpu_X1[i1] = first->x[i_first];
+                                gpu_Y1[i1] = first->y[i_first];
+                                gpu_Z1[i1++] = first->z[i_first];
+                        }
+                        for (int i_second = 0; i_second < second->nelements; i_second++) {
+                                //loop over weights if nw1 > 1 and copy them
+                                for (int i_w = 0; i_w < nw2; i_w++) {
+                                    gpu_W2[i2*nw2+i_w] = second->weights.weights[i_w][i_second];
+                                }
+                                gpu_X2[i2] = second->x[i_second];
+                                gpu_Y2[i2] = second->y[i_second];
+                                gpu_Z2[i2++] = second->z[i_second];
+                        }
+                }
+
+        }
+#endif
+
+#ifdef GPU
+        if (use_gpu) {
+                //if using GPU, call GPU version of countpairs_s_mu_mocks_gpu_DOUBLE here
+                const int status = countpairs_s_mu_mocks_gpu_DOUBLE(ND1, gpu_X1, gpu_Y1, gpu_Z1, gpu_W1, nw1,
+                                                                         ND2, gpu_X2, gpu_Y2, gpu_Z2, gpu_W2, nw2,
+                                                                         gpu_same_cell,
+                                                                         gpu_icell0, gpu_icell1, num_cell_pairs,
+                                                                         gpu_np0, gpu_np1, gpu_start_idx0, gpu_start_idx1,
+                                                                         smax, smin, nsbin, nmu_bins, gpu_supp_sqr, mu_max,
+                                                                         gpu_min_dx, gpu_min_dy,
+                                                                         gpu_savg, gpu_npairs,
+                                                                         gpu_weightavg, extra->weight_method, options->bin_type, options->los_type, autocorr);
+                abort_status |= status;
+        } else {
+#endif
+
+
 #if defined(_OPENMP)
 #pragma omp for schedule(dynamic)
 #endif
-        /*---Loop-over-all-cell-pairs--------------------*/
-        for(int64_t icellpair=0;icellpair<num_cell_pairs;icellpair++) {
+            /*---Loop-over-all-cell-pairs--------------------*/
+            for(int64_t icellpair=0;icellpair<num_cell_pairs;icellpair++) {
 #if defined(_OPENMP)
 #pragma omp flush (abort_status, interrupt_status_DDsmu_mocks_DOUBLE)
 #endif
-            if(abort_status == EXIT_SUCCESS && interrupt_status_DDsmu_mocks_DOUBLE == EXIT_SUCCESS) {
-                //omp cancel was introduced in omp 4.0 - so this is my way of checking if loop needs to be cancelled
-                /* If the verbose option is not enabled, avoid outputting anything unnecessary*/
-                if(options->verbose) {
+                if(abort_status == EXIT_SUCCESS && interrupt_status_DDsmu_mocks_DOUBLE == EXIT_SUCCESS) {
+                    //omp cancel was introduced in omp 4.0 - so this is my way of checking if loop needs to be cancelled
+                    /* If the verbose option is not enabled, avoid outputting anything unnecessary*/
+                    if(options->verbose) {
 #if defined(_OPENMP)
-                    if (omp_get_thread_num() == 0)
+                        if (omp_get_thread_num() == 0)
 #endif
-                        my_progressbar(numdone,&interrupted);
+                            my_progressbar(numdone,&interrupted);
 
 
 #if defined(_OPENMP)
 #pragma omp atomic
 #endif
-                    numdone++;
-                }
+                        numdone++;
+                    }
 
-                struct cell_pair_DOUBLE *this_cell_pair = &all_cell_pairs[icellpair];
+                    struct cell_pair_DOUBLE *this_cell_pair = &all_cell_pairs[icellpair];
 
-                const int64_t icell = this_cell_pair->cellindex1;
-                const int64_t icell2 = this_cell_pair->cellindex2;
-                const cellarray_mocks_DOUBLE *first = &lattice1[icell];
-                const cellarray_mocks_DOUBLE *second = &lattice2[icell2];
+                    const int64_t icell = this_cell_pair->cellindex1;
+                    const int64_t icell2 = this_cell_pair->cellindex2;
+                    const cellarray_mocks_DOUBLE *first = &lattice1[icell];
+                    const cellarray_mocks_DOUBLE *second = &lattice2[icell2];
 
-                if(options->need_avg_sep) {
-                    for(int j=0;j<totnbins;j++) tmp_savg[j] = 0.;
-                }
-                if(need_weightavg) {
-                    for(int j=0;j<totnbins;j++) tmp_weightavg[j] = 0.;
-                }
+                    if(options->need_avg_sep) {
+                        for(int j=0;j<totnbins;j++) tmp_savg[j] = 0.;
+                    }
+                    if(need_weightavg) {
+                        for(int j=0;j<totnbins;j++) tmp_weightavg[j] = 0.;
+                    }
 
-                const int status = countpairs_s_mu_mocks_function_DOUBLE(first->nelements, first->x, first->y, first->z, &(first->weights),
+                    const int status = countpairs_s_mu_mocks_function_DOUBLE(first->nelements, first->x, first->y, first->z, &(first->weights),
                                                                          second->nelements, second->x, second->y, second->z, &(second->weights),
                                                                          this_cell_pair->same_cell,
                                                                          options->fast_divide_and_NR_steps,
@@ -475,26 +604,62 @@ int countpairs_mocks_s_mu_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUB
                                                                          tmp_savg, this_npairs, tmp_weightavg,
                                                                          extra->weight_method, extra->pair_weight, options->selection, options->bin_type, options->los_type, autocorr);
 
-                /* This actually causes a race condition under OpenMP - but mostly
-                   I care that an error occurred - rather than the exact value of
-                   the error status */
-                abort_status |= status;
+                    /* This actually causes a race condition under OpenMP - but mostly
+                       I care that an error occurred - rather than the exact value of
+                       the error status */
+                    abort_status |= status;
 
-                if(options->need_avg_sep) {
-                    for(int j=0;j<totnbins;j++) this_savg[j] += tmp_savg[j];
-                }
-                if(need_weightavg) {
-                    for(int j=0;j<totnbins;j++) this_weightavg[j] += tmp_weightavg[j];
-                }
+                    if(options->need_avg_sep) {
+                        for(int j=0;j<totnbins;j++) this_savg[j] += tmp_savg[j];
+                    }
+                    if(need_weightavg) {
+                        for(int j=0;j<totnbins;j++) this_weightavg[j] += tmp_weightavg[j];
+                    }
 
-            }//abort-status
-        }//icellpair loop over num_cell_pairs
+                }//abort-status
+            }//icellpair loop over num_cell_pairs
+#ifdef GPU
+        //end if-else block in GPU mode
+        }
+#endif
+
     free(tmp_savg);
     free(tmp_weightavg);
 #if defined(_OPENMP)
     }//close the omp parallel region
 #endif//USE_OMP
     free(all_cell_pairs);
+
+#ifdef GPU
+    //Free memory and copy outputs back to CPU
+    if (use_gpu) {
+        gpu_free_mocks_DOUBLE(gpu_X1, gpu_Y1, gpu_Z1);
+        gpu_free_mocks_DOUBLE(gpu_X2, gpu_Y2, gpu_Z2);
+        gpu_free_mins_DOUBLE(gpu_min_dx, gpu_min_dy);
+        gpu_free_cell_luts(gpu_same_cell, gpu_icell0, gpu_icell1);
+        gpu_free_lattice_luts(gpu_np0, gpu_start_idx0);
+        gpu_free_lattice_luts(gpu_np1, gpu_start_idx1);
+        gpu_free_supp_sqr_DOUBLE(gpu_supp_sqr);
+
+        //Copy outputs back to CPU
+        for (int j = 0; j < totnbins; j++) {
+            npairs[j] = (uint64_t)gpu_npairs[j];
+        }
+        if(options->need_avg_sep) {
+            for (int j = 0; j < totnbins; j++) {
+                savg[j] = gpu_savg[j];
+            }
+        }
+        gpu_free_outputs_DOUBLE(gpu_savg, gpu_npairs);
+
+        if (need_weightavg) {
+            for (int j = 0; j < totnbins; j++) {
+                weightavg[j] = gpu_weightavg[j];
+            }
+            gpu_free_weight_output_DOUBLE(gpu_weightavg);
+        }
+    }
+#endif
 
     if(options->copy_particles == 0) {
         int64_t *original_index = lattice1[0].original_index;

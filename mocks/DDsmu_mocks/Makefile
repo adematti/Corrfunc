@@ -5,6 +5,9 @@ INSTALL_BIN_DIR := $(ROOT_DIR)/bin
 UTILS_DIR := $(ROOT_DIR)/utils
 IO_DIR := $(ROOT_DIR)/io
 
+NVCC_RESULT := $(shell which nvcc 2> NULL)
+NVCC_TEST := $(notdir $(NVCC_RESULT))
+
 GSL_REQUIRED := false
 include $(ROOT_DIR)/mocks.options $(ROOT_DIR)/common.mk
 
@@ -14,6 +17,12 @@ LIBSRC  := countpairs_s_mu_mocks.c countpairs_s_mu_mocks_impl_double.c countpair
            $(UTILS_DIR)/gridlink_mocks_impl_float.c $(UTILS_DIR)/gridlink_mocks_impl_double.c \
            $(UTILS_DIR)/gridlink_utils_float.c $(UTILS_DIR)/gridlink_utils_double.c \
            $(UTILS_DIR)/utils.c $(UTILS_DIR)/progressbar.c $(UTILS_DIR)/cpu_features.c $(UTILS_DIR)/avx512_calls.c
+ifeq ($(NVCC_TEST),nvcc)
+#Add GPU module to LIBSRC
+LIBSRC += countpairs_s_mu_mocks_gpu.o
+CFLAGS += -DGPU
+CLINK += -L$(CUDA_HOME)/lib64 -lcudart
+endif
 LIBRARY_HEADERS := $(LIBNAME).h
 
 TARGET   := DDsmu_mocks
@@ -31,6 +40,10 @@ INCL     := countpairs_s_mu_mocks_kernels_float.c countpairs_s_mu_mocks_kernels_
 	        $(UTILS_DIR)/utils.h $(UTILS_DIR)/function_precision.h $(UTILS_DIR)/avx512_calls.h $(UTILS_DIR)/avx_calls.h $(UTILS_DIR)/defs.h \
             $(UTILS_DIR)/weight_functions_double.h $(UTILS_DIR)/weight_functions_float.h $(UTILS_DIR)/weight_functions.h.src \
 	        $(UTILS_DIR)/weight_defs_double.h $(UTILS_DIR)/weight_defs_float.h $(UTILS_DIR)/weight_defs.h.src
+ifeq ($(NVCC_TEST),nvcc)
+#Add CUDA include dir
+INCL += countpairs_s_mu_mocks_gpu.h $(CUDA_HOME)/include
+endif
 
 TARGETOBJS:=$(TARGETSRC:.c=.o)
 LIBOBJS:=$(LIBSRC:.c=.o)

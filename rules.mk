@@ -66,6 +66,9 @@ $(LIBNAME)_impl_float.o: $(UTILS_DIR)/weight_functions_float.h
 %.o: %.c $(ROOT_DIR)/common.mk $(ROOT_DIR)/utils/defs.h Makefile
 	$(CC) $(CFLAGS) $(INCLUDE) $(EXTRA_INCL) -c $< -o $@
 
+%.o: %.cu $(ROOT_DIR)/common.mk $(ROOT_DIR)/utils/defs.h Makefile
+	nvcc $(CUFLAGS) $< -o $@
+
 $(LIBRARY): $(LIBOBJS) $(ROOT_DIR)/mocks.options $(ROOT_DIR)/theory.options $(ROOT_DIR)/common.mk Makefile
 	ar rcs $@ $(LIBOBJS)
 

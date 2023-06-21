@@ -16,6 +16,8 @@ CFLAGS ?=
 #### Add any compiler specific link flags you want
 CLINK ?=
 
+CUFLAGS := -ccbin gcc   -m64  -gencode arch=compute_60,code=sm_60  -gencode arch=compute_61,code=sm_61 -gencode arch=compute_70,code=sm_70 -gencode arch=compute_75,code=sm_75 -gencode arch=compute_80,code=sm_80 -gencode arch=compute_86,code=sm_86 -gencode arch=compute_86,code=compute_86 -Xcompiler -Ofast -I../../io -I../../utils  -c
+
 ## Set the python command (supply the full path to python you want to
 ## use, if different from directly calling `python` on the shell,
 ## as can be the case if python is set via an alias)

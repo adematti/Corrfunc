@@ -97,6 +97,7 @@ struct config_options
 
 
     size_t float_type; /* floating point type -> vectorized supports double/float; fallback can support long double*/
+    uint8_t use_gpu; //Whether or not to use GPU
     int32_t instruction_set; /* select instruction set to run on */
 
     char version[32];/* fill in the version number */
@@ -156,6 +157,7 @@ struct config_options
     /* Reserving to maintain ABI compatibility for the future */
     uint8_t reserved[OPTIONS_HEADER_SIZE - 33*sizeof(char) - sizeof(size_t) - 4*sizeof(double) - 3*sizeof(int) - sizeof(selection_struct)
                      - sizeof(uint16_t) - 16*sizeof(uint8_t) - sizeof(bin_type_t) - sizeof(los_type_t) - sizeof(struct api_cell_timings *) - sizeof(int64_t)
+                     - sizeof(uint8_t)
                      ];
 };
 
@@ -220,6 +222,10 @@ static inline int set_selection_struct(selection_struct* selection_st, selection
     return EXIT_SUCCESS;
 }
 
+static inline void set_gpu_mode(struct config_options *options, uint8_t use_gpu) {
+    //set GPU mode
+    options->use_gpu = use_gpu;
+}
 
 static inline void set_max_cells(struct config_options *options, const int max)
 {
@@ -286,6 +292,8 @@ static inline struct config_options get_config_options(void)
 #ifdef PERIODIC
     options.periodic = 1;
 #endif
+
+    options.use_gpu = 0;
 
 #ifdef __AVX512F__
     options.instruction_set = AVX512F;
@@ -667,7 +675,9 @@ static inline void allocate_cell_timer(struct config_options *options, const int
     if(options->totncells_timings >= num_cell_pairs) return;
 
     free_cell_timings(options);
-    options->cell_timings = calloc(num_cell_pairs, sizeof(*(options->cell_timings)));
+    //Add cast to get this to compile with nvcc
+    //options->cell_timings = calloc(num_cell_pairs, sizeof(*(options->cell_timings)));
+    options->cell_timings = (struct api_cell_timings *) calloc(num_cell_pairs, sizeof(*(options->cell_timings)));
     if(options->cell_timings == NULL) {
         fprintf(stderr,"Warning: In %s> Could not allocate memory to store the API timings per cell. \n",
                 __FUNCTION__);

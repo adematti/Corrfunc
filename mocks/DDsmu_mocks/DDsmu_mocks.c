@@ -57,6 +57,7 @@ int main(int argc, char *argv[])
 
     weight_method_t weight_method = NONE;
     int num_weights = 0;
+    bool use_gpu = false;
 
     /*---Data-variables--------------------*/
     int64_t ND1,ND2 ;
@@ -99,8 +100,14 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
+    for (int i=1; i<argc; i++) {
+        if (!strcmp(argv[i],"-gpu")) use_gpu = true;
+    }
+    if (use_gpu) fprintf(stderr, "USE GPU\n");
+
     /* Validate optional arguments */
     int noptargs_given = argc - (nargs + 1);
+    if (use_gpu) noptargs_given--;
     if(noptargs_given != 0 && noptargs_given != 3 && noptargs_given != 5){
         Printhelp();
         fprintf(stderr,"\nFound: %d optional arguments; must be 0 (no weights), 3 (for one set of weights) or 5 (for two sets)\n ", noptargs_given);
@@ -220,6 +227,7 @@ int main(int argc, char *argv[])
     /*---Count-pairs--------------------------------------*/
     results_countpairs_mocks_s_mu results;
     struct config_options options = get_config_options();
+    set_gpu_mode(&options, (uint8_t)use_gpu);
 
     /* Pack weights into extra options */
     struct extra_options extra = get_extra_options(weight_method);
@@ -261,7 +269,7 @@ int main(int argc, char *argv[])
         const double log_supp = LOG10(results.supp[i]);
         for(int j=0;j<nmubin;j++) {
             const int index = i*(nmubin+1) + j;
-            fprintf(stdout,"%10"PRIu64" %20.8lf %20.8lf  %20.8lf %20.8lf \n",results.npairs[index],results.savg[index],log_supp,(j+1)*dmu-mu_max,results.weightavg[index]);
+            fprintf(stdout,"%10"PRIu64" %20.8lf %20.8lf  %20.8lf %20.8lf \n",results.npairs[index],results.savg[index],log_supp,(j+1)*dmu-mu_max, results.weightavg[index]);
         }
     }
 
@@ -325,6 +333,12 @@ void Printhelp(void)
     fprintf(stderr,"Use OMP = True\n");
 #else
     fprintf(stderr,"Use OMP = False\n");
+#endif
+
+#ifdef GPU
+    fprintf(stderr,"Use GPU = True\n");
+#else
+    fprintf(stderr,"Use GPU = False\n");
 #endif
 
     fprintf(stderr,"=========================================================================\n") ;
