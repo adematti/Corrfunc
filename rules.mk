@@ -96,8 +96,6 @@ ifdef PROJECT
 
 endif
 
-
-
 .PHONY: clean clena celan install lib tests distclean all realclean libs
 
 celna: clean

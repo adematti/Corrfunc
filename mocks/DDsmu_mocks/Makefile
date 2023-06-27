@@ -20,8 +20,6 @@ LIBSRC  := countpairs_s_mu_mocks.c countpairs_s_mu_mocks_impl_double.c countpair
 ifeq ($(NVCC_TEST),nvcc)
 #Add GPU module to LIBSRC
 LIBSRC += countpairs_s_mu_mocks_gpu.o
-CFLAGS += -DGPU
-CLINK += -L$(CUDA_HOME)/lib64 -lcudart
 endif
 LIBRARY_HEADERS := $(LIBNAME).h
 
@@ -41,8 +39,7 @@ INCL     := countpairs_s_mu_mocks_kernels_float.c countpairs_s_mu_mocks_kernels_
             $(UTILS_DIR)/weight_functions_double.h $(UTILS_DIR)/weight_functions_float.h $(UTILS_DIR)/weight_functions.h.src \
 	        $(UTILS_DIR)/weight_defs_double.h $(UTILS_DIR)/weight_defs_float.h $(UTILS_DIR)/weight_defs.h.src
 ifeq ($(NVCC_TEST),nvcc)
-#Add CUDA include dir
-INCL += countpairs_s_mu_mocks_gpu.h $(CUDA_HOME)/include
+INCL += countpairs_s_mu_mocks_gpu.h $(CUDA_INCLUDE)
 endif
 
 TARGETOBJS:=$(TARGETSRC:.c=.o)

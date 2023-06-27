@@ -2156,6 +2156,7 @@ static PyObject *countpairs_countpairs_s_mu_mocks(PyObject *self, PyObject *args
     struct config_options options = get_config_options();
     options.verbose = 0;
     options.instruction_set = -1;
+    options.instruction_set = 0;
     options.periodic = 0;
     options.fast_divide_and_NR_steps=0;
     options.enable_min_sep_opt = 1;
@@ -2197,6 +2198,7 @@ static PyObject *countpairs_countpairs_s_mu_mocks(PyObject *self, PyObject *args
         "enable_min_sep_opt",
         "c_api_timer",
         "isa",/* instruction set to use of type enum isa; valid values are AVX512F, AVX, SSE, FALLBACK (enum) */
+        "gpu",
         "weight_type",
         "pair_weights",
         "sep_pair_weights",
@@ -2207,7 +2209,7 @@ static PyObject *countpairs_countpairs_s_mu_mocks(PyObject *self, PyObject *args
         NULL
     };
 
-    if ( ! PyArg_ParseTupleAndKeywords(args, kwargs, "iiO!diO!O!O!|OO!O!O!ObbbbbbhbbbisO!O!OOII", kwlist,
+    if ( ! PyArg_ParseTupleAndKeywords(args, kwargs, "iiO!diO!O!O!|OO!O!O!ObbbbbbhbbbiisO!O!OOII", kwlist,
                                        &autocorr,&nthreads,
                                        &PyArray_Type,&bins_obj,
                                        &mu_max,&nmu_bins,
@@ -2228,6 +2230,7 @@ static PyObject *countpairs_countpairs_s_mu_mocks(PyObject *self, PyObject *args
                                        &(options.enable_min_sep_opt),
                                        &(options.c_api_timer),
                                        &(options.instruction_set),
+                                       &(options.use_gpu),
                                        &weighting_method_str,
                                        &PyArray_Type,&pair_weight_obj,
                                        &PyArray_Type,&sep_pair_weight_obj,

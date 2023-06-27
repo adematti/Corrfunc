@@ -16,7 +16,16 @@ CFLAGS ?=
 #### Add any compiler specific link flags you want
 CLINK ?=
 
-CUFLAGS := -ccbin gcc   -m64  -gencode arch=compute_60,code=sm_60  -gencode arch=compute_61,code=sm_61 -gencode arch=compute_70,code=sm_70 -gencode arch=compute_75,code=sm_75 -gencode arch=compute_80,code=sm_80 -gencode arch=compute_86,code=sm_86 -gencode arch=compute_86,code=compute_86 -Xcompiler -Ofast -I../../io -I../../utils  -c
+CUFLAGS := -ccbin gcc -m64 -gencode arch=compute_60,code=sm_60  -gencode arch=compute_61,code=sm_61 -gencode arch=compute_70,code=sm_70 -gencode arch=compute_75,code=sm_75 -gencode arch=compute_80,code=sm_80 -gencode arch=compute_86,code=sm_86 -gencode arch=compute_86,code=compute_86 -Xcompiler -Ofast --compiler-options '-fPIC' -I../../io -I../../utils -c
+
+NVCC_RESULT := $(shell which nvcc 2> NULL)
+NVCC_TEST := $(notdir $(NVCC_RESULT))
+ifeq ($(NVCC_TEST),nvcc)
+#Add GPU module to LIBSRC
+CFLAGS += -DGPU
+CLINK += -L$(CUDA_HOME)/lib64 -lcudart
+CUDA_INCLUDE := $(CUDA_HOME)/include
+endif
 
 ## Set the python command (supply the full path to python you want to
 ## use, if different from directly calling `python` on the shell,

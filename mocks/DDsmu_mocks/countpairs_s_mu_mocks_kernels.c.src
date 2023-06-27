@@ -1658,7 +1658,7 @@ static inline int countpairs_s_mu_mocks_gpu_DOUBLE(const int64_t N0, DOUBLE *x0,
             i++;
         }
         int nthreads = tot_nblocks * THREADS_PER_BLOCK;
-        fprintf(stderr,"Cellpair %d to %d of %ld: nthreads = %d\n", i_start, i, num_cell_pairs, nthreads);
+        //fprintf(stderr,"Cellpair %d to %d of %ld: nthreads = %d\n", i_start, i, num_cell_pairs, nthreads);
 
         status = gpu_batch_countpairs_s_mu_mocks_DOUBLE(x0, y0, z0, weights0, nw0,
                        x1, y1, z1, weights1, nw1,
