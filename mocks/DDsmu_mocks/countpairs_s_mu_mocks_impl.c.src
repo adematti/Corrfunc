@@ -505,7 +505,6 @@ int countpairs_mocks_s_mu_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUB
                         gpu_Z2[i2++] = second->z[i_second];
                 }
         }
-
     }
 #endif
 
@@ -534,9 +533,14 @@ int countpairs_mocks_s_mu_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUB
 
 #ifdef GPU
 #if defined(_OPENMP)
-        int64_t cellpair_start = tid*num_cell_pairs/numthreads;
-        int64_t cellpair_end = (tid+1)*num_cell_pairs/numthreads;
-        if (use_gpu) {
+        //check n gpu so as to not crash if more threads than GPU are specified
+        int ngpu;
+        cudaGetDeviceCount(&ngpu);
+        int gputhreads = numthreads;
+        if (gputhreads > ngpu) gputhreads = ngpu;
+        int64_t cellpair_start = tid*num_cell_pairs/gputhreads;
+        int64_t cellpair_end = (tid+1)*num_cell_pairs/gputhreads;
+        if (use_gpu && tid < ngpu) {
                 //set CUDA device to this thread id
                 //should never have more threads than GPUs
                 cudaSetDevice(tid);
@@ -553,6 +557,8 @@ int countpairs_mocks_s_mu_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUB
         int *gpu_cellpair_lut, *gpu_cellthread_lut;
 
         if (use_gpu) {
+            //Only execute for thread ids < ngpu
+            if (tid < ngpu) {
                 //gpu_print_cuda_error();
                 gpu_allocate_outputs_DOUBLE(&gpu_savg, &gpu_npairs, totnbins);
                 if (need_weightavg) gpu_allocate_weight_output_DOUBLE(&gpu_weightavg, totnbins);
@@ -571,6 +577,7 @@ int countpairs_mocks_s_mu_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUB
                                                                          gpu_weightavg, extra->weight_method, options->bin_type, options->los_type, autocorr,
                                                                          gpu_cellpair_lut, gpu_cellthread_lut);
                 abort_status |= status;
+            }
         } else {
 #endif //GPU
 
@@ -647,7 +654,8 @@ int countpairs_mocks_s_mu_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUB
     //Free memory and copy outputs back to CPU
     //Handle outputs and block LUTs here
     //This will sum up all multi-GPU results (use +=)
-    if (use_gpu) {
+    //Check thread id to make sure it is < ngpu
+    if (use_gpu && tid < ngpu) {
         //Copy outputs back to CPU
         for (int j = 0; j < totnbins; j++) {
             npairs[j] += (uint64_t)gpu_npairs[j];
