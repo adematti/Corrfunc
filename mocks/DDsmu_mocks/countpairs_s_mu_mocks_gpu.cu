@@ -18,6 +18,7 @@ extern "C" {
 #include "cellarray_mocks_float.h"
 
 #include "countpairs_s_mu_mocks_gpu.h"
+#include <cuda_runtime.h>
 }
 
 __global__ void countpairs_s_mu_mocks_kernel_double(double *x0, double *y0, double *z0,

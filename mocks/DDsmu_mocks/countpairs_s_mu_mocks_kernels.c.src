@@ -1597,13 +1597,15 @@ static inline int countpairs_s_mu_mocks_gpu_DOUBLE(const int64_t N0, DOUBLE *x0,
                                                         const int64_t N1, DOUBLE *x1, DOUBLE *y1, DOUBLE *z1, DOUBLE *weights1, uint8_t nw1,
                                                         int *same_cell,
                                                         int64_t *gpu_icell0, int64_t *gpu_icell1, int64_t num_cell_pairs,
+                                                        int64_t cell_pair_start, int64_t cell_pair_end,
                                                         int *gpu_np0, int *gpu_np1, int *gpu_start_idx0, int *gpu_start_idx1,
                                                         const DOUBLE smax, const DOUBLE smin, const int nsbin,
                                                         const int nmu_bins, const DOUBLE *supp_sqr, const DOUBLE mu_max,
                                                         DOUBLE *min_xdiff, DOUBLE *min_ydiff,
                                                         DOUBLE *savg, int *npairs,
                                                         DOUBLE *weightavg, const weight_method_t weight_method,
-                                                        const bin_type_t bin_type, const los_type_t los_type, const int autocorr)
+                                                        const bin_type_t bin_type, const los_type_t los_type, const int autocorr,
+                                                        int *cellpair_lut, int *cellthread_lut)
 {
     if(N0 == 0 || N1 == 0) {
         return EXIT_SUCCESS;
@@ -1628,22 +1630,32 @@ static inline int countpairs_s_mu_mocks_gpu_DOUBLE(const int64_t N0, DOUBLE *x0,
     const int max_threads = 400000000; //400M
     const int max_blocks = (max_threads+THREADS_PER_BLOCK-1) / THREADS_PER_BLOCK; //max num blocks
 
-    int *cellpair_lut, *cellthread_lut;
-    gpu_allocate_block_luts(&cellpair_lut, &cellthread_lut, max_blocks);
+    //7/17/23 - moved allocation of cellpair_lut and cellthread_lut to countpairs_mocks_impl
 
     /*----------------- GPU CODE --------------------*/
 
     //We want to loop over gpu_icell0, gpu_icell1 (length num_cell_pairs)
     //Striding through the kernel with a reasonable number of threads
     //Where threads = sum(gpu_np0[icell0[i]] * gpu_np1[icell1[i]])
-    int i = 0; 
+
+    //With multi-GPU support, i does not start at 0 necessarily
+    //total cell pairs are divided among GPUs with each handling a fraction
+    //of overall arrays from cell_pair_start to cell_pair_end.
+    //For 1 GPU, i starts at 0 and cell_pair_end == total_cell_pairs
+
+    int64_t i = cell_pair_start;
+
+    //get CUDA device
+    int d;
+    cudaGetDevice(&d);
+
     int status = EXIT_FAILURE; 
-    while (i < num_cell_pairs) {
-        int i_start = i;
+    while (i < cell_pair_end) {
+        int64_t i_start = i;
         int tot_nblocks = 0;
         int this_cell_threads = 0;
         int nblocks = 0;
-        while (i < num_cell_pairs && nblocks < max_blocks) {
+        while (i < cell_pair_end && nblocks < max_blocks) {
             //nthreads += gpu_np0[gpu_icell0[i]] * gpu_np1[gpu_icell1[i]];
             this_cell_threads = gpu_np0[gpu_icell0[i]] * gpu_np1[gpu_icell1[i]];
             nblocks = (this_cell_threads+THREADS_PER_BLOCK-1)/THREADS_PER_BLOCK;
@@ -1658,7 +1670,7 @@ static inline int countpairs_s_mu_mocks_gpu_DOUBLE(const int64_t N0, DOUBLE *x0,
             i++;
         }
         int nthreads = tot_nblocks * THREADS_PER_BLOCK;
-        //fprintf(stderr,"Cellpair %d to %d of %ld: nthreads = %d\n", i_start, i, num_cell_pairs, nthreads);
+        fprintf(stderr,"GPU %d: Cellpair %ld to %ld of %ld: nthreads = %d\n", d, i_start, i, num_cell_pairs, nthreads);
 
         status = gpu_batch_countpairs_s_mu_mocks_DOUBLE(x0, y0, z0, weights0, nw0,
                        x1, y1, z1, weights1, nw1,
@@ -1674,7 +1686,7 @@ static inline int countpairs_s_mu_mocks_gpu_DOUBLE(const int64_t N0, DOUBLE *x0,
                        inv_sstep, smin_invstep,
                        need_savg, weight_method, autocorr, los_type, bin_type);
     }
-    gpu_free_block_luts(cellpair_lut, cellthread_lut);
+    //no longer need to free block LUTs here, done in countpairs_mocks_impl
 
     return status;
 }//end of GPU code
