@@ -1605,7 +1605,7 @@ static inline int countpairs_s_mu_mocks_gpu_DOUBLE(const int64_t N0, DOUBLE *x0,
                                                         DOUBLE *savg, int *npairs,
                                                         DOUBLE *weightavg, const weight_method_t weight_method,
                                                         const bin_type_t bin_type, const los_type_t los_type, const int autocorr,
-                                                        int *cellpair_lut, int *cellthread_lut)
+                                                        int *cellpair_lut, int *cellthread_lut, uint8_t verbose)
 {
     if(N0 == 0 || N1 == 0) {
         return EXIT_SUCCESS;
@@ -1670,7 +1670,7 @@ static inline int countpairs_s_mu_mocks_gpu_DOUBLE(const int64_t N0, DOUBLE *x0,
             i++;
         }
         int nthreads = tot_nblocks * THREADS_PER_BLOCK;
-        fprintf(stderr,"GPU %d: Cellpair %ld to %ld of %ld: nthreads = %d\n", d, i_start, i, num_cell_pairs, nthreads);
+        if (verbose) fprintf(stderr,"GPU %d: Cellpair %ld to %ld of %ld: nthreads = %d\n", d, i_start, i, num_cell_pairs, nthreads);
 
         status = gpu_batch_countpairs_s_mu_mocks_DOUBLE(x0, y0, z0, weights0, nw0,
                        x1, y1, z1, weights1, nw1,

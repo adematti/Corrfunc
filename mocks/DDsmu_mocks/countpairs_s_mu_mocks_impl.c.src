@@ -575,7 +575,7 @@ int countpairs_mocks_s_mu_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUB
                                                                          gpu_min_dx, gpu_min_dy,
                                                                          gpu_savg, gpu_npairs,
                                                                          gpu_weightavg, extra->weight_method, options->bin_type, options->los_type, autocorr,
-                                                                         gpu_cellpair_lut, gpu_cellthread_lut);
+                                                                         gpu_cellpair_lut, gpu_cellthread_lut, options->verbose);
                 abort_status |= status;
             }
         } else {
