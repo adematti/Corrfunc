@@ -68,7 +68,7 @@ int gpu_batch_countpairs_s_mu_mocks_double(double *x0, double *y0, double *z0, d
                const double sqr_smax, const double sqr_smin, const int nsbin,
                const int nmu_bins, 
                const double sqr_mumax, const double inv_dmu, const double mumin_invstep,
-               double inv_sstep, double smin_invstep,
+               double inv_sstep, double smin_invstep, const selection_struct selection,
                int need_savg, const weight_method_t weight_method, int autocorr, int los_type, int bin_type);
 
 
@@ -83,7 +83,7 @@ int gpu_batch_countpairs_s_mu_mocks_float(float *x0, float *y0, float *z0, float
                const float sqr_smax, const float sqr_smin, const int nsbin,
                const int nmu_bins,
                const float sqr_mumax, const float inv_dmu, const float mumin_invstep,
-               float inv_sstep, float smin_invstep,
+               float inv_sstep, float smin_invstep, const selection_struct selection,
                int need_savg, const weight_method_t weight_method, int autocorr, int los_type, int bin_type);
 
 // ======================================================= /

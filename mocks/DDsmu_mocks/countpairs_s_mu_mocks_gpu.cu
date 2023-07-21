@@ -32,7 +32,7 @@ __global__ void countpairs_s_mu_mocks_kernel_double(double *x0, double *y0, doub
                const double sqr_smax, const double sqr_smin, const int nsbin,
                const int nmu_bins, 
                const double sqr_mumax, const double inv_dmu, const double mumin_invstep,
-               double inv_sstep, double smin_invstep,
+               double inv_sstep, double smin_invstep, const selection_struct selection,
                int need_savg, int autocorr, int los_type, int bin_type) {
     //thread index tidx 
     int tidx = blockDim.x * blockIdx.x + threadIdx.x;
@@ -126,6 +126,7 @@ __global__ void countpairs_s_mu_mocks_kernel_double(double *x0, double *y0, doub
     int mubin = nmu_bins, mubin2 = nmu_bins;
     if (sqr_s <= 0.) {
         mubin2 = mubin = (int) mumin_invstep;
+        if((selection.selection_type & RP_SELECTION) && ((0. < selection.rpmin_sqr) || (0. >= selection.rpmax_sqr))) return;
     } 
     else if (los_type == MIDPOINT_LOS) {
         const double s_dot_l = parx*perpx + pary*perpy + parz*perpz;
@@ -134,6 +135,10 @@ __global__ void countpairs_s_mu_mocks_kernel_double(double *x0, double *y0, doub
         if (sqr_mu >= sqr_mumax) {
             return;
         } 
+        if (selection.selection_type & RP_SELECTION) {
+            const double sqr_rp = (1. - sqr_mu) * sqr_s;
+            if ((sqr_rp < selection.rpmin_sqr) || (sqr_rp >= selection.rpmax_sqr)) return;
+        }
         const double mu = s_dot_l >= 0 ? sqrt(sqr_mu) : -sqrt(sqr_mu);
         mubin = (int) (mu * inv_dmu + mumin_invstep);
         if (autocorr == 1) mubin2 = (int) (- mu * inv_dmu + mumin_invstep);
@@ -142,24 +147,33 @@ __global__ void countpairs_s_mu_mocks_kernel_double(double *x0, double *y0, doub
     else {
         const double s_dot_l = xhat0*perpx + yhat0*perpy + zhat0*perpz;
         const double sqr_mu = s_dot_l * s_dot_l / sqr_s;
+
+        int skip_mu = (sqr_mu >= sqr_mumax);
+        if (selection.selection_type & RP_SELECTION) {
+            const double sqr_rp = (1. - sqr_mu) * sqr_s;
+            if ((sqr_rp < selection.rpmin_sqr) || (sqr_rp >= selection.rpmax_sqr)) skip_mu = 1;
+        }
         if (autocorr == 1) {
             const double s_dot_l2 = xhat1*perpx + yhat1*perpy + zhat1*perpz;
-	    const double sqr_mu2 = s_dot_l2 * s_dot_l2 / sqr_s;
-	    const int skip_mu = (sqr_mu >= sqr_mumax);
-	    const int skip_mu2 = (sqr_mu2 >= sqr_mumax);
-	    if (skip_mu && skip_mu2) {
+            const double sqr_mu2 = s_dot_l2 * s_dot_l2 / sqr_s;
+            int skip_mu2 = (sqr_mu2 >= sqr_mumax);
+            if (selection.selection_type & RP_SELECTION) {
+                const double sqr_rp = (1. - sqr_mu2) * sqr_s; 
+                if ((sqr_rp < selection.rpmin_sqr) || (sqr_rp >= selection.rpmax_sqr)) skip_mu2 = 1;
+            }
+            if (skip_mu && skip_mu2) {
                 return;
-            } 
-	    s = sqrt(sqr_s);
-	    if (skip_mu == 0) mubin = (int) (s_dot_l / s * inv_dmu + mumin_invstep);
-	    if (skip_mu2 == 0) mubin2 = (int) (- s_dot_l2 / s * inv_dmu + mumin_invstep);
-	}
-	else {
-	    if (sqr_mu >= sqr_mumax) {
+            }
+            s = sqrt(sqr_s);
+            if (skip_mu == 0) mubin = (int) (s_dot_l / s * inv_dmu + mumin_invstep);
+            if (skip_mu2 == 0) mubin2 = (int) (- s_dot_l2 / s * inv_dmu + mumin_invstep);
+        }
+        else {
+            if (skip_mu) {
                 return;
-            } 
-	    s = sqrt(sqr_s);
-	    mubin = (int) (s_dot_l / s * inv_dmu + mumin_invstep);
+            }
+            s = sqrt(sqr_s);
+            mubin = (int) (s_dot_l / s * inv_dmu + mumin_invstep);
 	}
     }
 
@@ -201,7 +215,7 @@ __global__ void countpairs_s_mu_mocks_kernel_float(float *x0, float *y0, float *
                const float sqr_smax, const float sqr_smin, const int nsbin,
                const int nmu_bins, 
                const float sqr_mumax, const float inv_dmu, const float mumin_invstep,
-               float inv_sstep, float smin_invstep,
+               float inv_sstep, float smin_invstep, const selection_struct selection,
                int need_savg, int autocorr, int los_type, int bin_type) {
     //thread index tidx 
     int tidx = blockDim.x * blockIdx.x + threadIdx.x;
@@ -297,6 +311,7 @@ __global__ void countpairs_s_mu_mocks_kernel_float(float *x0, float *y0, float *
     int mubin = nmu_bins, mubin2 = nmu_bins;
     if (sqr_s <= 0.) {
         mubin2 = mubin = (int) mumin_invstep;
+        if((selection.selection_type & RP_SELECTION) && ((0. < selection.rpmin_sqr) || (0. >= selection.rpmax_sqr))) return;
     } 
     else if (los_type == MIDPOINT_LOS) {
         const float s_dot_l = parx*perpx + pary*perpy + parz*perpz;
@@ -305,6 +320,10 @@ __global__ void countpairs_s_mu_mocks_kernel_float(float *x0, float *y0, float *
         if (sqr_mu >= sqr_mumax) {
             return;
         } 
+        if (selection.selection_type & RP_SELECTION) {
+            const float sqr_rp = (1. - sqr_mu) * sqr_s;
+            if ((sqr_rp < selection.rpmin_sqr) || (sqr_rp >= selection.rpmax_sqr)) return;
+        }
         const float mu = s_dot_l >= 0 ? sqrt(sqr_mu) : -sqrt(sqr_mu);
         mubin = (int) (mu * inv_dmu + mumin_invstep);
         if (autocorr == 1) mubin2 = (int) (- mu * inv_dmu + mumin_invstep);
@@ -313,25 +332,34 @@ __global__ void countpairs_s_mu_mocks_kernel_float(float *x0, float *y0, float *
     else {
         const float s_dot_l = xhat0*perpx + yhat0*perpy + zhat0*perpz;
         const float sqr_mu = s_dot_l * s_dot_l / sqr_s;
+
+        int skip_mu = (sqr_mu >= sqr_mumax);
+        if (selection.selection_type & RP_SELECTION) {
+            const float sqr_rp = (1. - sqr_mu) * sqr_s;
+            if ((sqr_rp < selection.rpmin_sqr) || (sqr_rp >= selection.rpmax_sqr)) skip_mu = 1;
+        }
         if (autocorr == 1) {
             const float s_dot_l2 = xhat1*perpx + yhat1*perpy + zhat1*perpz;
-	    const float sqr_mu2 = s_dot_l2 * s_dot_l2 / sqr_s;
-	    const int skip_mu = (sqr_mu >= sqr_mumax);
-	    const int skip_mu2 = (sqr_mu2 >= sqr_mumax);
-	    if (skip_mu && skip_mu2) {
+            const float sqr_mu2 = s_dot_l2 * s_dot_l2 / sqr_s;
+            int skip_mu2 = (sqr_mu2 >= sqr_mumax);
+            if (selection.selection_type & RP_SELECTION) {
+                const float sqr_rp = (1. - sqr_mu2) * sqr_s;
+                if ((sqr_rp < selection.rpmin_sqr) || (sqr_rp >= selection.rpmax_sqr)) skip_mu2 = 1;
+            }
+            if (skip_mu && skip_mu2) {
                 return;
-            } 
-	    s = sqrt(sqr_s);
-	    if (skip_mu == 0) mubin = (int) (s_dot_l / s * inv_dmu + mumin_invstep);
-	    if (skip_mu2 == 0) mubin2 = (int) (- s_dot_l2 / s * inv_dmu + mumin_invstep);
-	}
-	else {
-	    if (sqr_mu >= sqr_mumax) {
+            }
+            s = sqrt(sqr_s);
+            if (skip_mu == 0) mubin = (int) (s_dot_l / s * inv_dmu + mumin_invstep);
+            if (skip_mu2 == 0) mubin2 = (int) (- s_dot_l2 / s * inv_dmu + mumin_invstep);
+        }
+        else {
+            if (skip_mu) {
                 return;
-            } 
-	    s = sqrt(sqr_s);
-	    mubin = (int) (s_dot_l / s * inv_dmu + mumin_invstep);
-	}
+            }
+            s = sqrt(sqr_s);
+            mubin = (int) (s_dot_l / s * inv_dmu + mumin_invstep);
+        }
     }
 
     float sw = s;
@@ -374,7 +402,7 @@ __global__ void countpairs_s_mu_mocks_pair_weights_kernel_double(double *x0, dou
                const double sqr_smax, const double sqr_smin, const int nsbin,
                const int nmu_bins, 
                const double sqr_mumax, const double inv_dmu, const double mumin_invstep,
-               double inv_sstep, double smin_invstep,
+               double inv_sstep, double smin_invstep, const selection_struct selection,
                int need_savg, int need_weightavg, int autocorr, int los_type, int bin_type) {
     //thread index tidx 
     int tidx = blockDim.x * blockIdx.x + threadIdx.x;
@@ -468,6 +496,7 @@ __global__ void countpairs_s_mu_mocks_pair_weights_kernel_double(double *x0, dou
     int mubin = nmu_bins, mubin2 = nmu_bins;
     if (sqr_s <= 0.) {
         mubin2 = mubin = (int) mumin_invstep;
+        if((selection.selection_type & RP_SELECTION) && ((0. < selection.rpmin_sqr) || (0. >= selection.rpmax_sqr))) return;
     } 
     else if (los_type == MIDPOINT_LOS) {
         const double s_dot_l = parx*perpx + pary*perpy + parz*perpz;
@@ -476,6 +505,10 @@ __global__ void countpairs_s_mu_mocks_pair_weights_kernel_double(double *x0, dou
         if (sqr_mu >= sqr_mumax) {
             return;
         } 
+        if (selection.selection_type & RP_SELECTION) {
+            const double sqr_rp = (1. - sqr_mu) * sqr_s;
+            if ((sqr_rp < selection.rpmin_sqr) || (sqr_rp >= selection.rpmax_sqr)) return;
+        }
         const double mu = s_dot_l >= 0 ? sqrt(sqr_mu) : -sqrt(sqr_mu);
         mubin = (int) (mu * inv_dmu + mumin_invstep);
         if (autocorr == 1) mubin2 = (int) (- mu * inv_dmu + mumin_invstep);
@@ -484,25 +517,34 @@ __global__ void countpairs_s_mu_mocks_pair_weights_kernel_double(double *x0, dou
     else {
         const double s_dot_l = xhat0*perpx + yhat0*perpy + zhat0*perpz;
         const double sqr_mu = s_dot_l * s_dot_l / sqr_s;
+
+        int skip_mu = (sqr_mu >= sqr_mumax);
+        if (selection.selection_type & RP_SELECTION) {
+            const double sqr_rp = (1. - sqr_mu) * sqr_s;
+            if ((sqr_rp < selection.rpmin_sqr) || (sqr_rp >= selection.rpmax_sqr)) skip_mu = 1;
+        }
         if (autocorr == 1) {
             const double s_dot_l2 = xhat1*perpx + yhat1*perpy + zhat1*perpz;
-	    const double sqr_mu2 = s_dot_l2 * s_dot_l2 / sqr_s;
-	    const int skip_mu = (sqr_mu >= sqr_mumax);
-	    const int skip_mu2 = (sqr_mu2 >= sqr_mumax);
-	    if (skip_mu && skip_mu2) {
+            const double sqr_mu2 = s_dot_l2 * s_dot_l2 / sqr_s;
+            int skip_mu2 = (sqr_mu2 >= sqr_mumax);
+            if (selection.selection_type & RP_SELECTION) {
+                const double sqr_rp = (1. - sqr_mu2) * sqr_s;
+                if ((sqr_rp < selection.rpmin_sqr) || (sqr_rp >= selection.rpmax_sqr)) skip_mu2 = 1;
+            }
+            if (skip_mu && skip_mu2) {
                 return;
-            } 
-	    s = sqrt(sqr_s);
-	    if (skip_mu == 0) mubin = (int) (s_dot_l / s * inv_dmu + mumin_invstep);
-	    if (skip_mu2 == 0) mubin2 = (int) (- s_dot_l2 / s * inv_dmu + mumin_invstep);
-	}
-	else {
-	    if (sqr_mu >= sqr_mumax) {
+            }
+            s = sqrt(sqr_s);
+            if (skip_mu == 0) mubin = (int) (s_dot_l / s * inv_dmu + mumin_invstep);
+            if (skip_mu2 == 0) mubin2 = (int) (- s_dot_l2 / s * inv_dmu + mumin_invstep);
+        }
+        else {
+            if (skip_mu) {
                 return;
-            } 
-	    s = sqrt(sqr_s);
-	    mubin = (int) (s_dot_l / s * inv_dmu + mumin_invstep);
-	}
+            }
+            s = sqrt(sqr_s);
+            mubin = (int) (s_dot_l / s * inv_dmu + mumin_invstep);
+        }
     }
 
     double pairweight = 0; 
@@ -568,7 +610,7 @@ __global__ void countpairs_s_mu_mocks_pair_weights_kernel_float(float *x0, float
                const float sqr_smax, const float sqr_smin, const int nsbin,
                const int nmu_bins, 
                const float sqr_mumax, const float inv_dmu, const float mumin_invstep,
-               float inv_sstep, float smin_invstep,
+               float inv_sstep, float smin_invstep, const selection_struct selection,
                int need_savg, int need_weightavg, int autocorr, int los_type, int bin_type) {
     //thread index tidx 
     int tidx = blockDim.x * blockIdx.x + threadIdx.x;
@@ -662,6 +704,7 @@ __global__ void countpairs_s_mu_mocks_pair_weights_kernel_float(float *x0, float
     int mubin = nmu_bins, mubin2 = nmu_bins;
     if (sqr_s <= 0.) {
         mubin2 = mubin = (int) mumin_invstep;
+        if((selection.selection_type & RP_SELECTION) && ((0. < selection.rpmin_sqr) || (0. >= selection.rpmax_sqr))) return;
     } 
     else if (los_type == MIDPOINT_LOS) {
         const float s_dot_l = parx*perpx + pary*perpy + parz*perpz;
@@ -670,6 +713,10 @@ __global__ void countpairs_s_mu_mocks_pair_weights_kernel_float(float *x0, float
         if (sqr_mu >= sqr_mumax) {
             return;
         } 
+        if (selection.selection_type & RP_SELECTION) {
+            const float sqr_rp = (1. - sqr_mu) * sqr_s;
+            if ((sqr_rp < selection.rpmin_sqr) || (sqr_rp >= selection.rpmax_sqr)) return;
+        }
         const float mu = s_dot_l >= 0 ? sqrt(sqr_mu) : -sqrt(sqr_mu);
         mubin = (int) (mu * inv_dmu + mumin_invstep);
         if (autocorr == 1) mubin2 = (int) (- mu * inv_dmu + mumin_invstep);
@@ -678,25 +725,34 @@ __global__ void countpairs_s_mu_mocks_pair_weights_kernel_float(float *x0, float
     else {
         const float s_dot_l = xhat0*perpx + yhat0*perpy + zhat0*perpz;
         const float sqr_mu = s_dot_l * s_dot_l / sqr_s;
+
+        int skip_mu = (sqr_mu >= sqr_mumax);
+        if (selection.selection_type & RP_SELECTION) {
+            const float sqr_rp = (1. - sqr_mu) * sqr_s;
+            if ((sqr_rp < selection.rpmin_sqr) || (sqr_rp >= selection.rpmax_sqr)) skip_mu = 1;
+        }
         if (autocorr == 1) {
             const float s_dot_l2 = xhat1*perpx + yhat1*perpy + zhat1*perpz;
-	    const float sqr_mu2 = s_dot_l2 * s_dot_l2 / sqr_s;
-	    const int skip_mu = (sqr_mu >= sqr_mumax);
-	    const int skip_mu2 = (sqr_mu2 >= sqr_mumax);
-	    if (skip_mu && skip_mu2) {
+            const float sqr_mu2 = s_dot_l2 * s_dot_l2 / sqr_s;
+            int skip_mu2 = (sqr_mu2 >= sqr_mumax);
+            if (selection.selection_type & RP_SELECTION) {
+                const float sqr_rp = (1. - sqr_mu2) * sqr_s;
+                if ((sqr_rp < selection.rpmin_sqr) || (sqr_rp >= selection.rpmax_sqr)) skip_mu2 = 1;
+            }
+            if (skip_mu && skip_mu2) {
                 return;
-            } 
-	    s = sqrt(sqr_s);
-	    if (skip_mu == 0) mubin = (int) (s_dot_l / s * inv_dmu + mumin_invstep);
-	    if (skip_mu2 == 0) mubin2 = (int) (- s_dot_l2 / s * inv_dmu + mumin_invstep);
-	}
-	else {
-	    if (sqr_mu >= sqr_mumax) {
+            }
+            s = sqrt(sqr_s);
+            if (skip_mu == 0) mubin = (int) (s_dot_l / s * inv_dmu + mumin_invstep);
+            if (skip_mu2 == 0) mubin2 = (int) (- s_dot_l2 / s * inv_dmu + mumin_invstep);
+        }
+        else {
+            if (skip_mu) {
                 return;
-            } 
-	    s = sqrt(sqr_s);
-	    mubin = (int) (s_dot_l / s * inv_dmu + mumin_invstep);
-	}
+            }
+            s = sqrt(sqr_s);
+            mubin = (int) (s_dot_l / s * inv_dmu + mumin_invstep);
+        }
     }
 
     float pairweight = 0; 
@@ -966,7 +1022,7 @@ int gpu_batch_countpairs_s_mu_mocks_double(double *x0, double *y0, double *z0,
                const double sqr_smax, const double sqr_smin, const int nsbin,
                const int nmu_bins, 
                const double sqr_mumax, const double inv_dmu, const double mumin_invstep,
-               double inv_sstep, double smin_invstep,
+               double inv_sstep, double smin_invstep, const selection_struct selection,
                int need_savg, const weight_method_t weight_method, int autocorr, int los_type, int bin_type) {
     long threads = N;
     int blocksPerGrid = (threads+THREADS_PER_BLOCK-1) / THREADS_PER_BLOCK;
@@ -987,7 +1043,7 @@ int gpu_batch_countpairs_s_mu_mocks_double(double *x0, double *y0, double *z0,
             savg, npairs, weightavg, supp_sqr,
             sqr_smax, sqr_smin, nsbin, nmu_bins,
             sqr_mumax,inv_dmu,mumin_invstep,
-            inv_sstep, smin_invstep,
+            inv_sstep, smin_invstep, selection,
             need_savg, 1, autocorr, los_type, bin_type);
     } else {
         countpairs_s_mu_mocks_kernel_double<<<blocksPerGrid, THREADS_PER_BLOCK>>>(
@@ -1001,7 +1057,7 @@ int gpu_batch_countpairs_s_mu_mocks_double(double *x0, double *y0, double *z0,
             savg, npairs, supp_sqr,
             sqr_smax, sqr_smin, nsbin, nmu_bins, 
             sqr_mumax,inv_dmu,mumin_invstep,
-            inv_sstep, smin_invstep,
+            inv_sstep, smin_invstep, selection,
             need_savg, autocorr, los_type, bin_type);
     }
 
@@ -1029,7 +1085,7 @@ int gpu_batch_countpairs_s_mu_mocks_float(float *x0, float *y0, float *z0,
                const float sqr_smax, const float sqr_smin, const int nsbin,
                const int nmu_bins,
                const float sqr_mumax, const float inv_dmu, const float mumin_invstep,
-               float inv_sstep, float smin_invstep,
+               float inv_sstep, float smin_invstep, const selection_struct selection,
                int need_savg, const weight_method_t weight_method, int autocorr, int los_type, int bin_type) {
     long threads = N;
     int blocksPerGrid = (threads+THREADS_PER_BLOCK-1) / THREADS_PER_BLOCK;
@@ -1050,7 +1106,7 @@ int gpu_batch_countpairs_s_mu_mocks_float(float *x0, float *y0, float *z0,
             savg, npairs, weightavg, supp_sqr,
             sqr_smax, sqr_smin, nsbin, nmu_bins,
             sqr_mumax,inv_dmu,mumin_invstep,
-            inv_sstep, smin_invstep,
+            inv_sstep, smin_invstep, selection,
             need_savg, 1, autocorr, los_type, bin_type);
     } else {
         countpairs_s_mu_mocks_kernel_float<<<blocksPerGrid, THREADS_PER_BLOCK>>>(
@@ -1064,7 +1120,7 @@ int gpu_batch_countpairs_s_mu_mocks_float(float *x0, float *y0, float *z0,
             savg, npairs, supp_sqr,
             sqr_smax, sqr_smin, nsbin, nmu_bins,
             sqr_mumax,inv_dmu,mumin_invstep,
-            inv_sstep, smin_invstep,
+            inv_sstep, smin_invstep, selection,
             need_savg, autocorr, los_type, bin_type);
     }
 
