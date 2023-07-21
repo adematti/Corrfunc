@@ -268,11 +268,6 @@ def DDsmu_mocks(autocorr, nthreads, binfile, mumax, nmubins,
         Y2 = np.empty(1)
         Z2 = np.empty(1)
 
-    if gpu and nthreads > 1:
-        import warnings
-        warnings.warn('cannot use more than 1 thread with GPU')
-        nthreads = 1
-
     weights1, weights2 = process_weights(weights1, weights2, X1, X2, weight_type, autocorr)
 
     # Ensure all input arrays are native endian
