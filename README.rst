@@ -52,7 +52,7 @@ Pre-requisites
    (often ``module load gsl`` will work).  With Anaconda Python, use
    ``conda install -c conda-forge gsl`` (MAC/linux). On MAC, you can use
    ``(sudo) port install gsl`` (MAC) if necessary.
-4. ``python >= 2.7`` or ``python>=3.4`` for compiling the CPython extensions.
+4. ``python>=2.7`` or ``python>=3.4`` for compiling the CPython extensions.
 5. ``numpy>=1.7`` for compiling the CPython extensions.
 
 Method 1: Source Installation (Recommended)
