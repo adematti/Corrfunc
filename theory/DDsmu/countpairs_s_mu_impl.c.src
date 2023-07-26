@@ -25,6 +25,10 @@
 #include "gridlink_impl_DOUBLE.h"//function proto-type for gridlink
 #include "gridlink_utils_DOUBLE.h" //for associated helper routines
 
+#ifdef GPU
+#include "countpairs_s_mu_gpu.h"
+#endif
+
 #if defined(_OPENMP)
 #include <omp.h>
 #endif
@@ -115,6 +119,11 @@ countpairs_s_mu_func_ptr_DOUBLE countpairs_s_mu_driver_DOUBLE(const struct confi
 
     if(options->verbose){
         // Must be ordered low to high, since higher ISA may be aliased to lower ones
+#ifdef GPU
+        if (options->use_gpu) {
+            fprintf(stderr,"Using GPU kernel\n");
+        } else
+#endif
         if(function_dispatch == fallback_index){
             fprintf(stderr,"Using fallback kernel\n");
         } else if(function_dispatch == sse_index){
@@ -149,6 +158,7 @@ int countpairs_s_mu_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z1
                 __FUNCTION__, sizeof(DOUBLE), options->float_type);
         return EXIT_FAILURE;
     }
+    bool use_gpu = (bool)options->use_gpu;
 
     /***********************
      *initializing the  bins
@@ -459,6 +469,109 @@ int countpairs_s_mu_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z1
         init_my_progressbar(num_cell_pairs, &interrupted);
     }
 
+#ifdef GPU
+    //declare GPU arrays here - there's no real penalty if use_gpu is false, they never get allocated
+    DOUBLE *gpu_X1, *gpu_Y1, *gpu_Z1;
+    DOUBLE *gpu_X2, *gpu_Y2, *gpu_Z2;
+    DOUBLE *gpu_W1, *gpu_W2;
+
+    DOUBLE *gpu_min_dx, *gpu_min_dy; //min_dz not needed for GPU kernel
+    DOUBLE *gpu_xwrap, *gpu_ywrap, *gpu_zwrap;
+    //DOUBLE *gpu_xwrap;
+    //DOUBLE *gpu_ywrap;
+    //DOUBLE *gpu_zwrap;
+    DOUBLE *gpu_supp_sqr;
+
+    //with multi-GPU mode, declare outputs within OPENMP parallel block
+    // - gpu_npairs, gpu_savg, gpu_weightavg
+
+    int *gpu_same_cell;
+    int64_t *gpu_icell0, *gpu_icell1;
+    int *gpu_np0, *gpu_np1;
+    int *gpu_start_idx0, *gpu_start_idx1;
+
+    uint8_t nw1 = (extra->weights0).num_weights;
+    uint8_t nw2 = (extra->weights1).num_weights;
+
+    //define max threads and max blocks here
+    const int max_threads = 400000000; //400M
+    const int max_blocks = (max_threads+THREADS_PER_BLOCK-1) / THREADS_PER_BLOCK; //max num blocks
+
+    //allocate global arrays here outside of OPENMP parallel block
+    //outputs and block LUTs will be allocated inside OPENMP block
+    if (use_gpu) {
+        gpu_allocate_cellarray_DOUBLE(&gpu_X1, &gpu_Y1, &gpu_Z1, ND1);
+        gpu_allocate_cellarray_DOUBLE(&gpu_X2, &gpu_Y2, &gpu_Z2, ND2);
+        gpu_allocate_mins_DOUBLE(&gpu_min_dx, &gpu_min_dy, num_cell_pairs);
+        gpu_allocate_wraps_DOUBLE(&gpu_xwrap, &gpu_ywrap, &gpu_zwrap, num_cell_pairs);
+        gpu_allocate_cell_luts(&gpu_same_cell, &gpu_icell0, &gpu_icell1, num_cell_pairs);
+        gpu_allocate_lattice_luts(&gpu_np0, &gpu_start_idx0, totncells);
+        gpu_allocate_lattice_luts(&gpu_np1, &gpu_start_idx1, totncells);
+        if (nw1 > 0) gpu_allocate_weights_DOUBLE(&gpu_W1, ND1, nw1);
+        if (nw2 > 0) gpu_allocate_weights_DOUBLE(&gpu_W2, ND2, nw2);
+        gpu_allocate_supp_sqr_DOUBLE(&gpu_supp_sqr, nsbin);
+
+        //copy data to GPU
+        for (int i = 0; i < nsbin; i++) gpu_supp_sqr[i] = supp_sqr[i];
+
+        //int64_t tcount = 0; //thread count
+        int64_t icell1, icell2;
+        //int64_t maxc = 0, minc = 0;
+        //int64_t this_count = 0;
+        for(int64_t icellpair=0;icellpair<num_cell_pairs;icellpair++) {
+                struct cell_pair_DOUBLE *this_cell_pair = &all_cell_pairs[icellpair];
+                gpu_min_dx[icellpair] = this_cell_pair->min_dx;
+                gpu_min_dy[icellpair] = this_cell_pair->min_dy;
+                gpu_xwrap[icellpair] = this_cell_pair->xwrap;
+                gpu_ywrap[icellpair] = this_cell_pair->ywrap;
+                gpu_zwrap[icellpair] = this_cell_pair->zwrap;
+                gpu_same_cell[icellpair] = (int)this_cell_pair->same_cell;
+                icell1 = this_cell_pair->cellindex1;
+                icell2 = this_cell_pair->cellindex2;
+                gpu_icell0[icellpair] = icell1;
+                gpu_icell1[icellpair] = icell2;
+                //thread count is total number of inner loop iterations
+                //this_count = (&lattice1[icell1])->nelements * (&lattice2[icell2])->nelements;
+                //tcount += this_count;
+                //if (this_count > maxc) maxc= this_count;
+                //if (minc == 0 || this_count < minc) minc = this_count;
+        }
+
+        //loop over lattices and populate LUTs
+        int pcount1 = 0, pcount2 = 0;
+        int64_t i1 = 0, i2 = 0;
+        for (int64_t icell = 0; icell<totncells; icell++) {
+                gpu_np0[icell] = (&lattice1[icell])->nelements;
+                gpu_np1[icell] = (&lattice2[icell])->nelements;
+                gpu_start_idx0[icell] = pcount1;
+                gpu_start_idx1[icell] = pcount2;
+                pcount1 += (&lattice1[icell])->nelements;
+                pcount2 += (&lattice2[icell])->nelements;
+                const cellarray_DOUBLE *first = &lattice1[icell];
+                const cellarray_DOUBLE *second = &lattice2[icell];
+                //loop over elements in first, second cells
+                for (int i_first = 0; i_first < first->nelements; i_first++) {
+                       //loop over weights if nw1 > 0 and copy them
+                        for (int i_w = 0; i_w < nw1; i_w++) {
+                            gpu_W1[i1*nw1+i_w] = first->weights.weights[i_w][i_first];
+                        }
+                        gpu_X1[i1] = first->x[i_first];
+                        gpu_Y1[i1] = first->y[i_first];
+                        gpu_Z1[i1++] = first->z[i_first];
+                }
+                for (int i_second = 0; i_second < second->nelements; i_second++) {
+                        //loop over weights if nw1 > 1 and copy them
+                        for (int i_w = 0; i_w < nw2; i_w++) {
+                            gpu_W2[i2*nw2+i_w] = second->weights.weights[i_w][i_second];
+                        }
+                        gpu_X2[i2] = second->x[i_second];
+                        gpu_Y2[i2] = second->y[i_second];
+                        gpu_Z2[i2++] = second->z[i_second];
+                }
+        }
+    }
+#endif
+
 #if defined(_OPENMP)
 #pragma omp parallel shared(numdone, abort_status, interrupt_status_DDsmu_DOUBLE)
 {
@@ -481,6 +594,59 @@ int countpairs_s_mu_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z1
     DOUBLE *tmp_savg = NULL, *tmp_weightavg = NULL;
     if(options->need_avg_sep) tmp_savg = (DOUBLE *) malloc(sizeof(DOUBLE)*totnbins);
     if(need_weightavg) tmp_weightavg = (DOUBLE *) malloc(sizeof(DOUBLE)*totnbins);
+
+#ifdef GPU
+#if defined(_OPENMP)
+        //check n gpu so as to not crash if more threads than GPU are specified
+        int ngpu;
+        cudaGetDeviceCount(&ngpu);
+        int gputhreads = numthreads;
+        if (gputhreads > ngpu) gputhreads = ngpu;
+        int64_t cellpair_start = tid*num_cell_pairs/gputhreads;
+        int64_t cellpair_end = (tid+1)*num_cell_pairs/gputhreads;
+        if (use_gpu && tid < ngpu) {
+                //set CUDA device to this thread id
+                //should never have more threads than GPUs
+                cudaSetDevice(tid);
+        }
+#else
+        int64_t cellpair_start = 0;
+        int64_t cellpair_end = num_cell_pairs;
+#endif //USE_OMP
+
+        //declare and populate output arrays and block LUTs for GPU here, within OPENMP parallel block
+        DOUBLE *gpu_savg;
+        DOUBLE *gpu_weightavg;
+        int *gpu_npairs;
+        int *gpu_cellpair_lut, *gpu_cellthread_lut;
+
+        if (use_gpu) {
+            //Only execute for thread ids < ngpu
+            if (tid < ngpu) {
+                //gpu_print_cuda_error();
+                gpu_allocate_outputs_DOUBLE(&gpu_savg, &gpu_npairs, totnbins);
+                if (need_weightavg) gpu_allocate_weight_output_DOUBLE(&gpu_weightavg, totnbins);
+                gpu_allocate_block_luts(&gpu_cellpair_lut, &gpu_cellthread_lut, max_blocks);
+
+                //if using multi GPU + OPENMP, call GPU version of countpairs_s_mu_gpu_DOUBLE here
+                const int status = countpairs_s_mu_gpu_DOUBLE(ND1, gpu_X1, gpu_Y1, gpu_Z1, gpu_W1, nw1,
+                                                                         ND2, gpu_X2, gpu_Y2, gpu_Z2, gpu_W2, nw2,
+                                                                         gpu_same_cell,
+                                                                         gpu_icell0, gpu_icell1, num_cell_pairs,
+                                                                         cellpair_start, cellpair_end,
+                                                                         gpu_np0, gpu_np1, gpu_start_idx0, gpu_start_idx1,
+                                                                         smax, smin, nsbin, nmu_bins, gpu_supp_sqr, mu_max,
+                                                                         pimax, gpu_xwrap, gpu_ywrap, gpu_zwrap, 
+                                                                         gpu_min_dx, gpu_min_dy,
+                                                                         gpu_savg, gpu_npairs,
+                                                                         gpu_weightavg, extra->weight_method, options->selection,
+                                                                         options->bin_type, autocorr,
+                                                                         gpu_cellpair_lut, gpu_cellthread_lut, options->verbose);
+                abort_status |= status;
+            }
+        } else {
+#endif //GPU
+
 
 #if defined(_OPENMP)
 #pragma omp for schedule(dynamic)
@@ -549,10 +715,54 @@ int countpairs_s_mu_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z1
 
             }//error occurred somewhere in the called functions: abort_status is set
         }//loop over cell-pairs
+#ifdef GPU
+        //end if-else block in GPU mode
+        }
+#endif
     free(tmp_savg);
     free(tmp_weightavg);
+#ifdef GPU
+    //Free memory and copy outputs back to CPU
+    //Handle outputs and block LUTs here
+    //This will sum up all multi-GPU results (use +=)
+    //Check thread id to make sure it is < ngpu
+    if (use_gpu && tid < ngpu) {
+        //Copy outputs back to CPU
+        for (int j = 0; j < totnbins; j++) {
+            npairs[j] += (uint64_t)gpu_npairs[j];
+        }
+        if(options->need_avg_sep) {
+            for (int j = 0; j < totnbins; j++) {
+                savg[j] += gpu_savg[j];
+            }
+        }
+        gpu_free_outputs_DOUBLE(gpu_savg, gpu_npairs);
+
+        if (need_weightavg) {
+            for (int j = 0; j < totnbins; j++) {
+                weightavg[j] += gpu_weightavg[j];
+            }
+            gpu_free_weight_output_DOUBLE(gpu_weightavg);
+        }
+        gpu_free_block_luts(gpu_cellpair_lut, gpu_cellthread_lut);
+    }
+#endif
+
 #if defined(_OPENMP)
     }//close the omp parallel region
+#endif
+#ifdef GPU
+    //Free memory and copy outputs back to CPU
+    if (use_gpu) {
+        gpu_free_cellarray_DOUBLE(gpu_X1, gpu_Y1, gpu_Z1);
+        gpu_free_cellarray_DOUBLE(gpu_X2, gpu_Y2, gpu_Z2);
+        gpu_free_mins_DOUBLE(gpu_min_dx, gpu_min_dy);
+        gpu_free_wraps_DOUBLE(gpu_xwrap, gpu_ywrap, gpu_zwrap);
+        gpu_free_cell_luts(gpu_same_cell, gpu_icell0, gpu_icell1);
+        gpu_free_lattice_luts(gpu_np0, gpu_start_idx0);
+        gpu_free_lattice_luts(gpu_np1, gpu_start_idx1);
+        gpu_free_supp_sqr_DOUBLE(gpu_supp_sqr);
+    }
 #endif
 
     free(all_cell_pairs);
