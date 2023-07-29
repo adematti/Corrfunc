@@ -14,14 +14,14 @@ extern "C" {
 
 //#include "weight_functions_double.h"
 
-#include "cellarray_mocks_double.h"
-#include "cellarray_mocks_float.h"
+#include "cellarray_double.h"
+#include "cellarray_float.h"
 
-#include "countpairs_s_mu_mocks_gpu.h"
+#include "countpairs_s_mu_gpu.h"
 #include <cuda_runtime.h>
 }
 
-__global__ void countpairs_s_mu_mocks_kernel_double(double *x0, double *y0, double *z0,
+__global__ void countpairs_s_mu_kernel_double(double *x0, double *y0, double *z0,
                double *x1, double *y1, double *z1, int N,
                int *np0, int *np1, 
                int *same_cell, int64_t *icell0, int64_t *icell1, 
@@ -29,11 +29,12 @@ __global__ void countpairs_s_mu_mocks_kernel_double(double *x0, double *y0, doub
                int *start_idx0, int *start_idx1,
                double *min_xdiff, double *min_ydiff, 
                double *savg, int *npairs, const double *supp_sqr,
+               const double pimax, double *off_xwrap, double *off_ywrap, double *off_zwrap,
                const double sqr_smax, const double sqr_smin, const int nsbin,
                const int nmu_bins, 
                const double sqr_mumax, const double inv_dmu, const double mumin_invstep,
                double inv_sstep, double smin_invstep, const selection_struct selection,
-               int need_savg, int autocorr, int los_type, int bin_type) {
+               int need_savg, int autocorr, int bin_type) {
     //thread index tidx 
     int tidx = blockDim.x * blockIdx.x + threadIdx.x;
     if (tidx >= N) return;
@@ -56,9 +57,9 @@ __global__ void countpairs_s_mu_mocks_kernel_double(double *x0, double *y0, doub
     int j = start_idx1[cellindex1] + cell_tidx % this_np1;
 
     //get positions for each particle
-    double xpos = x0[i];
-    double ypos = y0[i];
-    double zpos = z0[i];
+    double xpos = x0[i] + off_xwrap[icellpair];
+    double ypos = y0[i] + off_ywrap[icellpair];
+    double zpos = z0[i] + off_zwrap[icellpair];
 
     double x1pos = x1[j];
     double y1pos = y1[j];
@@ -70,7 +71,8 @@ __global__ void countpairs_s_mu_mocks_kernel_double(double *x0, double *y0, doub
         return;
     }
 
-    const double max_dz = sqrt(sqr_smax - min_xdiff[icellpair]*min_xdiff[icellpair] - min_ydiff[icellpair]*min_ydiff[icellpair]);
+    double max_dz = sqrt(sqr_smax - min_xdiff[icellpair]*min_xdiff[icellpair] - min_ydiff[icellpair]*min_ydiff[icellpair]);
+    max_dz = pimax < max_dz ? pimax:max_dz;
     const double this_dz = z1pos-zpos;
     if (abs(this_dz) >= max_dz) {
         //particle too far away in z
@@ -79,132 +81,77 @@ __global__ void countpairs_s_mu_mocks_kernel_double(double *x0, double *y0, doub
 
     const double this_dx = x1pos-xpos;
     const double this_dy = y1pos-ypos;
-    if ((this_dx*this_dx + this_dy*this_dy + this_dz*this_dz) >= sqr_smax) {
+    const double sqr_min_sep_this_point = this_dx*this_dx + this_dy*this_dy + this_dz*this_dz;
+    if (sqr_min_sep_this_point >= sqr_smax || this_dz > pimax) {
+        //            if(sqr_min_sep_this_point >= sqr_smax || min_dz > pimax) {
         //particle too far away in separation
         return;
     } 
 
-    //hat1 calcs are done if need_weightavg || ((autocorr == 1) && (los_type == FIRSTPOINT_LOS)
-    //need_weightavg is FALSE by definition in this kernel so remove that part of conditional 
-    double xhat1=NULL, yhat1=NULL, zhat1=NULL;
-    if (((autocorr == 1) && (los_type == FIRSTPOINT_LOS))) {
-        const double norm1 = sqrt(x1pos*x1pos + y1pos*y1pos + z1pos*z1pos);
-        xhat1 = x1pos/norm1;
-        yhat1 = y1pos/norm1;
-        zhat1 = z1pos/norm1;
-    }
+    //const double sqr_max_dz = sqr_smax - min_dx*min_dx - min_dy*min_dy;
+    const double sqr_max_dz = sqr_smax - min_xdiff[icellpair]*min_xdiff[icellpair] - min_ydiff[icellpair]*min_ydiff[icellpair];
+    max_dz = sqr_max_dz < pimax*pimax ? sqrt(sqr_max_dz):pimax;
 
-    //hat1 calcs are done if need_weightavg || los_type == FIRSTPOINT_LOS 
-    //need_weightavg is FALSE by definition in this kernel so remove that part of conditional 
-    double xhat0=NULL, yhat0=NULL, zhat0=NULL;
-    if (los_type == FIRSTPOINT_LOS) {
-        const double norm0 = sqrt(xpos*xpos + ypos*ypos + zpos*zpos);
-        xhat0 = xpos/norm0;
-        yhat0 = ypos/norm0;
-        zhat0 = zpos/norm0;
-    }
 
-    const double parx = xpos + x1pos;
-    const double pary = ypos + y1pos; 
-    const double parz = zpos + z1pos; 
-
-    const double perpx = x1pos - xpos;
-    const double perpy = y1pos - ypos;
-    const double perpz = z1pos - zpos;
+    const double dx = x1pos - xpos;
+    const double dy = y1pos - ypos;
+    const double dz = z1pos - zpos;//the ordering is important. localz1 - zpos ensures dz is in increasing order for future iterations
 
     //return if greater than max dz
-    if (perpz > max_dz) {
+    if (dz > max_dz) {
         return;
     }
 
-    const double sqr_s = perpx*perpx + perpy*perpy + perpz*perpz;
+    const double sqr_dx_dy = dx*dx + dy*dy;
+    //const double sqr_s = perpx*perpx + perpy*perpy + perpz*perpz;
+    if((selection.selection_type & RP_SELECTION) && ((sqr_dx_dy < selection.rpmin_sqr) || (sqr_dx_dy >= selection.rpmax_sqr))){
+        return;
+    }
+
+    const double sqr_dz = dz*dz;
+    const double sqr_s = sqr_dx_dy + sqr_dz;
     if(sqr_s >= sqr_smax || sqr_s < sqr_smin) {
         return;
     } 
 
+    double sqr_mu = 0.;
+    if (sqr_s > 0.) {
+        if (sqr_dz >= sqr_s * sqr_mumax) return; 
+        sqr_mu = sqr_dz/sqr_s;
+    }
+
+
     double s = 0;
-    int mubin = nmu_bins, mubin2 = nmu_bins;
-    if (sqr_s <= 0.) {
-        mubin2 = mubin = (int) mumin_invstep;
-        if((selection.selection_type & RP_SELECTION) && ((0. < selection.rpmin_sqr) || (0. >= selection.rpmax_sqr))) return;
-    } 
-    else if (los_type == MIDPOINT_LOS) {
-        const double s_dot_l = parx*perpx + pary*perpy + parz*perpz;
-        const double sqr_l = parx*parx + pary*pary + parz*parz;
-        const double sqr_mu = s_dot_l * s_dot_l / (sqr_l * sqr_s);
-        if (sqr_mu >= sqr_mumax) {
-            return;
-        } 
-        if (selection.selection_type & RP_SELECTION) {
-            const double sqr_rp = (1. - sqr_mu) * sqr_s;
-            if ((sqr_rp < selection.rpmin_sqr) || (sqr_rp >= selection.rpmax_sqr)) return;
-        }
-        const double mu = s_dot_l >= 0 ? sqrt(sqr_mu) : -sqrt(sqr_mu);
-        mubin = (int) (mu * inv_dmu + mumin_invstep);
-        if (autocorr == 1) mubin2 = (int) (- mu * inv_dmu + mumin_invstep);
-        if(need_savg || bin_type == BIN_LIN) s = sqrt(sqr_s);
-    }
-    else {
-        const double s_dot_l = xhat0*perpx + yhat0*perpy + zhat0*perpz;
-        const double sqr_mu = s_dot_l * s_dot_l / sqr_s;
-
-        int skip_mu = (sqr_mu >= sqr_mumax);
-        if (selection.selection_type & RP_SELECTION) {
-            const double sqr_rp = (1. - sqr_mu) * sqr_s;
-            if ((sqr_rp < selection.rpmin_sqr) || (sqr_rp >= selection.rpmax_sqr)) skip_mu = 1;
-        }
-        if (autocorr == 1) {
-            const double s_dot_l2 = xhat1*perpx + yhat1*perpy + zhat1*perpz;
-            const double sqr_mu2 = s_dot_l2 * s_dot_l2 / sqr_s;
-            int skip_mu2 = (sqr_mu2 >= sqr_mumax);
-            if (selection.selection_type & RP_SELECTION) {
-                const double sqr_rp = (1. - sqr_mu2) * sqr_s; 
-                if ((sqr_rp < selection.rpmin_sqr) || (sqr_rp >= selection.rpmax_sqr)) skip_mu2 = 1;
-            }
-            if (skip_mu && skip_mu2) {
-                return;
-            }
-            s = sqrt(sqr_s);
-            if (skip_mu == 0) mubin = (int) (s_dot_l / s * inv_dmu + mumin_invstep);
-            if (skip_mu2 == 0) mubin2 = (int) (- s_dot_l2 / s * inv_dmu + mumin_invstep);
-        }
-        else {
-            if (skip_mu) {
-                return;
-            }
-            s = sqrt(sqr_s);
-            mubin = (int) (s_dot_l / s * inv_dmu + mumin_invstep);
-	}
+    if(need_savg || bin_type == BIN_LIN) {
+        s = sqrt(sqr_s); 
     }
 
-    double sw = s;
     int kbin = 0;
     if (bin_type == BIN_LIN) {
-	kbin = (int) (s*inv_sstep + smin_invstep);
+        kbin = (int) (s*inv_sstep + smin_invstep);
+    } else {
+        for(kbin=nsbin-1;kbin>=1;kbin--) {
+            if(sqr_s >= supp_sqr[kbin-1]) {
+                break;
+            }
+        }//finding kbin
     }
-    else {
-	for(kbin=nsbin-1;kbin>=1;kbin--) {
-	    if(sqr_s >= supp_sqr[kbin-1]) {
-		break;
-	    }
-	}//finding kbin
-    }
+
     kbin *= nmu_bins+1;
-    {
-	const int ibin = kbin + mubin;
-        //use atomic add to guarantee atomicity
-        atomicAdd(&npairs[ibin], 1);
-        if (need_savg) atomicAdd(&savg[ibin], sw);
-    }
+    const double mubin = dz >=0 ? sqrt(sqr_mu)*inv_dmu : -sqrt(sqr_mu)*inv_dmu;
+    int ibin = kbin + (int) (mubin + mumin_invstep);
+    //use atomic add to guarantee atomicity
+    atomicAdd(&npairs[ibin], 1);
+    if (need_savg) atomicAdd(&savg[ibin], s); 
     if (autocorr == 1) {
-	const int ibin = kbin + mubin2;
+        ibin = kbin + (int) (-mubin + mumin_invstep);
         //use atomic add to guarantee atomicity
         atomicAdd(&npairs[ibin], 1);
-        if (need_savg) atomicAdd(&savg[ibin], sw);
+        if (need_savg) atomicAdd(&savg[ibin], s);
     }
 }
 
-__global__ void countpairs_s_mu_mocks_kernel_float(float *x0, float *y0, float *z0,
+__global__ void countpairs_s_mu_kernel_float(float *x0, float *y0, float *z0,
                float *x1, float *y1, float *z1, int N,
                int *np0, int *np1, 
                int *same_cell, int64_t *icell0, int64_t *icell1, 
@@ -212,11 +159,12 @@ __global__ void countpairs_s_mu_mocks_kernel_float(float *x0, float *y0, float *
                int *start_idx0, int *start_idx1,
                float *min_xdiff, float *min_ydiff, 
                float *savg, int *npairs, const float *supp_sqr,
+               const float pimax, float *off_xwrap, float *off_ywrap, float *off_zwrap,
                const float sqr_smax, const float sqr_smin, const int nsbin,
                const int nmu_bins, 
                const float sqr_mumax, const float inv_dmu, const float mumin_invstep,
                float inv_sstep, float smin_invstep, const selection_struct selection,
-               int need_savg, int autocorr, int los_type, int bin_type) {
+               int need_savg, int autocorr, int bin_type) {
     //thread index tidx 
     int tidx = blockDim.x * blockIdx.x + threadIdx.x;
     if (tidx >= N) return;
@@ -239,9 +187,9 @@ __global__ void countpairs_s_mu_mocks_kernel_float(float *x0, float *y0, float *
     int j = start_idx1[cellindex1] + cell_tidx % this_np1;
 
     //get positions for each particle
-    float xpos = x0[i];
-    float ypos = y0[i];
-    float zpos = z0[i];
+    float xpos = x0[i] + off_xwrap[icellpair];
+    float ypos = y0[i] + off_ywrap[icellpair];
+    float zpos = z0[i] + off_zwrap[icellpair];
 
     float x1pos = x1[j];
     float y1pos = y1[j];
@@ -249,13 +197,14 @@ __global__ void countpairs_s_mu_mocks_kernel_float(float *x0, float *y0, float *
 
     if (same_cell[icellpair] && z1pos <= zpos) { 
         //return if same particle or in same cell with z1 < z0
-        //this way we do not float count pairs
+        //this way we do not double count pairs
         if (z1pos < zpos) return;
         if (z1pos == zpos && j <= i) return;
         //return;
     }
 
-    const float max_dz = sqrt(sqr_smax - min_xdiff[icellpair]*min_xdiff[icellpair] - min_ydiff[icellpair]*min_ydiff[icellpair]);
+    float max_dz = sqrt(sqr_smax - min_xdiff[icellpair]*min_xdiff[icellpair] - min_ydiff[icellpair]*min_ydiff[icellpair]);
+    max_dz = pimax < max_dz ? pimax:max_dz;
     const float this_dz = z1pos-zpos;
     if (abs(this_dz) >= max_dz) {
         //particle too far away in z
@@ -264,132 +213,77 @@ __global__ void countpairs_s_mu_mocks_kernel_float(float *x0, float *y0, float *
 
     const float this_dx = x1pos-xpos;
     const float this_dy = y1pos-ypos;
-    if ((this_dx*this_dx + this_dy*this_dy + this_dz*this_dz) >= sqr_smax) {
+    const float sqr_min_sep_this_point = this_dx*this_dx + this_dy*this_dy + this_dz*this_dz;
+    if (sqr_min_sep_this_point >= sqr_smax || this_dz > pimax) {
+        //            if(sqr_min_sep_this_point >= sqr_smax || min_dz > pimax) {
         //particle too far away in separation
         return;
     } 
 
-    //hat1 calcs are done if need_weightavg || ((autocorr == 1) && (los_type == FIRSTPOINT_LOS)
-    //need_weightavg is FALSE by definition in this kernel so remove that part of conditional 
-    float xhat1=NULL, yhat1=NULL, zhat1=NULL;
-    if (((autocorr == 1) && (los_type == FIRSTPOINT_LOS))) {
-        const float norm1 = sqrt(x1pos*x1pos + y1pos*y1pos + z1pos*z1pos);
-        xhat1 = x1pos/norm1;
-        yhat1 = y1pos/norm1;
-        zhat1 = z1pos/norm1;
-    }
+    //const float sqr_max_dz = sqr_smax - min_dx*min_dx - min_dy*min_dy;
+    const float sqr_max_dz = sqr_smax - min_xdiff[icellpair]*min_xdiff[icellpair] - min_ydiff[icellpair]*min_ydiff[icellpair];
+    max_dz = sqr_max_dz < pimax*pimax ? sqrt(sqr_max_dz):pimax;
 
-    //hat1 calcs are done if need_weightavg || los_type == FIRSTPOINT_LOS 
-    //need_weightavg is FALSE by definition in this kernel so remove that part of conditional 
-    float xhat0=NULL, yhat0=NULL, zhat0=NULL;
-    if (los_type == FIRSTPOINT_LOS) {
-        const float norm0 = sqrt(xpos*xpos + ypos*ypos + zpos*zpos);
-        xhat0 = xpos/norm0;
-        yhat0 = ypos/norm0;
-        zhat0 = zpos/norm0;
-    }
 
-    const float parx = xpos + x1pos;
-    const float pary = ypos + y1pos; 
-    const float parz = zpos + z1pos; 
-
-    const float perpx = x1pos - xpos;
-    const float perpy = y1pos - ypos;
-    const float perpz = z1pos - zpos;
+    const float dx = x1pos - xpos;
+    const float dy = y1pos - ypos;
+    const float dz = z1pos - zpos;//the ordering is important. localz1 - zpos ensures dz is in increasing order for future iterations
 
     //return if greater than max dz
-    if (perpz > max_dz) {
+    if (dz > max_dz) {
         return;
     }
 
-    const float sqr_s = perpx*perpx + perpy*perpy + perpz*perpz;
+    const float sqr_dx_dy = dx*dx + dy*dy;
+    //const float sqr_s = perpx*perpx + perpy*perpy + perpz*perpz;
+    if((selection.selection_type & RP_SELECTION) && ((sqr_dx_dy < selection.rpmin_sqr) || (sqr_dx_dy >= selection.rpmax_sqr))){
+        return;
+    }
+
+    const float sqr_dz = dz*dz;
+    const float sqr_s = sqr_dx_dy + sqr_dz;
     if(sqr_s >= sqr_smax || sqr_s < sqr_smin) {
         return;
     } 
 
+    float sqr_mu = 0.;
+    if (sqr_s > 0.) {
+        if (sqr_dz >= sqr_s * sqr_mumax) return; 
+        sqr_mu = sqr_dz/sqr_s;
+    }
+
+
     float s = 0;
-    int mubin = nmu_bins, mubin2 = nmu_bins;
-    if (sqr_s <= 0.) {
-        mubin2 = mubin = (int) mumin_invstep;
-        if((selection.selection_type & RP_SELECTION) && ((0. < selection.rpmin_sqr) || (0. >= selection.rpmax_sqr))) return;
-    } 
-    else if (los_type == MIDPOINT_LOS) {
-        const float s_dot_l = parx*perpx + pary*perpy + parz*perpz;
-        const float sqr_l = parx*parx + pary*pary + parz*parz;
-        const float sqr_mu = s_dot_l * s_dot_l / (sqr_l * sqr_s);
-        if (sqr_mu >= sqr_mumax) {
-            return;
-        } 
-        if (selection.selection_type & RP_SELECTION) {
-            const float sqr_rp = (1. - sqr_mu) * sqr_s;
-            if ((sqr_rp < selection.rpmin_sqr) || (sqr_rp >= selection.rpmax_sqr)) return;
-        }
-        const float mu = s_dot_l >= 0 ? sqrt(sqr_mu) : -sqrt(sqr_mu);
-        mubin = (int) (mu * inv_dmu + mumin_invstep);
-        if (autocorr == 1) mubin2 = (int) (- mu * inv_dmu + mumin_invstep);
-        if(need_savg || bin_type == BIN_LIN) s = sqrt(sqr_s);
-    }
-    else {
-        const float s_dot_l = xhat0*perpx + yhat0*perpy + zhat0*perpz;
-        const float sqr_mu = s_dot_l * s_dot_l / sqr_s;
-
-        int skip_mu = (sqr_mu >= sqr_mumax);
-        if (selection.selection_type & RP_SELECTION) {
-            const float sqr_rp = (1. - sqr_mu) * sqr_s;
-            if ((sqr_rp < selection.rpmin_sqr) || (sqr_rp >= selection.rpmax_sqr)) skip_mu = 1;
-        }
-        if (autocorr == 1) {
-            const float s_dot_l2 = xhat1*perpx + yhat1*perpy + zhat1*perpz;
-            const float sqr_mu2 = s_dot_l2 * s_dot_l2 / sqr_s;
-            int skip_mu2 = (sqr_mu2 >= sqr_mumax);
-            if (selection.selection_type & RP_SELECTION) {
-                const float sqr_rp = (1. - sqr_mu2) * sqr_s;
-                if ((sqr_rp < selection.rpmin_sqr) || (sqr_rp >= selection.rpmax_sqr)) skip_mu2 = 1;
-            }
-            if (skip_mu && skip_mu2) {
-                return;
-            }
-            s = sqrt(sqr_s);
-            if (skip_mu == 0) mubin = (int) (s_dot_l / s * inv_dmu + mumin_invstep);
-            if (skip_mu2 == 0) mubin2 = (int) (- s_dot_l2 / s * inv_dmu + mumin_invstep);
-        }
-        else {
-            if (skip_mu) {
-                return;
-            }
-            s = sqrt(sqr_s);
-            mubin = (int) (s_dot_l / s * inv_dmu + mumin_invstep);
-        }
+    if(need_savg || bin_type == BIN_LIN) {
+        s = sqrt(sqr_s); 
     }
 
-    float sw = s;
     int kbin = 0;
     if (bin_type == BIN_LIN) {
-	kbin = (int) (s*inv_sstep + smin_invstep);
+        kbin = (int) (s*inv_sstep + smin_invstep);
+    } else {
+        for(kbin=nsbin-1;kbin>=1;kbin--) {
+            if(sqr_s >= supp_sqr[kbin-1]) {
+                break;
+            }
+        }//finding kbin
     }
-    else {
-	for(kbin=nsbin-1;kbin>=1;kbin--) {
-	    if(sqr_s >= supp_sqr[kbin-1]) {
-		break;
-	    }
-	}//finding kbin
-    }
+
     kbin *= nmu_bins+1;
-    {
-	const int ibin = kbin + mubin;
-        //use atomic add to guarantee atomicity
-        atomicAdd(&npairs[ibin], 1);
-        if (need_savg) atomicAdd(&savg[ibin], sw);
-    }
+    const float mubin = dz >=0 ? sqrt(sqr_mu)*inv_dmu : -sqrt(sqr_mu)*inv_dmu;
+    int ibin = kbin + (int) (mubin + mumin_invstep);
+    //use atomic add to guarantee atomicity
+    atomicAdd(&npairs[ibin], 1);
+    if (need_savg) atomicAdd(&savg[ibin], s); 
     if (autocorr == 1) {
-	const int ibin = kbin + mubin2;
+        ibin = kbin + (int) (-mubin + mumin_invstep);
         //use atomic add to guarantee atomicity
         atomicAdd(&npairs[ibin], 1);
-        if (need_savg) atomicAdd(&savg[ibin], sw);
+        if (need_savg) atomicAdd(&savg[ibin], s);
     }
 }
 
-__global__ void countpairs_s_mu_mocks_pair_weights_kernel_double(double *x0, double *y0, double *z0,
+__global__ void countpairs_s_mu_pair_weights_kernel_double(double *x0, double *y0, double *z0,
                double *weights0, int numweights0,
                double *x1, double *y1, double *z1, 
                double *weights1, int numweights1,
@@ -399,11 +293,12 @@ __global__ void countpairs_s_mu_mocks_pair_weights_kernel_double(double *x0, dou
                int *start_idx0, int *start_idx1,
                double *min_xdiff, double *min_ydiff, 
                double *savg, int *npairs, double *weightavg, const double *supp_sqr,
+               const double pimax, double *off_xwrap, double *off_ywrap, double *off_zwrap,
                const double sqr_smax, const double sqr_smin, const int nsbin,
                const int nmu_bins, 
                const double sqr_mumax, const double inv_dmu, const double mumin_invstep,
                double inv_sstep, double smin_invstep, const selection_struct selection,
-               int need_savg, int need_weightavg, int autocorr, int los_type, int bin_type) {
+               int need_savg, int need_weightavg, int autocorr, int bin_type) {
     //thread index tidx 
     int tidx = blockDim.x * blockIdx.x + threadIdx.x;
     if (tidx >= N) return;
@@ -426,9 +321,9 @@ __global__ void countpairs_s_mu_mocks_pair_weights_kernel_double(double *x0, dou
     int j = start_idx1[cellindex1] + cell_tidx % this_np1;
 
     //get positions for each particle
-    double xpos = x0[i];
-    double ypos = y0[i];
-    double zpos = z0[i];
+    double xpos = x0[i] + off_xwrap[icellpair];
+    double ypos = y0[i] + off_ywrap[icellpair];
+    double zpos = z0[i] + off_zwrap[icellpair];
 
     double x1pos = x1[j];
     double y1pos = y1[j];
@@ -440,7 +335,8 @@ __global__ void countpairs_s_mu_mocks_pair_weights_kernel_double(double *x0, dou
         return;
     }
 
-    const double max_dz = sqrt(sqr_smax - min_xdiff[icellpair]*min_xdiff[icellpair] - min_ydiff[icellpair]*min_ydiff[icellpair]);
+    double max_dz = sqrt(sqr_smax - min_xdiff[icellpair]*min_xdiff[icellpair] - min_ydiff[icellpair]*min_ydiff[icellpair]);
+    max_dz = pimax < max_dz ? pimax:max_dz;
     const double this_dz = z1pos-zpos;
     if (abs(this_dz) >= max_dz) {
         //particle too far away in z
@@ -449,155 +345,102 @@ __global__ void countpairs_s_mu_mocks_pair_weights_kernel_double(double *x0, dou
 
     const double this_dx = x1pos-xpos;
     const double this_dy = y1pos-ypos;
-    if ((this_dx*this_dx + this_dy*this_dy + this_dz*this_dz) >= sqr_smax) {
+    const double sqr_min_sep_this_point = this_dx*this_dx + this_dy*this_dy + this_dz*this_dz;
+    if (sqr_min_sep_this_point >= sqr_smax || this_dz > pimax) {
+        //            if(sqr_min_sep_this_point >= sqr_smax || min_dz > pimax) {
         //particle too far away in separation
         return;
     } 
 
-    //hat1 calcs are done if need_weightavg || ((autocorr == 1) && (los_type == FIRSTPOINT_LOS)
-    //need_weightavg is true by definition in this kernel so remove conditional
-    double xhat1=NULL, yhat1=NULL, zhat1=NULL;
-    const double norm1 = sqrt(x1pos*x1pos + y1pos*y1pos + z1pos*z1pos);
-    xhat1 = x1pos/norm1;
-    yhat1 = y1pos/norm1;
-    zhat1 = z1pos/norm1;
+    //const double sqr_max_dz = sqr_smax - min_dx*min_dx - min_dy*min_dy;
+    const double sqr_max_dz = sqr_smax - min_xdiff[icellpair]*min_xdiff[icellpair] - min_ydiff[icellpair]*min_ydiff[icellpair];
+    max_dz = sqr_max_dz < pimax*pimax ? sqrt(sqr_max_dz):pimax;
 
-    //hat1 calcs are done if need_weightavg || los_type == FIRSTPOINT_LOS 
+    //norm calcs are done if need_costheta == need_weightavg
     //need_weightavg is true by definition in this kernel so remove conditional
-    double xhat0=NULL, yhat0=NULL, zhat0=NULL;
+    //positions are not divided by norm here
+    const double norm1 = sqrt(x1pos*x1pos + y1pos*y1pos + z1pos*z1pos);
+
+    //need_weightavg is true by definition in this kernel so remove conditional
     const double norm0 = sqrt(xpos*xpos + ypos*ypos + zpos*zpos);
-    xhat0 = xpos/norm0;
-    yhat0 = ypos/norm0;
-    zhat0 = zpos/norm0;
 
     //need_weightavg is TRUE in this kernel BUT pair_costheta_d not used
     //in PAIR_PRODUCT so comment out - will be used for INVERSE_BITWISE 
     //double pair_costheta_d = xhat1*xhat0 + yhat1*yhat0 + zhat1*zhat0;
+    //double localnorm1 = norm1;
+    //double pair_costheta_d = (*localx1)*xpos + (*localy1)*ypos + (*localz1)*zpos;
+    //pair_costheta_d /= localnorm1*norm0;
 
-    const double parx = xpos + x1pos;
-    const double pary = ypos + y1pos; 
-    const double parz = zpos + z1pos; 
+    const double dx = x1pos - xpos;
+    const double dy = y1pos - ypos;
+    const double dz = z1pos - zpos;//the ordering is important. localz1 - zpos ensures dz is in increasing order for future iterations
 
-    const double perpx = x1pos - xpos;
-    const double perpy = y1pos - ypos;
-    const double perpz = z1pos - zpos;
-
-    //return if > max_dz
-    if (perpz > max_dz) {
+    //return if greater than max dz
+    if (dz > max_dz) {
         return;
     }
 
-    const double sqr_s = perpx*perpx + perpy*perpy + perpz*perpz;
+    const double sqr_dx_dy = dx*dx + dy*dy;
+    //const double sqr_s = perpx*perpx + perpy*perpy + perpz*perpz;
+    if((selection.selection_type & RP_SELECTION) && ((sqr_dx_dy < selection.rpmin_sqr) || (sqr_dx_dy >= selection.rpmax_sqr))){
+        return;
+    }
+
+    const double sqr_dz = dz*dz;
+    const double sqr_s = sqr_dx_dy + sqr_dz;
     if(sqr_s >= sqr_smax || sqr_s < sqr_smin) {
         return;
     } 
 
-    double s = 0;
-    int mubin = nmu_bins, mubin2 = nmu_bins;
-    if (sqr_s <= 0.) {
-        mubin2 = mubin = (int) mumin_invstep;
-        if((selection.selection_type & RP_SELECTION) && ((0. < selection.rpmin_sqr) || (0. >= selection.rpmax_sqr))) return;
-    } 
-    else if (los_type == MIDPOINT_LOS) {
-        const double s_dot_l = parx*perpx + pary*perpy + parz*perpz;
-        const double sqr_l = parx*parx + pary*pary + parz*parz;
-        const double sqr_mu = s_dot_l * s_dot_l / (sqr_l * sqr_s);
-        if (sqr_mu >= sqr_mumax) {
-            return;
-        } 
-        if (selection.selection_type & RP_SELECTION) {
-            const double sqr_rp = (1. - sqr_mu) * sqr_s;
-            if ((sqr_rp < selection.rpmin_sqr) || (sqr_rp >= selection.rpmax_sqr)) return;
-        }
-        const double mu = s_dot_l >= 0 ? sqrt(sqr_mu) : -sqrt(sqr_mu);
-        mubin = (int) (mu * inv_dmu + mumin_invstep);
-        if (autocorr == 1) mubin2 = (int) (- mu * inv_dmu + mumin_invstep);
-        if(need_savg || bin_type == BIN_LIN) s = sqrt(sqr_s);
-    }
-    else {
-        const double s_dot_l = xhat0*perpx + yhat0*perpy + zhat0*perpz;
-        const double sqr_mu = s_dot_l * s_dot_l / sqr_s;
-
-        int skip_mu = (sqr_mu >= sqr_mumax);
-        if (selection.selection_type & RP_SELECTION) {
-            const double sqr_rp = (1. - sqr_mu) * sqr_s;
-            if ((sqr_rp < selection.rpmin_sqr) || (sqr_rp >= selection.rpmax_sqr)) skip_mu = 1;
-        }
-        if (autocorr == 1) {
-            const double s_dot_l2 = xhat1*perpx + yhat1*perpy + zhat1*perpz;
-            const double sqr_mu2 = s_dot_l2 * s_dot_l2 / sqr_s;
-            int skip_mu2 = (sqr_mu2 >= sqr_mumax);
-            if (selection.selection_type & RP_SELECTION) {
-                const double sqr_rp = (1. - sqr_mu2) * sqr_s;
-                if ((sqr_rp < selection.rpmin_sqr) || (sqr_rp >= selection.rpmax_sqr)) skip_mu2 = 1;
-            }
-            if (skip_mu && skip_mu2) {
-                return;
-            }
-            s = sqrt(sqr_s);
-            if (skip_mu == 0) mubin = (int) (s_dot_l / s * inv_dmu + mumin_invstep);
-            if (skip_mu2 == 0) mubin2 = (int) (- s_dot_l2 / s * inv_dmu + mumin_invstep);
-        }
-        else {
-            if (skip_mu) {
-                return;
-            }
-            s = sqrt(sqr_s);
-            mubin = (int) (s_dot_l / s * inv_dmu + mumin_invstep);
-        }
+    double sqr_mu = 0.;
+    if (sqr_s > 0.) {
+        if (sqr_dz >= sqr_s * sqr_mumax) return; 
+        sqr_mu = sqr_dz/sqr_s;
     }
 
-    double pairweight = 0; 
-    double sw = s;
-
+    double s = 0, pairweight = 0;
+    if(need_savg || bin_type == BIN_LIN) {
+        s = sqrt(sqr_s); 
+    }
     //need_weightavg is TRUE so remove conditional and always calculate
     //pairweight - only do simple PAIR_PRODUCT in this kernel
     pairweight = weights0[i*numweights0] * weights1[j*numweights1]; 
-    if(need_savg) sw = s*pairweight;
 
-/*
-    if(need_weightavg){
-	pair.dx.d = perpx;
-	pair.dy.d = perpy;
-	pair.dz.d = perpz;
-
-	pair.parx.d = parx;
-	pair.pary.d = pary;
-	pair.parz.d = parz;
-
-	pairweight = weight_func(&pair);
-	if(need_savg) sw = s*pairweight;
-    }
-*/
     int kbin = 0;
     if (bin_type == BIN_LIN) {
-	kbin = (int) (s*inv_sstep + smin_invstep);
+        kbin = (int) (s*inv_sstep + smin_invstep);
+    } else {
+        for(kbin=nsbin-1;kbin>=1;kbin--) {
+            if(sqr_s >= supp_sqr[kbin-1]) {
+                break;
+            }
+        }//finding kbin
     }
-    else {
-	for(kbin=nsbin-1;kbin>=1;kbin--) {
-	    if(sqr_s >= supp_sqr[kbin-1]) {
-		break;
-	    }
-	}//finding kbin
-    }
+
     kbin *= nmu_bins+1;
-    {
-	const int ibin = kbin + mubin;
-        //use atomic add to guarantee atomicity
-        atomicAdd(&npairs[ibin], 1);
-        if (need_savg) atomicAdd(&savg[ibin], sw);
-        atomicAdd(&weightavg[ibin], pairweight); //need_weightavg is always true
+    const double mubin = dz >=0 ? sqrt(sqr_mu)*inv_dmu : -sqrt(sqr_mu)*inv_dmu;
+    int ibin = kbin + (int) (mubin + mumin_invstep);
+    //use atomic add to guarantee atomicity
+    atomicAdd(&npairs[ibin], 1);
+    if (need_savg) {
+        //need_weightavg is true so remove conditional
+        s*=pairweight;
+        atomicAdd(&savg[ibin], s);
     }
+    //need_weightavg is true so remove conditional
+    atomicAdd(&weightavg[ibin], pairweight); //need_weightavg is always true
+
     if (autocorr == 1) {
-	const int ibin = kbin + mubin2;
+        ibin = kbin + (int) (-mubin + mumin_invstep);
         //use atomic add to guarantee atomicity
         atomicAdd(&npairs[ibin], 1);
-        if (need_savg) atomicAdd(&savg[ibin], sw);
+        if (need_savg) atomicAdd(&savg[ibin], s); //already weighted
+        //need_weightavg is true so remove conditional
         atomicAdd(&weightavg[ibin], pairweight); //need_weightavg is always true
     }
 }
 
-__global__ void countpairs_s_mu_mocks_pair_weights_kernel_float(float *x0, float *y0, float *z0,
+__global__ void countpairs_s_mu_pair_weights_kernel_float(float *x0, float *y0, float *z0,
                float *weights0, int numweights0,
                float *x1, float *y1, float *z1, 
                float *weights1, int numweights1,
@@ -607,11 +450,12 @@ __global__ void countpairs_s_mu_mocks_pair_weights_kernel_float(float *x0, float
                int *start_idx0, int *start_idx1,
                float *min_xdiff, float *min_ydiff, 
                float *savg, int *npairs, float *weightavg, const float *supp_sqr,
+               const float pimax, float *off_xwrap, float *off_ywrap, float *off_zwrap,
                const float sqr_smax, const float sqr_smin, const int nsbin,
                const int nmu_bins, 
                const float sqr_mumax, const float inv_dmu, const float mumin_invstep,
                float inv_sstep, float smin_invstep, const selection_struct selection,
-               int need_savg, int need_weightavg, int autocorr, int los_type, int bin_type) {
+               int need_savg, int need_weightavg, int autocorr, int bin_type) {
     //thread index tidx 
     int tidx = blockDim.x * blockIdx.x + threadIdx.x;
     if (tidx >= N) return;
@@ -634,21 +478,24 @@ __global__ void countpairs_s_mu_mocks_pair_weights_kernel_float(float *x0, float
     int j = start_idx1[cellindex1] + cell_tidx % this_np1;
 
     //get positions for each particle
-    float xpos = x0[i];
-    float ypos = y0[i];
-    float zpos = z0[i];
+    double xpos = x0[i] + off_xwrap[icellpair];
+    double ypos = y0[i] + off_ywrap[icellpair];
+    double zpos = z0[i] + off_zwrap[icellpair];
 
-    float x1pos = x1[j];
-    float y1pos = y1[j];
-    float z1pos = z1[j];
+    double x1pos = x1[j];
+    double y1pos = y1[j];
+    double z1pos = z1[j];
 
     if (same_cell[icellpair] && z1pos <= zpos) { 
         //return if same particle or in same cell with z1 < z0
         //this way we do not float count pairs
-        return;
+        if (z1pos < zpos) return;
+        if (z1pos == zpos && j <= i) return;
+        //return;
     }
 
-    const float max_dz = sqrt(sqr_smax - min_xdiff[icellpair]*min_xdiff[icellpair] - min_ydiff[icellpair]*min_ydiff[icellpair]);
+    float max_dz = sqrt(sqr_smax - min_xdiff[icellpair]*min_xdiff[icellpair] - min_ydiff[icellpair]*min_ydiff[icellpair]);
+    max_dz = pimax < max_dz ? pimax:max_dz;
     const float this_dz = z1pos-zpos;
     if (abs(this_dz) >= max_dz) {
         //particle too far away in z
@@ -657,150 +504,97 @@ __global__ void countpairs_s_mu_mocks_pair_weights_kernel_float(float *x0, float
 
     const float this_dx = x1pos-xpos;
     const float this_dy = y1pos-ypos;
-    if ((this_dx*this_dx + this_dy*this_dy + this_dz*this_dz) >= sqr_smax) {
+    const float sqr_min_sep_this_point = this_dx*this_dx + this_dy*this_dy + this_dz*this_dz;
+    if (sqr_min_sep_this_point >= sqr_smax || this_dz > pimax) {
+        //            if(sqr_min_sep_this_point >= sqr_smax || min_dz > pimax) {
         //particle too far away in separation
         return;
     } 
 
-    //hat1 calcs are done if need_weightavg || ((autocorr == 1) && (los_type == FIRSTPOINT_LOS)
-    //need_weightavg is true by definition in this kernel so remove conditional
-    float xhat1=NULL, yhat1=NULL, zhat1=NULL;
-    const float norm1 = sqrt(x1pos*x1pos + y1pos*y1pos + z1pos*z1pos);
-    xhat1 = x1pos/norm1;
-    yhat1 = y1pos/norm1;
-    zhat1 = z1pos/norm1;
+    //const float sqr_max_dz = sqr_smax - min_dx*min_dx - min_dy*min_dy;
+    const float sqr_max_dz = sqr_smax - min_xdiff[icellpair]*min_xdiff[icellpair] - min_ydiff[icellpair]*min_ydiff[icellpair];
+    max_dz = sqr_max_dz < pimax*pimax ? sqrt(sqr_max_dz):pimax;
 
-    //hat1 calcs are done if need_weightavg || los_type == FIRSTPOINT_LOS 
+    //norm calcs are done if need_costheta == need_weightavg
     //need_weightavg is true by definition in this kernel so remove conditional
-    float xhat0=NULL, yhat0=NULL, zhat0=NULL;
+    //positions are not divided by norm here
+    const float norm1 = sqrt(x1pos*x1pos + y1pos*y1pos + z1pos*z1pos);
+
+    //need_weightavg is true by definition in this kernel so remove conditional
     const float norm0 = sqrt(xpos*xpos + ypos*ypos + zpos*zpos);
-    xhat0 = xpos/norm0;
-    yhat0 = ypos/norm0;
-    zhat0 = zpos/norm0;
 
     //need_weightavg is TRUE in this kernel BUT pair_costheta_d not used
     //in PAIR_PRODUCT so comment out - will be used for INVERSE_BITWISE 
     //float pair_costheta_d = xhat1*xhat0 + yhat1*yhat0 + zhat1*zhat0;
+    //float localnorm1 = norm1;
+    //float pair_costheta_d = (*localx1)*xpos + (*localy1)*ypos + (*localz1)*zpos;
+    //pair_costheta_d /= localnorm1*norm0;
 
-    const float parx = xpos + x1pos;
-    const float pary = ypos + y1pos; 
-    const float parz = zpos + z1pos; 
+    const float dx = x1pos - xpos;
+    const float dy = y1pos - ypos;
+    const float dz = z1pos - zpos;//the ordering is important. localz1 - zpos ensures dz is in increasing order for future iterations
 
-    const float perpx = x1pos - xpos;
-    const float perpy = y1pos - ypos;
-    const float perpz = z1pos - zpos;
-
-    //return if > max_dz
-    if (perpz > max_dz) {
+    //return if greater than max dz
+    if (dz > max_dz) {
         return;
     }
 
-    const float sqr_s = perpx*perpx + perpy*perpy + perpz*perpz;
+    const float sqr_dx_dy = dx*dx + dy*dy;
+    //const float sqr_s = perpx*perpx + perpy*perpy + perpz*perpz;
+    if((selection.selection_type & RP_SELECTION) && ((sqr_dx_dy < selection.rpmin_sqr) || (sqr_dx_dy >= selection.rpmax_sqr))){
+        return;
+    }
+
+    const float sqr_dz = dz*dz;
+    const float sqr_s = sqr_dx_dy + sqr_dz;
     if(sqr_s >= sqr_smax || sqr_s < sqr_smin) {
         return;
     } 
 
-    float s = 0;
-    int mubin = nmu_bins, mubin2 = nmu_bins;
-    if (sqr_s <= 0.) {
-        mubin2 = mubin = (int) mumin_invstep;
-        if((selection.selection_type & RP_SELECTION) && ((0. < selection.rpmin_sqr) || (0. >= selection.rpmax_sqr))) return;
-    } 
-    else if (los_type == MIDPOINT_LOS) {
-        const float s_dot_l = parx*perpx + pary*perpy + parz*perpz;
-        const float sqr_l = parx*parx + pary*pary + parz*parz;
-        const float sqr_mu = s_dot_l * s_dot_l / (sqr_l * sqr_s);
-        if (sqr_mu >= sqr_mumax) {
-            return;
-        } 
-        if (selection.selection_type & RP_SELECTION) {
-            const float sqr_rp = (1. - sqr_mu) * sqr_s;
-            if ((sqr_rp < selection.rpmin_sqr) || (sqr_rp >= selection.rpmax_sqr)) return;
-        }
-        const float mu = s_dot_l >= 0 ? sqrt(sqr_mu) : -sqrt(sqr_mu);
-        mubin = (int) (mu * inv_dmu + mumin_invstep);
-        if (autocorr == 1) mubin2 = (int) (- mu * inv_dmu + mumin_invstep);
-        if(need_savg || bin_type == BIN_LIN) s = sqrt(sqr_s);
-    }
-    else {
-        const float s_dot_l = xhat0*perpx + yhat0*perpy + zhat0*perpz;
-        const float sqr_mu = s_dot_l * s_dot_l / sqr_s;
-
-        int skip_mu = (sqr_mu >= sqr_mumax);
-        if (selection.selection_type & RP_SELECTION) {
-            const float sqr_rp = (1. - sqr_mu) * sqr_s;
-            if ((sqr_rp < selection.rpmin_sqr) || (sqr_rp >= selection.rpmax_sqr)) skip_mu = 1;
-        }
-        if (autocorr == 1) {
-            const float s_dot_l2 = xhat1*perpx + yhat1*perpy + zhat1*perpz;
-            const float sqr_mu2 = s_dot_l2 * s_dot_l2 / sqr_s;
-            int skip_mu2 = (sqr_mu2 >= sqr_mumax);
-            if (selection.selection_type & RP_SELECTION) {
-                const float sqr_rp = (1. - sqr_mu2) * sqr_s;
-                if ((sqr_rp < selection.rpmin_sqr) || (sqr_rp >= selection.rpmax_sqr)) skip_mu2 = 1;
-            }
-            if (skip_mu && skip_mu2) {
-                return;
-            }
-            s = sqrt(sqr_s);
-            if (skip_mu == 0) mubin = (int) (s_dot_l / s * inv_dmu + mumin_invstep);
-            if (skip_mu2 == 0) mubin2 = (int) (- s_dot_l2 / s * inv_dmu + mumin_invstep);
-        }
-        else {
-            if (skip_mu) {
-                return;
-            }
-            s = sqrt(sqr_s);
-            mubin = (int) (s_dot_l / s * inv_dmu + mumin_invstep);
-        }
+    float sqr_mu = 0.;
+    if (sqr_s > 0.) {
+        if (sqr_dz >= sqr_s * sqr_mumax) return; 
+        sqr_mu = sqr_dz/sqr_s;
     }
 
-    float pairweight = 0; 
-    float sw = s;
-
+    float s = 0, pairweight = 0;
+    if(need_savg || bin_type == BIN_LIN) {
+        s = sqrt(sqr_s); 
+    }
     //need_weightavg is TRUE so remove conditional and always calculate
     //pairweight - only do simple PAIR_PRODUCT in this kernel
     pairweight = weights0[i*numweights0] * weights1[j*numweights1]; 
-    if(need_savg) sw = s*pairweight;
 
-/*
-    if(need_weightavg){
-	pair.dx.d = perpx;
-	pair.dy.d = perpy;
-	pair.dz.d = perpz;
-
-	pair.parx.d = parx;
-	pair.pary.d = pary;
-	pair.parz.d = parz;
-
-	pairweight = weight_func(&pair);
-	if(need_savg) sw = s*pairweight;
-    }
-*/
     int kbin = 0;
     if (bin_type == BIN_LIN) {
-	kbin = (int) (s*inv_sstep + smin_invstep);
+        kbin = (int) (s*inv_sstep + smin_invstep);
+    } else {
+        for(kbin=nsbin-1;kbin>=1;kbin--) {
+            if(sqr_s >= supp_sqr[kbin-1]) {
+                break;
+            }
+        }//finding kbin
     }
-    else {
-	for(kbin=nsbin-1;kbin>=1;kbin--) {
-	    if(sqr_s >= supp_sqr[kbin-1]) {
-		break;
-	    }
-	}//finding kbin
-    }
+
     kbin *= nmu_bins+1;
-    {
-	const int ibin = kbin + mubin;
-        //use atomic add to guarantee atomicity
-        atomicAdd(&npairs[ibin], 1);
-        if (need_savg) atomicAdd(&savg[ibin], sw);
-        atomicAdd(&weightavg[ibin], pairweight); //need_weightavg is always true
+    const float mubin = dz >=0 ? sqrt(sqr_mu)*inv_dmu : -sqrt(sqr_mu)*inv_dmu;
+    int ibin = kbin + (int) (mubin + mumin_invstep);
+    //use atomic add to guarantee atomicity
+    atomicAdd(&npairs[ibin], 1);
+    if (need_savg) {
+        //need_weightavg is true so remove conditional
+        s*=pairweight;
+        atomicAdd(&savg[ibin], s);
     }
+    //need_weightavg is true so remove conditional
+    atomicAdd(&weightavg[ibin], pairweight); //need_weightavg is always true
+
     if (autocorr == 1) {
-	const int ibin = kbin + mubin2;
+        ibin = kbin + (int) (-mubin + mumin_invstep);
         //use atomic add to guarantee atomicity
         atomicAdd(&npairs[ibin], 1);
-        if (need_savg) atomicAdd(&savg[ibin], sw);
+        if (need_savg) atomicAdd(&savg[ibin], s); //already weighted
+        //need_weightavg is true so remove conditional
         atomicAdd(&weightavg[ibin], pairweight); //need_weightavg is always true
     }
 }
@@ -843,7 +637,13 @@ void gpu_allocate_mins_double(double **p_gpu_min_dx, double **p_gpu_min_dy, cons
     cudaMallocManaged(&(*p_gpu_min_dy), num_cell_pairs*sizeof(double));
 }   
 
-void gpu_allocate_mocks_double(double **p_X1, double **p_Y1, double **p_Z1, const int64_t ND1) {
+void gpu_allocate_wraps_double(double **p_gpu_xwrap, double **p_gpu_ywrap, double **p_gpu_zwrap, const int64_t num_cell_pairs) {
+    cudaMallocManaged(&(*p_gpu_xwrap), num_cell_pairs*sizeof(double));
+    cudaMallocManaged(&(*p_gpu_ywrap), num_cell_pairs*sizeof(double));
+    cudaMallocManaged(&(*p_gpu_zwrap), num_cell_pairs*sizeof(double));
+}
+
+void gpu_allocate_cellarray_double(double **p_X1, double **p_Y1, double **p_Z1, const int64_t ND1) {
     // Allocate Unified Memory – accessible from CPU or GPU
     // Takes pointers as args
     cudaMallocManaged(&(*p_X1), ND1*sizeof(double));
@@ -885,7 +685,13 @@ void gpu_allocate_mins_float(float **p_gpu_min_dx, float **p_gpu_min_dy, const i
     cudaMallocManaged(&(*p_gpu_min_dy), num_cell_pairs*sizeof(float));
 }
 
-void gpu_allocate_mocks_float(float **p_X1, float **p_Y1, float **p_Z1, const int64_t ND1) {
+void gpu_allocate_wraps_float(float **p_gpu_xwrap, float **p_gpu_ywrap, float **p_gpu_zwrap, const int64_t num_cell_pairs) {
+    cudaMallocManaged(&(*p_gpu_xwrap), num_cell_pairs*sizeof(float));
+    cudaMallocManaged(&(*p_gpu_ywrap), num_cell_pairs*sizeof(float));
+    cudaMallocManaged(&(*p_gpu_zwrap), num_cell_pairs*sizeof(float));
+}
+
+void gpu_allocate_cellarray_float(float **p_X1, float **p_Y1, float **p_Z1, const int64_t ND1) {
     // Allocate Unified Memory – accessible from CPU or GPU
     // Takes pointers as args
     cudaMallocManaged(&(*p_X1), ND1*sizeof(float));
@@ -944,7 +750,13 @@ void gpu_free_mins_double(double *gpu_min_dx, double *gpu_min_dy) {
     cudaFree(gpu_min_dy);
 }
 
-void gpu_free_mocks_double(double *X1, double *Y1, double *Z1) {
+void gpu_free_wraps_double(double *gpu_xwrap, double *gpu_ywrap, double *gpu_zwrap) {
+    cudaFree(gpu_xwrap);
+    cudaFree(gpu_ywrap);
+    cudaFree(gpu_zwrap);
+}
+
+void gpu_free_cellarray_double(double *X1, double *Y1, double *Z1) {
     cudaFree(X1);
     cudaFree(Y1);
     cudaFree(Z1);
@@ -974,7 +786,13 @@ void gpu_free_mins_float(float *gpu_min_dx, float *gpu_min_dy) {
     cudaFree(gpu_min_dy);
 }
 
-void gpu_free_mocks_float(float *X1, float *Y1, float *Z1) {
+void gpu_free_wraps_float(float *gpu_xwrap, float *gpu_ywrap, float *gpu_zwrap) {
+    cudaFree(gpu_xwrap);
+    cudaFree(gpu_ywrap);
+    cudaFree(gpu_zwrap);
+}
+
+void gpu_free_cellarray_float(float *X1, float *Y1, float *Z1) {
     cudaFree(X1);
     cudaFree(Y1);
     cudaFree(Z1);
@@ -1009,7 +827,7 @@ void gpu_device_synchronize() {
 
 // =========   Kernel called below ============//
 
-int gpu_batch_countpairs_s_mu_mocks_double(double *x0, double *y0, double *z0,
+int gpu_batch_countpairs_s_mu_double(double *x0, double *y0, double *z0,
                double *weights0, uint8_t numweights0,
                double *x1, double *y1, double *z1, 
                double *weights1, uint8_t numweights1,
@@ -1019,11 +837,12 @@ int gpu_batch_countpairs_s_mu_mocks_double(double *x0, double *y0, double *z0,
                int *start_idx0, int *start_idx1,
                double *min_xdiff, double *min_ydiff, 
                double *savg, int *npairs, double *weightavg, const double *supp_sqr,
+               const double pimax, double *off_xwrap, double *off_ywrap, double *off_zwrap,
                const double sqr_smax, const double sqr_smin, const int nsbin,
                const int nmu_bins, 
                const double sqr_mumax, const double inv_dmu, const double mumin_invstep,
                double inv_sstep, double smin_invstep, const selection_struct selection,
-               int need_savg, const weight_method_t weight_method, int autocorr, int los_type, int bin_type) {
+               int need_savg, const weight_method_t weight_method, int autocorr, int bin_type) {
     long threads = N;
     int blocksPerGrid = (threads+THREADS_PER_BLOCK-1) / THREADS_PER_BLOCK;
 
@@ -1032,7 +851,7 @@ int gpu_batch_countpairs_s_mu_mocks_double(double *x0, double *y0, double *z0,
     //be performed
 
     if (weight_method == PAIR_PRODUCT) {
-        countpairs_s_mu_mocks_pair_weights_kernel_double<<<blocksPerGrid, THREADS_PER_BLOCK>>>(
+        countpairs_s_mu_pair_weights_kernel_double<<<blocksPerGrid, THREADS_PER_BLOCK>>>(
             x0, y0, z0, weights0, (int)numweights0,
             x1, y1, z1, weights1, (int)numweights1,
             N, np0, np1,
@@ -1041,12 +860,13 @@ int gpu_batch_countpairs_s_mu_mocks_double(double *x0, double *y0, double *z0,
             start_idx0, start_idx1,
             min_xdiff, min_ydiff, 
             savg, npairs, weightavg, supp_sqr,
+            pimax, off_xwrap, off_ywrap, off_zwrap,
             sqr_smax, sqr_smin, nsbin, nmu_bins,
             sqr_mumax,inv_dmu,mumin_invstep,
             inv_sstep, smin_invstep, selection,
-            need_savg, 1, autocorr, los_type, bin_type);
+            need_savg, 1, autocorr, bin_type);
     } else {
-        countpairs_s_mu_mocks_kernel_double<<<blocksPerGrid, THREADS_PER_BLOCK>>>(
+        countpairs_s_mu_kernel_double<<<blocksPerGrid, THREADS_PER_BLOCK>>>(
             x0, y0, z0,
             x1, y1, z1, N,
             np0, np1, 
@@ -1055,10 +875,11 @@ int gpu_batch_countpairs_s_mu_mocks_double(double *x0, double *y0, double *z0,
             start_idx0, start_idx1,
             min_xdiff, min_ydiff, 
             savg, npairs, supp_sqr,
+            pimax, off_xwrap, off_ywrap, off_zwrap, 
             sqr_smax, sqr_smin, nsbin, nmu_bins, 
             sqr_mumax,inv_dmu,mumin_invstep,
             inv_sstep, smin_invstep, selection,
-            need_savg, autocorr, los_type, bin_type);
+            need_savg, autocorr, bin_type);
     }
 
     //synchronize memory after kernel call
@@ -1072,7 +893,7 @@ int gpu_batch_countpairs_s_mu_mocks_double(double *x0, double *y0, double *z0,
 
 // ----------- float version ----------------
 
-int gpu_batch_countpairs_s_mu_mocks_float(float *x0, float *y0, float *z0,
+int gpu_batch_countpairs_s_mu_float(float *x0, float *y0, float *z0,
                float *weights0, uint8_t numweights0,
                float *x1, float *y1, float *z1,
                float *weights1, uint8_t numweights1,
@@ -1082,11 +903,12 @@ int gpu_batch_countpairs_s_mu_mocks_float(float *x0, float *y0, float *z0,
                int *start_idx0, int *start_idx1,
                float *min_xdiff, float *min_ydiff,
                float *savg, int *npairs, float *weightavg, const float *supp_sqr,
+               const float pimax, float *off_xwrap, float *off_ywrap, float *off_zwrap,
                const float sqr_smax, const float sqr_smin, const int nsbin,
                const int nmu_bins,
                const float sqr_mumax, const float inv_dmu, const float mumin_invstep,
                float inv_sstep, float smin_invstep, const selection_struct selection,
-               int need_savg, const weight_method_t weight_method, int autocorr, int los_type, int bin_type) {
+               int need_savg, const weight_method_t weight_method, int autocorr, int bin_type) {
     long threads = N;
     int blocksPerGrid = (threads+THREADS_PER_BLOCK-1) / THREADS_PER_BLOCK;
 
@@ -1095,7 +917,7 @@ int gpu_batch_countpairs_s_mu_mocks_float(float *x0, float *y0, float *z0,
     //be performed
 
     if (weight_method == PAIR_PRODUCT) {
-        countpairs_s_mu_mocks_pair_weights_kernel_float<<<blocksPerGrid, THREADS_PER_BLOCK>>>(
+        countpairs_s_mu_pair_weights_kernel_float<<<blocksPerGrid, THREADS_PER_BLOCK>>>(
             x0, y0, z0, weights0, (int)numweights0,
             x1, y1, z1, weights1, (int)numweights1,
             N, np0, np1,
@@ -1104,12 +926,13 @@ int gpu_batch_countpairs_s_mu_mocks_float(float *x0, float *y0, float *z0,
             start_idx0, start_idx1,
             min_xdiff, min_ydiff,
             savg, npairs, weightavg, supp_sqr,
+            pimax, off_xwrap, off_ywrap, off_zwrap,
             sqr_smax, sqr_smin, nsbin, nmu_bins,
             sqr_mumax,inv_dmu,mumin_invstep,
             inv_sstep, smin_invstep, selection,
-            need_savg, 1, autocorr, los_type, bin_type);
+            need_savg, 1, autocorr, bin_type);
     } else {
-        countpairs_s_mu_mocks_kernel_float<<<blocksPerGrid, THREADS_PER_BLOCK>>>(
+        countpairs_s_mu_kernel_float<<<blocksPerGrid, THREADS_PER_BLOCK>>>(
             x0, y0, z0,
             x1, y1, z1, N,
             np0, np1,
@@ -1118,10 +941,11 @@ int gpu_batch_countpairs_s_mu_mocks_float(float *x0, float *y0, float *z0,
             start_idx0, start_idx1,
             min_xdiff, min_ydiff,
             savg, npairs, supp_sqr,
+            pimax, off_xwrap, off_ywrap, off_zwrap,
             sqr_smax, sqr_smin, nsbin, nmu_bins,
             sqr_mumax,inv_dmu,mumin_invstep,
             inv_sstep, smin_invstep, selection,
-            need_savg, autocorr, los_type, bin_type);
+            need_savg, autocorr, bin_type);
     }
 
     //synchronize memory after kernel call

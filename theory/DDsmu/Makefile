@@ -5,6 +5,9 @@ INSTALL_BIN_DIR := $(ROOT_DIR)/bin
 UTILS_DIR := $(ROOT_DIR)/utils
 IO_DIR := $(ROOT_DIR)/io
 
+NVCC_RESULT := $(shell which nvcc 2> NULL)
+NVCC_TEST := $(notdir $(NVCC_RESULT))
+
 include $(ROOT_DIR)/theory.options $(ROOT_DIR)/common.mk
 
 TARGET := DDsmu
@@ -15,6 +18,11 @@ LIBSRC  := countpairs_s_mu.c countpairs_s_mu_impl_double.c countpairs_s_mu_impl_
          $(UTILS_DIR)/gridlink_utils_float.c $(UTILS_DIR)/gridlink_utils_double.c \
          $(UTILS_DIR)/utils.c $(UTILS_DIR)/progressbar.c $(UTILS_DIR)/cpu_features.c $(UTILS_DIR)/avx512_calls.c
 LIBRARY_HEADERS := countpairs_s_mu.h
+
+ifeq ($(NVCC_TEST),nvcc)
+#Add GPU module to LIBSRC
+LIBSRC += countpairs_s_mu_gpu.o
+endif
 
 TARGETSRC := DDsmu.c $(IO_DIR)/ftread.c $(IO_DIR)/io.c $(LIBSRC)
 
@@ -29,6 +37,9 @@ INCL   := countpairs_s_mu_kernels_float.c countpairs_s_mu_kernels_double.c count
           $(IO_DIR)/ftread.h $(IO_DIR)/io.h $(UTILS_DIR)/utils.h $(UTILS_DIR)/progressbar.h \
           $(UTILS_DIR)/weight_functions_double.h $(UTILS_DIR)/weight_functions_float.h $(UTILS_DIR)/weight_functions.h.src \
 	  $(UTILS_DIR)/weight_defs_double.h $(UTILS_DIR)/weight_defs_float.h $(UTILS_DIR)/weight_defs.h.src
+ifeq ($(NVCC_TEST),nvcc)
+INCL += countpairs_s_mu_gpu.h $(CUDA_INCLUDE)
+endif
 
 TARGETOBJS  := $(TARGETSRC:.c=.o)
 LIBOBJS := $(LIBSRC:.c=.o)

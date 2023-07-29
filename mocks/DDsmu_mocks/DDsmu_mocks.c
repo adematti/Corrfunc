@@ -227,6 +227,8 @@ int main(int argc, char *argv[])
     /*---Count-pairs--------------------------------------*/
     results_countpairs_mocks_s_mu results;
     struct config_options options = get_config_options();
+    //set_selection_struct(&(options.selection), RP_SELECTION, 0, 25); //uncomment this line to test RP_SELECTION
+
     set_gpu_mode(&options, (uint8_t)use_gpu);
 
     /* Pack weights into extra options */
