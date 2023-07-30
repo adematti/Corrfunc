@@ -31,6 +31,11 @@ endif
 ifeq ($(USE_GPU), 1)
   #Add GPU module to LIBSRC
   CFLAGS += -DGPU
+  ifndef CUDA_HOME
+      $(info $(ccred)Error:$(ccreset) To compile with GPU support define $(ccblue)"CUDA_HOME"$(ccreset))
+      $(info Else set $(ccblue)"USE_GPU=0"$(ccreset))
+      $(error )
+  endif
   CLINK += -L$(CUDA_HOME)/lib64 -lcudart
   CUDA_INCLUDE := $(CUDA_HOME)/include
 endif
