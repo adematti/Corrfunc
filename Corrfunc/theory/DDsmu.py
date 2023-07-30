@@ -21,7 +21,7 @@ def DDsmu(autocorr, nthreads, binfile, mumax, nmubins,
           xbin_refine_factor=2, ybin_refine_factor=2,
           zbin_refine_factor=1, max_cells_per_dim=100,
           copy_particles=True, enable_min_sep_opt=True,
-          c_api_timer=False, isa='fastest',
+          c_api_timer=False, isa='fastest', gpu=False,
           weight_type=None, bin_type='custom',
           pair_weights=None, sep_pair_weights=None, attrs_pair_weights=None, attrs_selection=None):
     """
@@ -166,6 +166,9 @@ def DDsmu(autocorr, nthreads, binfile, mumax, nmubins,
         sets, you should always leave ``isa`` to the default value. And if
         you *are* benchmarking, then the string supplied here gets translated
         into an ``enum`` for the instruction set defined in ``utils/defs.h``.
+
+    gpu : bool (default False)
+        If ``True``, use GPU (nvidia) instead of CPU.
 
     weight_type : str, optional
         The type of pair weighting to apply. One of ["pair_product", "inverse_bitwise", None].
@@ -328,6 +331,11 @@ def DDsmu(autocorr, nthreads, binfile, mumax, nmubins,
     if periodic and boxsize is None:
         raise ValueError("Must specify a boxsize if periodic=True")
 
+    if gpu:
+        if weight_type not in [None, 'pair_product']:
+            raise NotImplementedError('weight_type {} not supported with GPU'.format(weight_type))
+        if pair_weights is not None:
+            raise NotImplementedError('pair_weight not supported with GPU')
     weights1, weights2 = process_weights(weights1, weights2, X1, X2, weight_type, autocorr)
 
     # Ensure all input arrays are native endian
@@ -375,6 +383,7 @@ def DDsmu(autocorr, nthreads, binfile, mumax, nmubins,
                                   enable_min_sep_opt=enable_min_sep_opt,
                                   c_api_timer=c_api_timer,
                                   isa=integer_isa,
+                                  gpu=int(gpu),
                                   bin_type=integer_bin_type, **kwargs)
     if extn_results is None:
         msg = "RuntimeError occurred"

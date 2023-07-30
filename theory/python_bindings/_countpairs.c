@@ -2474,6 +2474,7 @@ static PyObject *countpairs_countpairs_s_mu(PyObject *self, PyObject *args, PyOb
         "enable_min_sep_opt",
         "c_api_timer",
         "isa",/* instruction set to use of type enum isa; valid values are AVX512F, AVX, SSE, FALLBACK */
+        "gpu",
         "weight_type",
         "pair_weights",
         "sep_pair_weights",
@@ -2483,7 +2484,7 @@ static PyObject *countpairs_countpairs_s_mu(PyObject *self, PyObject *args, PyOb
         NULL
     };
 
-    if ( ! PyArg_ParseTupleAndKeywords(args, kwargs, "iiO!diO!O!O!|OO!O!O!Obb(ddd)bbbbbhbbbisO!O!OOI", kwlist,
+    if ( ! PyArg_ParseTupleAndKeywords(args, kwargs, "iiO!diO!O!O!|OO!O!O!Obb(ddd)bbbbbhbbbiisO!O!OOI", kwlist,
                                        &autocorr,&nthreads,
                                        &PyArray_Type,&bins_obj,
                                        &mu_max, &nmu_bins,
@@ -2508,6 +2509,7 @@ static PyObject *countpairs_countpairs_s_mu(PyObject *self, PyObject *args, PyOb
                                        &(options.enable_min_sep_opt),
                                        &(options.c_api_timer),
                                        &(options.instruction_set),
+                                       &(options.use_gpu),
                                        &weighting_method_str,
                                        &PyArray_Type,&pair_weight_obj,
                                        &PyArray_Type,&sep_pair_weight_obj,

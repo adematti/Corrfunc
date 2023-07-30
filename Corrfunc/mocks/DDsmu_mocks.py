@@ -273,8 +273,6 @@ def DDsmu_mocks(autocorr, nthreads, binfile, mumax, nmubins,
             raise NotImplementedError('weight_type {} not supported with GPU'.format(weight_type))
         if pair_weights is not None:
             raise NotImplementedError('pair_weight not supported with GPU')
-        if attrs_selection:
-            raise NotImplementedError('attrs_selection not supported with GPU')
     weights1, weights2 = process_weights(weights1, weights2, X1, X2, weight_type, autocorr)
 
     # Ensure all input arrays are native endian
