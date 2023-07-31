@@ -1649,7 +1649,7 @@ static inline int countpairs_s_mu_mocks_gpu_DOUBLE(const int64_t N0, DOUBLE *x0,
     int d;
     cudaGetDevice(&d);
 
-    int status = EXIT_FAILURE; 
+    int status = EXIT_FAILURE;
     while (i < cell_pair_end) {
         int64_t i_start = i;
         int tot_nblocks = 0;

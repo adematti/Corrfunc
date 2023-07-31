@@ -20,7 +20,8 @@
  * nmu_bins      = number of mu bins
  * numthreads    = number of threads to use
 --- OPTIONAL ARGS:
- * weight_method = the type of pair weighting to apply.  Options are: 'pair_product', 'none'.  Default: 'none'.
+ * weight_method = the type of pair weighting to apply. Options are: 'pair_product', 'inverse_bitwise', 'none'. Default: 'none'.
+ * pair_weights = name of file containing the angular upweights (costheta, weight)
  * weights_file1 = name of file containing the weights corresponding to the first data file
  * weights_format1 = format of file containing the weights corresponding to the first data file
  * weights_file2 = name of file containing the weights corresponding to the second data file
@@ -45,6 +46,32 @@
 
 void Printhelp(void);
 
+static int get_number_of_columns(const char *filename) {
+    FILE * fp;
+    char * line = NULL;
+    size_t len = 0;
+    ssize_t read;
+    int ncols = 0;
+
+    fp = fopen(filename, "r");
+    if (fp == NULL) return ncols;
+
+    while ((read = getline(&line, &len, fp)) != -1) {
+        bool word = false;
+        for (size_t ic=0; ic<len; ic++) {
+            if ((line[ic] == ' ') || (line[ic] == ',')) word = false;
+            else if (!word) {
+                ncols++;
+                word = true;
+            }
+        }
+        break;
+    }
+    free(line);
+    fclose(fp);
+    return ncols;
+}
+
 int main(int argc, char *argv[])
 {
     /*---Arguments-------------------------*/
@@ -56,14 +83,16 @@ int main(int argc, char *argv[])
     DOUBLE mu_max;
 
     weight_method_t weight_method = NONE;
+    weight_type_t weight_types[MAX_NUM_WEIGHTS];
     int num_weights = 0;
     bool use_gpu = false;
 
     /*---Data-variables--------------------*/
     int64_t ND1,ND2 ;
 
-    DOUBLE *X1,*Y1,*Z1, *weights1[MAX_NUM_WEIGHTS]={NULL};
-    DOUBLE *X2,*Y2,*Z2, *weights2[MAX_NUM_WEIGHTS]={NULL};
+    DOUBLE *X1,*Y1,*Z1, *weights1[MAX_NUM_WEIGHTS] = {NULL};
+    DOUBLE *X2,*Y2,*Z2, *weights2[MAX_NUM_WEIGHTS] = {NULL};
+    DOUBLE *pair_weights[2] = {NULL};
 
     struct timeval t_end,t_start,t0,t1;
     double read_time=0.0;
@@ -72,33 +101,14 @@ int main(int argc, char *argv[])
 
     /*---Corrfunc-variables----------------*/
 #if defined(_OPENMP)
-    const char argnames[][30]={"file1","format1","file2","format2","sbinfile","mu_max","nmu_bins","numthreads"};
+    char argnames[][30]={"file1","format1","file2","format2","sbinfile","mu_max","nmu_bins","numthreads"};
 #else
-    const char argnames[][30]={"file1","format1","file2","format2","sbinfile","mu_max","nmu_bins"};
+    char argnames[][30]={"file1","format1","file2","format2","sbinfile","mu_max","nmu_bins"};
 #endif
-    const char optargnames[][30]={"weight_method", "weights_file1","weights_format1","weights_file2","weights_format2"};
+    char optargnames[][30]={"weight_method","pair_weights","weights_file1","weights_format1","weights_file2","weights_format2"};
 
     int nargs=sizeof(argnames)/(sizeof(char)*30);
     int noptargs=sizeof(optargnames)/(sizeof(char)*30);
-
-    /*---Read-arguments-----------------------------------*/
-    if(argc< (nargs+1)) {
-        Printhelp() ;
-        fprintf(stderr,"\nFound: %d parameters\n ",argc-1);
-        int i;
-        for(i=1;i<argc;i++) {
-            if(i <= nargs)
-                fprintf(stderr,"\t\t %s = `%s' \n",argnames[i-1],argv[i]);
-            else if(i <= nargs + noptargs)
-                fprintf(stderr,"\t\t %s = `%s' \n",optargnames[i-1-nargs],argv[i]);
-            else
-                fprintf(stderr,"\t\t <> = `%s' \n",argv[i]);
-        }
-        fprintf(stderr,"\nMissing required parameters \n");
-        for(i=argc;i<=nargs;i++)
-            fprintf(stderr,"\t\t %s = `?'\n",argnames[i-1]);
-        return EXIT_FAILURE;
-    }
 
     for (int i=1; i<argc; i++) {
         if (!strcmp(argv[i],"-gpu")) use_gpu = true;
@@ -108,9 +118,36 @@ int main(int argc, char *argv[])
     /* Validate optional arguments */
     int noptargs_given = argc - (nargs + 1);
     if (use_gpu) noptargs_given--;
+    int with_pair_weights = (int) ((noptargs_given == 4) || (noptargs_given == 6));
+    if (with_pair_weights) noptargs_given--;
+    else {
+        for (int i=1; i<noptargs-1; i++) strcpy(optargnames[i], optargnames[i+1]);  // shift all arguments
+        strcpy(optargnames[noptargs-1], "");
+    }
+
+    /*---Read-arguments-----------------------------------*/
+    if(argc< (nargs+1)) {
+        Printhelp() ;
+        fprintf(stderr,"\nFound: %d parameters\n ",argc-1);
+        int i;
+        for(i=1;i<argc;i++) {
+            if(i <= nargs)
+                fprintf(stderr,"\t\t %s = `%s' \n",argnames[i-1],argv[i]);
+            else if(i <= nargs + noptargs) {
+                fprintf(stderr,"\t\t %s = `%s' \n",optargnames[i-1-nargs],argv[i]);
+            }
+            else
+                fprintf(stderr,"\t\t <> = `%s' \n",argv[i]);
+        }
+        fprintf(stderr,"\nMissing required parameters \n");
+        for(i=argc;i<=nargs;i++)
+            fprintf(stderr,"\t\t %s = `?'\n",argnames[i-1]);
+        return EXIT_FAILURE;
+    }
+
     if(noptargs_given != 0 && noptargs_given != 3 && noptargs_given != 5){
         Printhelp();
-        fprintf(stderr,"\nFound: %d optional arguments; must be 0 (no weights), 3 (for one set of weights) or 5 (for two sets)\n ", noptargs_given);
+        fprintf(stderr,"\nFound: %d optional arguments; must be 0 (no weights), 3 or 4 (for one set of weights) or 5 or 6 (for two sets)\n ", noptargs_given);
         int i;
         for(i=nargs+1;i<argc;i++) {
             if(i <= nargs + noptargs)
@@ -137,6 +174,8 @@ int main(int argc, char *argv[])
     assert(nthreads >= 1 && "Number of threads must be at least 1");
 #endif
 
+    int64_t Npw = 0;
+    int iarg = 0;
     if(noptargs_given >= 3){
        weight_method_str = argv[nargs + 1];
        int wstatus = get_weight_method_by_name(weight_method_str, &weight_method);
@@ -145,13 +184,29 @@ int main(int argc, char *argv[])
          return EXIT_FAILURE;
        }
        num_weights = get_num_weights_by_method(weight_method);
+       if (with_pair_weights) {
+        if (weight_method == INVERSE_BITWISE) {
+            iarg += 1;
+            Npw = read_columns_into_array(argv[nargs + 2], "a", sizeof(DOUBLE), 2, (void **) pair_weights);
+        }
+        else {
+            fprintf(stderr, "Error: pair weights not accepted with weight method \"%s\"\n", weight_method_str);
+            return EXIT_FAILURE;
+        }
+       }
+       weights_file1 = argv[nargs + 2 + iarg];
+       weights_fileformat1 = argv[nargs + 3 + iarg];
 
-       weights_file1 = argv[nargs + 2];
-       weights_fileformat1 = argv[nargs + 3];
+       if (weight_method == INVERSE_BITWISE) {
+         num_weights = get_number_of_columns(weights_file1);
+         //num_weights = 5;  // hard-coded, 4 bitwise weights and 1 float weights
+         for (int ii=0; ii<num_weights - 1; ii++) weight_types[ii] = INT_TYPE;
+         weight_types[num_weights - 1] = FLOAT_TYPE;
+       }
     }
     if(noptargs_given >= 5){
-       weights_file2 = argv[nargs + 4];
-       weights_fileformat2 = argv[nargs + 5];
+       weights_file2 = argv[nargs + 4 + iarg];
+       weights_fileformat2 = argv[nargs + 5 + iarg];
     }
 
     int autocorr=0;
@@ -222,12 +277,11 @@ int main(int argc, char *argv[])
         }
     }
 
-
-
     /*---Count-pairs--------------------------------------*/
     results_countpairs_mocks_s_mu results;
     struct config_options options = get_config_options();
     //set_selection_struct(&(options.selection), RP_SELECTION, 0, 25); //uncomment this line to test RP_SELECTION
+    //options.instruction_set = FALLBACK;
 
     set_gpu_mode(&options, (uint8_t)use_gpu);
 
@@ -236,6 +290,11 @@ int main(int argc, char *argv[])
     for(int w = 0; w < num_weights; w++){
         extra.weights0.weights[w] = (void *) weights1[w];
         extra.weights1.weights[w] = (void *) weights2[w];
+    }
+    if (weight_method == INVERSE_BITWISE) {
+        set_weight_struct(&(extra.weights0), weight_method, weight_types, num_weights);
+        set_weight_struct(&(extra.weights1), weight_method, weight_types, num_weights);
+        if (Npw) set_pair_weight_struct(&(extra.pair_weight), pair_weights[0], pair_weights[1], Npw, 1, 0.);
     }
 
     int status = countpairs_mocks_s_mu(ND1,X1,Y1,Z1,
@@ -271,7 +330,7 @@ int main(int argc, char *argv[])
         const double log_supp = LOG10(results.supp[i]);
         for(int j=0;j<nmubin;j++) {
             const int index = i*(nmubin+1) + j;
-            fprintf(stdout,"%10"PRIu64" %20.8lf %20.8lf  %20.8lf %20.8lf \n",results.npairs[index],results.savg[index],log_supp,(j+1)*dmu-mu_max, results.weightavg[index]);
+            fprintf(stdout,"%10"PRIu64" %20.8lf %20.8lf %20.8lf %20.12lf \n",results.npairs[index],results.savg[index],log_supp,(j+1)*dmu-mu_max, results.weightavg[index]);
         }
     }
 
@@ -286,9 +345,9 @@ void Printhelp(void)
 {
     fprintf(stderr,"=========================================================================\n") ;
 #if defined(USE_OMP) && defined(_OPENMP)
-    fprintf(stderr,"   --- DDsmu file1 format1 file2 format2 sbinfile nmu_bins mu_max numthreads [weight_method weights_file1 weights_format1 [weights_file2 weights_format2]] > DDfile\n") ;
+    fprintf(stderr,"   --- DDsmu file1 format1 file2 format2 sbinfile mu_max nmu_bins numthreads [weight_method [pair_weights] weights_file1 weights_format1 [weights_file2 weights_format2]] > DDfile\n") ;
 #else
-    fprintf(stderr,"   --- DDsmu file1 format1 file2 format2 sbinfile nmu_bins mu_max [weight_method weights_file1 weights_format1 [weights_file2 weights_format2]] > DDfile\n") ;
+    fprintf(stderr,"   --- DDsmu file1 format1 file2 format2 sbinfile mu_max nmu_bins [weight_method [pair_weights] weights_file1 weights_format1 [weights_file2 weights_format2]] > DDfile\n") ;
 #endif
     fprintf(stderr,"   --- Measure the cross-correlation function xi(rp,pi) for two different\n") ;
     fprintf(stderr,"       data files (or autocorrelation if data1=data2).\n") ;
@@ -297,13 +356,14 @@ void Printhelp(void)
     fprintf(stderr,"     * data2         = name of second data file\n") ;
     fprintf(stderr,"     * format2       = format of second data file (a=ascii, c=csv, f=fast-food)\n") ;
     fprintf(stderr,"     * sbinfile      = name of ascii file containing the r-bins (rmin rmax for each bin)\n") ;
-    fprintf(stderr,"     * nmu_bins      = number of mu bins\n") ;
     fprintf(stderr,"     * mu_max        = maximum mu value (>0 and <= 1.0)\n") ;
+    fprintf(stderr,"     * nmu_bins      = number of mu bins\n") ;
 #if defined(USE_OMP) && defined(_OPENMP)
     fprintf(stderr,"     * numthreads    = number of threads to use\n");
 #endif
     fprintf(stderr,"   --- OPTIONAL ARGS:\n");
-    fprintf(stderr,"     * weight_method = the type of pair weighting to apply.  Options are: 'pair_product', 'none'.  Default: 'none'.\n");
+    fprintf(stderr,"     * weight_method = the type of pair weighting to apply. Options are: 'pair_product', 'inverse_bitwise', 'none'. Default: 'none'.\n");
+    fprintf(stderr,"     * pair_weights = name of file containing the angular upweights (costheta, weight)\n");
     fprintf(stderr,"     * weights_file1 = name of file containing the weights corresponding to the first data file\n");
     fprintf(stderr,"     * weights_format1 = format of file containing the weights corresponding to the first data file\n");
     fprintf(stderr,"     * weights_file2 = name of file containing the weights corresponding to the second data file\n");
