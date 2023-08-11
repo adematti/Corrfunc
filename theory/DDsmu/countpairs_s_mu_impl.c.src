@@ -625,7 +625,14 @@ int countpairs_s_mu_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z1
             if (tid < ngpu) {
                 //gpu_print_cuda_error();
                 gpu_allocate_outputs_DOUBLE(&gpu_savg, &gpu_npairs, totnbins);
-                if (need_weightavg) gpu_allocate_weight_output_DOUBLE(&gpu_weightavg, totnbins);
+                for(int j=0;j<totnbins;j++) gpu_npairs[j] = 0;
+                if (options->need_avg_sep) {
+                    for(int j=0;j<totnbins;j++) gpu_savg[j] = 0.;
+                }
+                if (need_weightavg) {
+                    gpu_allocate_weight_output_DOUBLE(&gpu_weightavg, totnbins);
+                    for(int j=0;j<totnbins;j++) gpu_weightavg[j] = 0.;
+                }
                 gpu_allocate_block_luts(&gpu_cellpair_lut, &gpu_cellthread_lut, max_blocks);
 
                 //if using multi GPU + OPENMP, call GPU version of countpairs_s_mu_gpu_DOUBLE here
