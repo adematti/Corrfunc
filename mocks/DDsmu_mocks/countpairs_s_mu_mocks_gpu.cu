@@ -19,7 +19,122 @@ extern "C" {
 
 #include "countpairs_s_mu_mocks_gpu.h"
 #include <cuda_runtime.h>
+
+// Define pair_struct_double here instead of including weight_functions_double
+// Info about a particle pair that we will pass to the weight function
+typedef struct
+{
+    double weights0[MAX_NUM_WEIGHTS];
+    double weights1[MAX_NUM_WEIGHTS];
+    double dx, dy, dz;
+
+    // These will only be present for mock catalogs
+    double parx, pary, parz;
+
+    // Add for angular weights
+    double costheta;
+
+    double *p_weight;
+    double *p_sep;
+    int p_num;
+    //pair_weight_struct_double pair_weight;
+
+    int num_weights;
+    uint8_t num_integer_weights;
+    int8_t noffset;
+    double default_value;
+} pair_struct_double;
+
+typedef struct
+{
+    float weights0[MAX_NUM_WEIGHTS];
+    float weights1[MAX_NUM_WEIGHTS];
+    float dx, dy, dz;
+
+    // These will only be present for mock catalogs
+    float parx, pary, parz;
+
+    // Add for angular weights
+    float costheta;
+
+    float *p_weight;
+    float *p_sep;
+    int p_num;
+    //pair_weight_struct_float pair_weight;
+
+    int num_weights;
+    uint8_t num_integer_weights;
+    int8_t noffset;
+    float default_value;
+} pair_struct_float;
+
 }
+
+//device function to do inverse_bitwise weighting
+__device__ double inverse_bitwise_double(pair_struct_double *pair){
+    int nbits = pair->noffset;
+    for (int w=0;w<pair->num_integer_weights;w++) {
+        nbits += __popc(*((long *) &(pair->weights0[w])) & *((long *) &(pair->weights1[w])));
+    }
+    double weight = (nbits == 0) ? pair->default_value : 1./nbits;
+    int num = pair->p_num;
+    if (num) {
+        double costheta = pair->costheta;
+        double *pair_sep = pair->p_sep;
+        if (costheta > pair_sep[num-1] || (costheta <= pair_sep[0])) {
+            ;
+        }
+        else {
+            double *pair_weight = pair->p_weight;
+            for (int kbin=0;kbin<num-1;kbin++) {
+                if(costheta <= pair_sep[kbin+1]) { // ]min, max], as costheta instead of theta
+                    double frac = (costheta - pair_sep[kbin])/(pair_sep[kbin+1] - pair_sep[kbin]);
+                    weight *= (1 - frac) * pair_weight[kbin] + frac * pair_weight[kbin+1];
+                    break;
+                }
+            }
+        }
+    }
+    num = pair->num_weights;
+    int numi = pair->num_integer_weights;
+    if (num > numi) weight *= pair->weights0[numi]*pair->weights1[numi]; // multiply by the first float weight
+    numi++;
+    if (num > numi) weight -= pair->weights0[numi]*pair->weights1[numi]; // subtract the second float weight
+    return weight;
+}
+
+__device__ float inverse_bitwise_float(pair_struct_float *pair){
+    int nbits = pair->noffset;
+    for (int w=0;w<pair->num_integer_weights;w++) {
+        nbits += __popc(*((long *) &(pair->weights0[w])) & *((long *) &(pair->weights1[w])));
+    }
+    float weight = (nbits == 0) ? pair->default_value : 1./nbits;
+    int num = pair->p_num;
+    if (num) {
+        float costheta = pair->costheta;
+        float *pair_sep = pair->p_sep;
+        if (costheta > pair_sep[num-1] || (costheta <= pair_sep[0])) {
+            ;
+        }
+        else {
+            float *pair_weight = pair->p_weight;
+            for (int kbin=0;kbin<num-1;kbin++) {
+                if(costheta <= pair_sep[kbin+1]) { // ]min, max], as costheta instead of theta
+                    float frac = (costheta - pair_sep[kbin])/(pair_sep[kbin+1] - pair_sep[kbin]);
+                    weight *= (1 - frac) * pair_weight[kbin] + frac * pair_weight[kbin+1];
+                    break;
+                }
+            }
+        }
+    }
+    num = pair->num_weights;
+    int numi = pair->num_integer_weights;
+    if (num > numi) weight *= pair->weights0[numi]*pair->weights1[numi]; // multiply by the first float weight
+    numi++;
+    if (num > numi) weight -= pair->weights0[numi]*pair->weights1[numi]; // subtract the second float weight
+    return weight;
+}
+
 
 __global__ void countpairs_s_mu_mocks_kernel_double(double *x0, double *y0, double *z0,
                double *x1, double *y1, double *z1, int N,
@@ -403,7 +518,8 @@ __global__ void countpairs_s_mu_mocks_pair_weights_kernel_double(double *x0, dou
                const int nmu_bins, 
                const double sqr_mumax, const double inv_dmu, const double mumin_invstep,
                double inv_sstep, double smin_invstep, const selection_struct selection,
-               int need_savg, int need_weightavg, int autocorr, int los_type, int bin_type) {
+               int need_savg, int need_weightavg, int autocorr, int los_type, int bin_type,
+               const weight_method_t weight_method, const pair_weight_struct pair_w, double *p_weight, double *p_sep) {
     //thread index tidx 
     int tidx = blockDim.x * blockIdx.x + threadIdx.x;
     if (tidx >= N) return;
@@ -434,7 +550,7 @@ __global__ void countpairs_s_mu_mocks_pair_weights_kernel_double(double *x0, dou
     double y1pos = y1[j];
     double z1pos = z1[j];
 
-    if (same_cell[icellpair] && z1pos <= zpos) { 
+    if (same_cell[icellpair] && z1pos <= zpos) {
         //return if same particle or in same cell with z1 < z0
         //this way we do not double count pairs
         return;
@@ -470,9 +586,6 @@ __global__ void countpairs_s_mu_mocks_pair_weights_kernel_double(double *x0, dou
     yhat0 = ypos/norm0;
     zhat0 = zpos/norm0;
 
-    //need_weightavg is TRUE in this kernel BUT pair_costheta_d not used
-    //in PAIR_PRODUCT so comment out - will be used for INVERSE_BITWISE 
-    //double pair_costheta_d = xhat1*xhat0 + yhat1*yhat0 + zhat1*zhat0;
 
     const double parx = xpos + x1pos;
     const double pary = ypos + y1pos; 
@@ -552,23 +665,36 @@ __global__ void countpairs_s_mu_mocks_pair_weights_kernel_double(double *x0, dou
 
     //need_weightavg is TRUE so remove conditional and always calculate
     //pairweight - only do simple PAIR_PRODUCT in this kernel
-    pairweight = weights0[i*numweights0] * weights1[j*numweights1]; 
+    if (weight_method == PAIR_PRODUCT) pairweight = weights0[i*numweights0] * weights1[j*numweights1];
+    else if (weight_method == INVERSE_BITWISE) {
+        //use pair_struct and helper method to calculate inverse bitwise weights
+        pair_struct_double pair = {.num_weights=numweights0};
+        pair.num_integer_weights = numweights1-1;
+        for(int w = 0; w < pair.num_weights; w++) {
+            pair.weights0[w] = weights0[i*numweights0+w];
+            pair.weights1[w] = weights1[j*numweights1+w];
+        }
+        double pair_costheta_d = xhat1*xhat0 + yhat1*yhat0 + zhat1*zhat0;
+
+        pair.dx = perpx;
+        pair.dy = perpy;
+        pair.dz = perpz;
+
+        pair.parx = parx;
+        pair.pary = pary;
+        pair.parz = parz;
+        pair.costheta = pair_costheta_d;
+
+        pair.p_weight = p_weight;
+        pair.p_sep = p_sep;
+        pair.p_num = (int)pair_w.num;
+        pair.noffset = pair_w.noffset;
+        pair.default_value = (double) pair_w.default_value;
+
+        pairweight = inverse_bitwise_double(&pair);
+    }
     if(need_savg) sw = s*pairweight;
 
-/*
-    if(need_weightavg){
-	pair.dx.d = perpx;
-	pair.dy.d = perpy;
-	pair.dz.d = perpz;
-
-	pair.parx.d = parx;
-	pair.pary.d = pary;
-	pair.parz.d = parz;
-
-	pairweight = weight_func(&pair);
-	if(need_savg) sw = s*pairweight;
-    }
-*/
     int kbin = 0;
     if (bin_type == BIN_LIN) {
 	kbin = (int) (s*inv_sstep + smin_invstep);
@@ -611,7 +737,8 @@ __global__ void countpairs_s_mu_mocks_pair_weights_kernel_float(float *x0, float
                const int nmu_bins, 
                const float sqr_mumax, const float inv_dmu, const float mumin_invstep,
                float inv_sstep, float smin_invstep, const selection_struct selection,
-               int need_savg, int need_weightavg, int autocorr, int los_type, int bin_type) {
+               int need_savg, int need_weightavg, int autocorr, int los_type, int bin_type,
+               const weight_method_t weight_method, const pair_weight_struct pair_w, float *p_weight, float *p_sep) {
     //thread index tidx 
     int tidx = blockDim.x * blockIdx.x + threadIdx.x;
     if (tidx >= N) return;
@@ -642,7 +769,7 @@ __global__ void countpairs_s_mu_mocks_pair_weights_kernel_float(float *x0, float
     float y1pos = y1[j];
     float z1pos = z1[j];
 
-    if (same_cell[icellpair] && z1pos <= zpos) { 
+    if (same_cell[icellpair] && z1pos <= zpos) {
         //return if same particle or in same cell with z1 < z0
         //this way we do not float count pairs
         return;
@@ -760,23 +887,36 @@ __global__ void countpairs_s_mu_mocks_pair_weights_kernel_float(float *x0, float
 
     //need_weightavg is TRUE so remove conditional and always calculate
     //pairweight - only do simple PAIR_PRODUCT in this kernel
-    pairweight = weights0[i*numweights0] * weights1[j*numweights1]; 
+    if (weight_method == PAIR_PRODUCT) pairweight = weights0[i*numweights0] * weights1[j*numweights1];
+    else if (weight_method == INVERSE_BITWISE) {
+        //use pair_struct and helper method to calculate inverse bitwise weights
+        pair_struct_float pair = {.num_weights=numweights0};
+        pair.num_integer_weights = numweights1-1;
+        for(int w = 0; w < pair.num_weights; w++) {
+            pair.weights0[w] = weights0[i*numweights0+w];
+            pair.weights1[w] = weights1[j*numweights1+w];
+        }
+        float pair_costheta_d = xhat1*xhat0 + yhat1*yhat0 + zhat1*zhat0;
+
+        pair.dx = perpx;
+        pair.dy = perpy;
+        pair.dz = perpz;
+
+        pair.parx = parx;
+        pair.pary = pary;
+        pair.parz = parz;
+        pair.costheta = pair_costheta_d;
+
+        pair.p_weight = p_weight;
+        pair.p_sep = p_sep;
+        pair.p_num = (int)pair_w.num;
+        pair.noffset = pair_w.noffset;
+        pair.default_value = (float) pair_w.default_value;
+
+        pairweight = inverse_bitwise_float(&pair);
+    }
     if(need_savg) sw = s*pairweight;
 
-/*
-    if(need_weightavg){
-	pair.dx.d = perpx;
-	pair.dy.d = perpy;
-	pair.dz.d = perpz;
-
-	pair.parx.d = parx;
-	pair.pary.d = pary;
-	pair.parz.d = parz;
-
-	pairweight = weight_func(&pair);
-	if(need_savg) sw = s*pairweight;
-    }
-*/
     int kbin = 0;
     if (bin_type == BIN_LIN) {
 	kbin = (int) (s*inv_sstep + smin_invstep);
@@ -858,7 +998,7 @@ void gpu_allocate_outputs_double(double **p_gpu_savg, int **p_gpu_npairs, const 
     cudaMallocManaged(&(*p_gpu_npairs), totnbins*sizeof(int));
 }
 
-void gpu_allocate_supp_sqr_double(double **p_gpu_supp_sqr, const int nsbin) {
+void gpu_allocate_one_array_double(double **p_gpu_supp_sqr, const int nsbin) {
     // Allocate Unified Memory – accessible from CPU or GPU
     // Takes pointers as args
     cudaMallocManaged(&(*p_gpu_supp_sqr), nsbin*sizeof(double));
@@ -900,7 +1040,7 @@ void gpu_allocate_outputs_float(float **p_gpu_savg, int **p_gpu_npairs, const in
     cudaMallocManaged(&(*p_gpu_npairs), totnbins*sizeof(int));
 }
 
-void gpu_allocate_supp_sqr_float(float **p_gpu_supp_sqr, const int nsbin) {
+void gpu_allocate_one_array_float(float **p_gpu_supp_sqr, const int nsbin) {
     // Allocate Unified Memory – accessible from CPU or GPU
     // Takes pointers as args
     cudaMallocManaged(&(*p_gpu_supp_sqr), nsbin*sizeof(float));
@@ -955,7 +1095,7 @@ void gpu_free_outputs_double(double *gpu_savg, int *gpu_npairs) {
     cudaFree(gpu_npairs);
 }
 
-void gpu_free_supp_sqr_double(double *gpu_supp_sqr) {
+void gpu_free_one_array_double(double *gpu_supp_sqr) {
     cudaFree(gpu_supp_sqr);
 }
 
@@ -985,7 +1125,7 @@ void gpu_free_outputs_float(float *gpu_savg, int *gpu_npairs) {
     cudaFree(gpu_npairs);
 }
 
-void gpu_free_supp_sqr_float(float *gpu_supp_sqr) {
+void gpu_free_one_array_float(float *gpu_supp_sqr) {
     cudaFree(gpu_supp_sqr);
 }
 
@@ -1023,7 +1163,9 @@ int gpu_batch_countpairs_s_mu_mocks_double(double *x0, double *y0, double *z0,
                const int nmu_bins, 
                const double sqr_mumax, const double inv_dmu, const double mumin_invstep,
                double inv_sstep, double smin_invstep, const selection_struct selection,
-               int need_savg, const weight_method_t weight_method, int autocorr, int los_type, int bin_type) {
+               int need_savg, const weight_method_t weight_method, const pair_weight_struct pair_weight,
+               double *p_weight, double *p_sep,
+               int autocorr, int los_type, int bin_type) {
     long threads = N;
     int blocksPerGrid = (threads+THREADS_PER_BLOCK-1) / THREADS_PER_BLOCK;
 
@@ -1031,7 +1173,21 @@ int gpu_batch_countpairs_s_mu_mocks_double(double *x0, double *y0, double *z0,
     //is not unnecessarily passed extra arrays for weighting calcs that won't
     //be performed
 
-    if (weight_method == PAIR_PRODUCT) {
+    if (weight_method == NONE) {
+        countpairs_s_mu_mocks_kernel_double<<<blocksPerGrid, THREADS_PER_BLOCK>>>(
+            x0, y0, z0,
+            x1, y1, z1, N,
+            np0, np1,
+            same_cell, icell0, icell1,
+            cellpair_lut, cellthread_lut,
+            start_idx0, start_idx1,
+            min_xdiff, min_ydiff,
+            savg, npairs, supp_sqr,
+            sqr_smax, sqr_smin, nsbin, nmu_bins,
+            sqr_mumax,inv_dmu,mumin_invstep,
+            inv_sstep, smin_invstep, selection,
+            need_savg, autocorr, los_type, bin_type);
+    } else {
         countpairs_s_mu_mocks_pair_weights_kernel_double<<<blocksPerGrid, THREADS_PER_BLOCK>>>(
             x0, y0, z0, weights0, (int)numweights0,
             x1, y1, z1, weights1, (int)numweights1,
@@ -1044,21 +1200,8 @@ int gpu_batch_countpairs_s_mu_mocks_double(double *x0, double *y0, double *z0,
             sqr_smax, sqr_smin, nsbin, nmu_bins,
             sqr_mumax,inv_dmu,mumin_invstep,
             inv_sstep, smin_invstep, selection,
-            need_savg, 1, autocorr, los_type, bin_type);
-    } else {
-        countpairs_s_mu_mocks_kernel_double<<<blocksPerGrid, THREADS_PER_BLOCK>>>(
-            x0, y0, z0,
-            x1, y1, z1, N,
-            np0, np1, 
-            same_cell, icell0, icell1, 
-            cellpair_lut, cellthread_lut,
-            start_idx0, start_idx1,
-            min_xdiff, min_ydiff, 
-            savg, npairs, supp_sqr,
-            sqr_smax, sqr_smin, nsbin, nmu_bins, 
-            sqr_mumax,inv_dmu,mumin_invstep,
-            inv_sstep, smin_invstep, selection,
-            need_savg, autocorr, los_type, bin_type);
+            need_savg, 1, autocorr, los_type, bin_type,
+            weight_method, pair_weight, p_weight, p_sep);
     }
 
     //synchronize memory after kernel call
@@ -1086,7 +1229,9 @@ int gpu_batch_countpairs_s_mu_mocks_float(float *x0, float *y0, float *z0,
                const int nmu_bins,
                const float sqr_mumax, const float inv_dmu, const float mumin_invstep,
                float inv_sstep, float smin_invstep, const selection_struct selection,
-               int need_savg, const weight_method_t weight_method, int autocorr, int los_type, int bin_type) {
+               int need_savg, const weight_method_t weight_method, const pair_weight_struct pair_weight,
+               float *p_weight, float *p_sep,
+               int autocorr, int los_type, int bin_type) {
     long threads = N;
     int blocksPerGrid = (threads+THREADS_PER_BLOCK-1) / THREADS_PER_BLOCK;
 
@@ -1094,21 +1239,7 @@ int gpu_batch_countpairs_s_mu_mocks_float(float *x0, float *y0, float *z0,
     //is not unnecessarily passed extra arrays for weighting calcs that won't
     //be performed
 
-    if (weight_method == PAIR_PRODUCT) {
-        countpairs_s_mu_mocks_pair_weights_kernel_float<<<blocksPerGrid, THREADS_PER_BLOCK>>>(
-            x0, y0, z0, weights0, (int)numweights0,
-            x1, y1, z1, weights1, (int)numweights1,
-            N, np0, np1,
-            same_cell, icell0, icell1,
-            cellpair_lut, cellthread_lut,
-            start_idx0, start_idx1,
-            min_xdiff, min_ydiff,
-            savg, npairs, weightavg, supp_sqr,
-            sqr_smax, sqr_smin, nsbin, nmu_bins,
-            sqr_mumax,inv_dmu,mumin_invstep,
-            inv_sstep, smin_invstep, selection,
-            need_savg, 1, autocorr, los_type, bin_type);
-    } else {
+    if (weight_method == NONE) {
         countpairs_s_mu_mocks_kernel_float<<<blocksPerGrid, THREADS_PER_BLOCK>>>(
             x0, y0, z0,
             x1, y1, z1, N,
@@ -1122,6 +1253,21 @@ int gpu_batch_countpairs_s_mu_mocks_float(float *x0, float *y0, float *z0,
             sqr_mumax,inv_dmu,mumin_invstep,
             inv_sstep, smin_invstep, selection,
             need_savg, autocorr, los_type, bin_type);
+    } else {
+        countpairs_s_mu_mocks_pair_weights_kernel_float<<<blocksPerGrid, THREADS_PER_BLOCK>>>(
+            x0, y0, z0, weights0, (int)numweights0,
+            x1, y1, z1, weights1, (int)numweights1,
+            N, np0, np1,
+            same_cell, icell0, icell1,
+            cellpair_lut, cellthread_lut,
+            start_idx0, start_idx1,
+            min_xdiff, min_ydiff,
+            savg, npairs, weightavg, supp_sqr,
+            sqr_smax, sqr_smin, nsbin, nmu_bins,
+            sqr_mumax,inv_dmu,mumin_invstep,
+            inv_sstep, smin_invstep, selection,
+            need_savg, 1, autocorr, los_type, bin_type,
+            weight_method, pair_weight, p_weight, p_sep);
     }
 
     //synchronize memory after kernel call

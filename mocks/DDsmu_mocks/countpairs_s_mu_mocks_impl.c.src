@@ -433,6 +433,11 @@ int countpairs_mocks_s_mu_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUB
     uint8_t nw1 = (extra->weights0).num_weights;
     uint8_t nw2 = (extra->weights1).num_weights;
 
+    //Make copies of pair_weight_struct arrays that are type void* here
+    //These need to be copied to GPU Unified memory before they can be used
+    //if doing inverse bitwise with pair weights
+    DOUBLE *gpu_p_weight, *gpu_p_sep;
+
     //define max threads and max blocks here
     const int max_threads = 400000000; //400M
     const int max_blocks = (max_threads+THREADS_PER_BLOCK-1) / THREADS_PER_BLOCK; //max num blocks
@@ -448,7 +453,21 @@ int countpairs_mocks_s_mu_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUB
         gpu_allocate_lattice_luts(&gpu_np1, &gpu_start_idx1, totncells);
         if (nw1 > 0) gpu_allocate_weights_DOUBLE(&gpu_W1, ND1, nw1);
         if (nw2 > 0) gpu_allocate_weights_DOUBLE(&gpu_W2, ND2, nw2);
-        gpu_allocate_supp_sqr_DOUBLE(&gpu_supp_sqr, nsbin);
+        gpu_allocate_one_array_DOUBLE(&gpu_supp_sqr, nsbin);
+
+        //reuse gpu_allocate_one_array method to allocate p_weight, p_sep
+        if (extra->pair_weight.num > 0) {
+            //First must create new DOUBLE * and cast void *
+            DOUBLE *p_weight = (DOUBLE *)(extra->pair_weight.weight);
+            DOUBLE *p_sep = (DOUBLE *)(extra->pair_weight.sep);
+            gpu_allocate_one_array_DOUBLE(&gpu_p_weight, extra->pair_weight.num);
+            gpu_allocate_one_array_DOUBLE(&gpu_p_sep, extra->pair_weight.num);
+            //Now copy over to GPU
+            for (int i = 0; i < extra->pair_weight.num; i++) {
+                gpu_p_weight[i] = p_weight[i];
+                gpu_p_sep[i] = p_sep[i];
+            }
+        }
 
         //copy data to GPU
         for (int i = 0; i < nsbin; i++) gpu_supp_sqr[i] = supp_sqr[i];
@@ -574,8 +593,9 @@ int countpairs_mocks_s_mu_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUB
                                                                          smax, smin, nsbin, nmu_bins, gpu_supp_sqr, mu_max,
                                                                          gpu_min_dx, gpu_min_dy,
                                                                          gpu_savg, gpu_npairs,
-                                                                         gpu_weightavg, extra->weight_method, options->selection,
-                                                                         options->bin_type, options->los_type, autocorr,
+                                                                         gpu_weightavg, extra->weight_method, extra->pair_weight,
+                                                                         gpu_p_weight, gpu_p_sep,
+                                                                         options->selection, options->bin_type, options->los_type, autocorr,
                                                                          gpu_cellpair_lut, gpu_cellthread_lut, options->verbose);
                 abort_status |= status;
             }
@@ -690,7 +710,11 @@ int countpairs_mocks_s_mu_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUB
         gpu_free_cell_luts(gpu_same_cell, gpu_icell0, gpu_icell1);
         gpu_free_lattice_luts(gpu_np0, gpu_start_idx0);
         gpu_free_lattice_luts(gpu_np1, gpu_start_idx1);
-        gpu_free_supp_sqr_DOUBLE(gpu_supp_sqr);
+        gpu_free_one_array_DOUBLE(gpu_supp_sqr);
+        if (extra->pair_weight.num > 0) {
+            gpu_free_one_array_DOUBLE(gpu_p_weight);
+            gpu_free_one_array_DOUBLE(gpu_p_sep);
+        }
     }
 #endif
     free(all_cell_pairs);
