@@ -67,6 +67,7 @@ typedef struct
 static inline int set_pair_struct_DOUBLE(pair_struct_DOUBLE *pair, const weight_struct_DOUBLE *weights0, const weight_struct_DOUBLE *weights1, const pair_weight_struct *pair_w) {
     pair->num_weights = weights0->num_weights;
     pair->num_integer_weights = weights1->num_integer_weights;
+    //printf("NUMW %d %d NUMWI %d %d\n", weights0->num_weights, weights1->num_weights, weights0->num_integer_weights, weights1->num_integer_weights);
     pair->pair_weight.weight = pair_w->weight;
     pair->pair_weight.sep = pair_w->sep;
     pair->pair_weight.num = pair_w->num;
@@ -263,7 +264,6 @@ static inline DOUBLE inverse_bitwise_DOUBLE(pair_struct_DOUBLE *pair){
     int nbits = pair->noffset;
     //printf("%d ", nbits);
     for (int w=0;w<pair->num_integer_weights;w++) {
-        //printf("w%d %ld %ld\n", w, *((LONG *) &(pair->weights0[w].d)), *((LONG *) &(pair->weights1[w].d)));
         nbits += POPCOUNT(*((LONG *) &(pair->weights0[w].d)) & *((LONG *) &(pair->weights1[w].d)));
     }
     DOUBLE weight = (nbits == 0) ? pair->default_value : 1./nbits;

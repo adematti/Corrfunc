@@ -174,9 +174,9 @@ int main(int argc, char *argv[])
 #endif
 
     int64_t Npw = 0;
-    int iarg = 0;
+    int iarg = use_gpu;
     if(noptargs_given >= 3){
-       weight_method_str = argv[nargs + 1];
+       weight_method_str = argv[nargs + 1 + iarg];
        int wstatus = get_weight_method_by_name(weight_method_str, &weight_method);
        if(wstatus != EXIT_SUCCESS){
          fprintf(stderr, "Error: Unknown weight method \"%s\"\n", weight_method_str);
@@ -186,7 +186,7 @@ int main(int argc, char *argv[])
        if (with_pair_weights) {
         if (weight_method == INVERSE_BITWISE) {
             iarg += 1;
-            Npw = read_columns_into_array(argv[nargs + 2], "a", sizeof(DOUBLE), 2, (void **) pair_weights);
+            Npw = read_columns_into_array(argv[nargs + 2 + iarg], "a", sizeof(DOUBLE), 2, (void **) pair_weights);
         }
         else {
             fprintf(stderr, "Error: pair weights not accepted with weight method \"%s\"\n", weight_method_str);
@@ -218,10 +218,12 @@ int main(int argc, char *argv[])
     for(int i=1;i<argc;i++) {
         if(i <= nargs) {
             fprintf(stderr,"\t\t %-10s = %s \n",argnames[i-1],argv[i]);
-        } else if(i <= nargs + noptargs){
-            fprintf(stderr,"\t\t %-10s = %s \n",optargnames[i-nargs-1],argv[i]);
-        } else {
-            fprintf(stderr,"\t\t <> = `%s' \n",argv[i]);
+        } else if (i > nargs + use_gpu) {
+            if (i <= nargs + use_gpu + noptargs_given + with_pair_weights){
+                fprintf(stderr,"\t\t %-10s = %s \n",optargnames[i - nargs - use_gpu - 1],argv[i]);
+            } else {
+                fprintf(stderr,"\t\t <> = `%s' \n",argv[i]);
+            }
         }
     }
     fprintf(stderr,"\t\t -------------------------------------\n");
@@ -354,9 +356,9 @@ void Printhelp(void)
 {
     fprintf(stderr,"=========================================================================\n") ;
 #if defined(USE_OMP) && defined(_OPENMP)
-    fprintf(stderr,"   --- DDsmu file1 format1 file2 format2 sbinfile mu_max nmu_bins boxsize numthreads [weight_method weights_file1 weights_format1 [weights_file2 weights_format2]] > DDfile\n");
+    fprintf(stderr,"   --- DDsmu file1 format1 file2 format2 sbinfile mu_max nmu_bins boxsize numthreads [-gpu] [weight_method weights_file1 weights_format1 [weights_file2 weights_format2]] > DDfile\n");
 #else
-    fprintf(stderr,"   --- DDsmu file1 format1 file2 format2 sbinfile mu_max nmu_bins boxsize [weight_method weights_file1 weights_format1 [weights_file2 weights_format2]] > DDfile\n") ;
+    fprintf(stderr,"   --- DDsmu file1 format1 file2 format2 sbinfile mu_max nmu_bins boxsize [-gpu] [weight_method weights_file1 weights_format1 [weights_file2 weights_format2]] > DDfile\n") ;
 #endif
 
     fprintf(stderr,"   --- Measure the cross-correlation function xi(s, mu) for two different\n") ;

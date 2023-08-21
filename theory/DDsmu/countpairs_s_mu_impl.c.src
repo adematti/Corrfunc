@@ -492,6 +492,7 @@ int countpairs_s_mu_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z1
 
     uint8_t nw1 = (extra->weights0).num_weights;
     uint8_t nw2 = (extra->weights1).num_weights;
+    uint8_t niw1 = (extra->weights0).num_integer_weights;
 
     //Make copies of pair_weight_struct arrays that are type void* here
     //These need to be copied to GPU Unified memory before they can be used
@@ -656,7 +657,7 @@ int countpairs_s_mu_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z1
 
                 //if using multi GPU + OPENMP, call GPU version of countpairs_s_mu_gpu_DOUBLE here
                 const int status = countpairs_s_mu_gpu_DOUBLE(ND1, gpu_X1, gpu_Y1, gpu_Z1, gpu_W1, nw1,
-                                                                         ND2, gpu_X2, gpu_Y2, gpu_Z2, gpu_W2, nw2,
+                                                                         ND2, gpu_X2, gpu_Y2, gpu_Z2, gpu_W2, niw1,
                                                                          gpu_same_cell,
                                                                          gpu_icell0, gpu_icell1, num_cell_pairs,
                                                                          cellpair_start, cellpair_end,

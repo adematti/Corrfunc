@@ -2700,7 +2700,7 @@ static PyObject *countpairs_countpairs_s_mu(PyObject *self, PyObject *args, PyOb
 
     /* Build the output list */
     PyObject *ret = PyList_New(0);//create an empty list
-    double smin=results.supp[0];
+    double smin = results.supp[0];
     const double dmu = 2.*mu_max/(double)nmu_bins;//mu_min is assumed to be 0.0
     for(int i=1;i<results.nsbin;i++) {
         const double smax=results.supp[i];
@@ -2712,7 +2712,7 @@ static PyObject *countpairs_countpairs_s_mu(PyObject *self, PyObject *args, PyOb
             PyList_Append(ret, item);
             Py_XDECREF(item);
         }
-        smin=smax;
+        smin = smax;
     }
     free_results_s_mu(&results);
 

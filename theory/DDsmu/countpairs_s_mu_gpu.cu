@@ -75,7 +75,7 @@ typedef struct
 __device__ double inverse_bitwise_double(pair_struct_double *pair){
     int nbits = pair->noffset;
     for (int w=0;w<pair->num_integer_weights;w++) {
-        nbits += __popc(*((long *) &(pair->weights0[w])) & *((long *) &(pair->weights1[w])));
+        nbits += __popcll(*((long *) &(pair->weights0[w])) & *((long *) &(pair->weights1[w])));
     }
     double weight = (nbits == 0) ? pair->default_value : 1./nbits;
     int num = pair->p_num;
@@ -107,7 +107,7 @@ __device__ double inverse_bitwise_double(pair_struct_double *pair){
 __device__ float inverse_bitwise_float(pair_struct_float *pair){
     int nbits = pair->noffset;
     for (int w=0;w<pair->num_integer_weights;w++) {
-        nbits += __popc(*((long *) &(pair->weights0[w])) & *((long *) &(pair->weights1[w])));
+        nbits += __popc(*((int *) &(pair->weights0[w])) & *((int *) &(pair->weights1[w])));
     }
     float weight = (nbits == 0) ? pair->default_value : 1./nbits;
     int num = pair->p_num;
@@ -399,9 +399,9 @@ __global__ void countpairs_s_mu_kernel_float(float *x0, float *y0, float *z0,
 }
 
 __global__ void countpairs_s_mu_pair_weights_kernel_double(double *x0, double *y0, double *z0,
-               double *weights0, int numweights0,
+               double *weights0, int numweights,
                double *x1, double *y1, double *z1, 
-               double *weights1, int numweights1,
+               double *weights1, int numintweights,
                int N, int *np0, int *np1, 
                int *same_cell, int64_t *icell0, int64_t *icell1, 
                int *cellpair_lut, int *cellthread_lut,
@@ -511,16 +511,17 @@ __global__ void countpairs_s_mu_pair_weights_kernel_double(double *x0, double *y
     if(need_savg || bin_type == BIN_LIN) {
         s = sqrt(sqr_s); 
     }
+    if (autocorr) weights1 = weights0;
+
     //need_weightavg is TRUE so remove conditional and always calculate
     //pairweight - only do simple PAIR_PRODUCT in this kernel
-    if (weight_method == PAIR_PRODUCT) pairweight = weights0[i*numweights0] * weights1[j*numweights1];
+    if (weight_method == PAIR_PRODUCT) pairweight = weights0[i*numweights] * weights1[j*numweights];
     else if (weight_method == INVERSE_BITWISE) {
         //use pair_struct and helper method to calculate inverse bitwise weights
-        pair_struct_double pair = {.num_weights=numweights0};
-        pair.num_integer_weights = numweights1-1;
+        pair_struct_double pair = {.num_weights=numweights, .num_integer_weights=numintweights};
         for(int w = 0; w < pair.num_weights; w++) {
-            pair.weights0[w] = weights0[i*numweights0+w];
-            pair.weights1[w] = weights1[j*numweights1+w];
+            pair.weights0[w] = weights0[i*numweights+w];
+            pair.weights1[w] = weights1[j*numweights+w];
         }
         double pair_costheta_d = x1pos*xpos + y1pos*ypos + z1pos*zpos;
         pair_costheta_d /= norm1*norm0;
@@ -575,9 +576,9 @@ __global__ void countpairs_s_mu_pair_weights_kernel_double(double *x0, double *y
 }
 
 __global__ void countpairs_s_mu_pair_weights_kernel_float(float *x0, float *y0, float *z0,
-               float *weights0, int numweights0,
+               float *weights0, int numweights,
                float *x1, float *y1, float *z1, 
-               float *weights1, int numweights1,
+               float *weights1, int numintweights,
                int N, int *np0, int *np1, 
                int *same_cell, int64_t *icell0, int64_t *icell1, 
                int *cellpair_lut, int *cellthread_lut,
@@ -689,16 +690,17 @@ __global__ void countpairs_s_mu_pair_weights_kernel_float(float *x0, float *y0, 
     if(need_savg || bin_type == BIN_LIN) {
         s = sqrt(sqr_s); 
     }
+    if (autocorr) weights1 = weights0;
+
     //need_weightavg is TRUE so remove conditional and always calculate
     //pairweight - only do simple PAIR_PRODUCT in this kernel
-    if (weight_method == PAIR_PRODUCT) pairweight = weights0[i*numweights0] * weights1[j*numweights1];
+    if (weight_method == PAIR_PRODUCT) pairweight = weights0[i*numweights] * weights1[j*numweights];
     else if (weight_method == INVERSE_BITWISE) {
         //use pair_struct and helper method to calculate inverse bitwise weights
-        pair_struct_float pair = {.num_weights=numweights0};
-        pair.num_integer_weights = numweights1-1;
+        pair_struct_float pair = {.num_weights=numweights, .num_integer_weights=numintweights};
         for(int w = 0; w < pair.num_weights; w++) {
-            pair.weights0[w] = weights0[i*numweights0+w];
-            pair.weights1[w] = weights1[j*numweights1+w];
+            pair.weights0[w] = weights0[i*numweights+w];
+            pair.weights1[w] = weights1[j*numweights+w];
         }
         float pair_costheta_d = x1pos*xpos + y1pos*ypos + z1pos*zpos;
         pair_costheta_d /= norm1*norm0;
@@ -980,9 +982,9 @@ void gpu_device_synchronize() {
 // =========   Kernel called below ============//
 
 int gpu_batch_countpairs_s_mu_double(double *x0, double *y0, double *z0,
-               double *weights0, uint8_t numweights0,
+               double *weights0, uint8_t numweights,
                double *x1, double *y1, double *z1, 
-               double *weights1, uint8_t numweights1,
+               double *weights1, uint8_t numintweights,
                const int N, int *np0, int *np1,
                int *same_cell, int64_t *icell0, int64_t *icell1,
                int *cellpair_lut, int *cellthread_lut,
@@ -1021,8 +1023,8 @@ int gpu_batch_countpairs_s_mu_double(double *x0, double *y0, double *z0,
             need_savg, autocorr, bin_type);
     } else {
         countpairs_s_mu_pair_weights_kernel_double<<<blocksPerGrid, THREADS_PER_BLOCK>>>(
-            x0, y0, z0, weights0, (int)numweights0,
-            x1, y1, z1, weights1, (int)numweights1,
+            x0, y0, z0, weights0, (int)numweights,
+            x1, y1, z1, weights1, (int)numintweights,
             N, np0, np1,
             same_cell, icell0, icell1,
             cellpair_lut, cellthread_lut,
@@ -1049,9 +1051,9 @@ int gpu_batch_countpairs_s_mu_double(double *x0, double *y0, double *z0,
 // ----------- float version ----------------
 
 int gpu_batch_countpairs_s_mu_float(float *x0, float *y0, float *z0,
-               float *weights0, uint8_t numweights0,
+               float *weights0, uint8_t numweights,
                float *x1, float *y1, float *z1,
-               float *weights1, uint8_t numweights1,
+               float *weights1, uint8_t numintweights,
                const int N, int *np0, int *np1,
                int *same_cell, int64_t *icell0, int64_t *icell1,
                int *cellpair_lut, int *cellthread_lut,
@@ -1091,8 +1093,8 @@ int gpu_batch_countpairs_s_mu_float(float *x0, float *y0, float *z0,
             need_savg, autocorr, bin_type);
     } else {
         countpairs_s_mu_pair_weights_kernel_float<<<blocksPerGrid, THREADS_PER_BLOCK>>>(
-            x0, y0, z0, weights0, (int)numweights0,
-            x1, y1, z1, weights1, (int)numweights1,
+            x0, y0, z0, weights0, (int)numweights,
+            x1, y1, z1, weights1, (int)numintweights,
             N, np0, np1,
             same_cell, icell0, icell1,
             cellpair_lut, cellthread_lut,

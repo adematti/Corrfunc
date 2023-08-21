@@ -2258,7 +2258,6 @@ static PyObject *countpairs_countpairs_s_mu_mocks(PyObject *self, PyObject *args
 
         Py_RETURN_NONE;
     }
-
     /*This is for the fastest isa */
     if(options.instruction_set == -1) {
         options.instruction_set = highest_isa_mocks;
@@ -2425,7 +2424,7 @@ static PyObject *countpairs_countpairs_s_mu_mocks(PyObject *self, PyObject *args
 
     /* Build the output list */
     PyObject *ret = PyList_New(0);//create an empty list
-    double rlow=results.supp[0];
+    double rlow = results.supp[0];
     const double dmu = 2.*mu_max/(double) results.nmu_bins;
 
     for(int i=1;i<results.nsbin;i++) {
@@ -2437,7 +2436,7 @@ static PyObject *countpairs_countpairs_s_mu_mocks(PyObject *self, PyObject *args
             PyList_Append(ret, item);
             Py_XDECREF(item);
         }
-        rlow=results.supp[i];
+        rlow = results.supp[i];
     }
     free_results_mocks_s_mu(&results);
 

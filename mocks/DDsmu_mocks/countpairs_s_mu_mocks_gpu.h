@@ -58,7 +58,7 @@ void gpu_free_weights_float(float *weights);
 // ================== KERNEL =================== /
 
 int gpu_batch_countpairs_s_mu_mocks_double(double *x0, double *y0, double *z0, double *weights0, uint8_t nw0,
-               double *x1, double *y1, double *z1, double *weights1, uint8_t nw1,
+               double *x1, double *y1, double *z1, double *weights1, uint8_t i0,
                const int N, int *np0, int *np1, 
                int *same_cell, int64_t *icell0, int64_t *icell1,
                int *cellpair_lut, int *cellthread_lut,
@@ -75,7 +75,7 @@ int gpu_batch_countpairs_s_mu_mocks_double(double *x0, double *y0, double *z0, d
 
 
 int gpu_batch_countpairs_s_mu_mocks_float(float *x0, float *y0, float *z0, float *weights0, uint8_t nw0,
-               float *x1, float *y1, float *z1, float *weights1, uint8_t nw1,
+               float *x1, float *y1, float *z1, float *weights1, uint8_t niw0,
                const int N, int *np0, int *np1,
                int *same_cell, int64_t *icell0, int64_t *icell1,
                int *cellpair_lut, int *cellthread_lut,
