@@ -298,9 +298,13 @@ static inline int wp_avx512_intrinsics_DOUBLE(DOUBLE *x0, DOUBLE *y0, DOUBLE *z0
         }//end of j-loop over second set of particles
     }//loop over first set of particles
 
+#ifdef COUNT_VECTORIZED
     uint64_t npairs_found = 0;
+#endif
     for(int i=0;i<nbin;i++) {
+#ifdef COUNT_VECTORIZED
         npairs_found += npairs[i];
+#endif
         src_npairs[i] += npairs[i];
         if(need_rpavg) {
             src_rpavg[i]  += rpavg[i];
@@ -665,9 +669,13 @@ static inline int wp_avx2_intrinsics_DOUBLE(DOUBLE *x0, DOUBLE *y0, DOUBLE *z0, 
         }//remainder loop over second set of particles
     }//loop over first set of particles
 
+#ifdef COUNT_VECTORIZED
     uint64_t npairs_found = 0;
+#endif
     for(int i=0;i<nbin;i++) {
+#ifdef COUNT_VECTORIZED
         npairs_found += npairs[i];
+#endif
         src_npairs[i] += npairs[i];
         if(need_rpavg) {
             src_rpavg[i]  += rpavg[i];
@@ -1045,9 +1053,13 @@ static inline int wp_avx_intrinsics_DOUBLE(DOUBLE *x0, DOUBLE *y0, DOUBLE *z0, c
         }//remainder loop over second set of particles
     }//loop over first set of particles
 
+#ifdef COUNT_VECTORIZED
     uint64_t npairs_found = 0;
+#endif
     for(int i=0;i<nbin;i++) {
+#ifdef COUNT_VECTORIZED
         npairs_found += npairs[i];
+#endif
         src_npairs[i] += npairs[i];
         if(need_rpavg) {
             src_rpavg[i]  += rpavg[i];
@@ -1406,10 +1418,15 @@ static inline int wp_sse_intrinsics_DOUBLE(DOUBLE *x0, DOUBLE *y0, DOUBLE *z0, c
             }
         }
     }
+
+#ifdef COUNT_VECTORIZED
     uint64_t npairs_found = 0;
+#endif
     for(int i=0;i<nbin;i++) {
-        src_npairs[i] += npairs[i];
+#ifdef COUNT_VECTORIZED
         npairs_found += npairs[i];
+#endif
+        src_npairs[i] += npairs[i];
         if(need_rpavg) {
             src_rpavg[i] += rpavg[i];
         }
@@ -1614,10 +1631,14 @@ static inline int wp_fallback_DOUBLE(DOUBLE *x0, DOUBLE *y0, DOUBLE *z0, const w
         }
     }
 
+#ifdef COUNT_VECTORIZED
     uint64_t npairs_found = 0;
+#endif
     for(int i=0;i<nbin;i++) {
-        src_npairs[i] += npairs[i];
+#ifdef COUNT_VECTORIZED
         npairs_found += npairs[i];
+#endif
+        src_npairs[i] += npairs[i];
         if(need_rpavg) {
             src_rpavg[i] += rpavg[i];
         }

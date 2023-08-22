@@ -10,8 +10,26 @@ New features
 - conda installable package
 - GPU version
 
+2.5.2 (upcoming)
+================
+- Fix python_requires in setup.py [#302]
 
-2.5.0 (upcoming)
+2.5.1 (28/07/2023)
+==================
+
+Enhancements
+------------
+- Corrfunc now compiles  and runs on Apple M1/M2 cpus (using the `FALLBACK` kernels) [#295]
+
+Changes
+-------
+- Python >= 3.7 and numpy >= 1.16 are required for python extensions [#291]
+
+Enhancements
+------------
+- Warn about loss of precision for float32 calculations involving small ``theta`` in ``DDtheta_mocks`` and large ``mu`` in ``DDsmu_mocks`` [#299]
+
+2.5.0 (2022-12-23)
 ================
 
 Enhancements
@@ -31,6 +49,7 @@ Fixes
 - Check and fix ``z`` vs ``cz`` in ``DDrppi_mocks`` and ``DDsmu_mocks`` only if comoving distance flag is not set [#275]
 - Update GNU assembler bug detection [#278]
 - Fix installation instructions and update README.rst [#285]
+- Remove mistaken references to "projected" correlation function in docs [#289]
 
 
 2.4.0 (2021-09-30)

@@ -26,7 +26,7 @@ def DDrppi_mocks(autocorr, nthreads, binfile, pimax, npibins,
                  weight_type=None, bin_type='custom', los_type='midpoint',
                  pair_weights=None, sep_pair_weights=None, attrs_pair_weights=None):
     """
-    Calculate the 2-D pair-counts corresponding to the projected correlation
+    Calculate the pair-counts corresponding to the 2-D correlation
     function, :math:`\\xi(r_p, \\pi)`. Pairs which are separated by less
     than the ``rp`` bins (specified in ``binfile``) in the
     X-Y plane, and less than ``pimax`` in the Z-dimension are
@@ -384,6 +384,7 @@ def DDrppi_mocks(autocorr, nthreads, binfile, pimax, npibins,
         return results
     else:
         return results, api_time
+
 
 if __name__ == '__main__':
     import doctest
