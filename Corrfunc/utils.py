@@ -17,7 +17,7 @@ import numpy as np
 
 
 __all__ = ['translate_isa_string_to_enum', 'translate_bin_type_string_to_enum', 'translate_los_type_string_to_enum',
-           'return_file_with_rbins', 'compute_nbins', 'gridlink_sphere', ]
+           'get_edges', 'compute_nbins', 'gridlink_sphere']
 if sys.version_info[0] < 3:
     __all__ = [n.encode('ascii') for n in __all__]
 

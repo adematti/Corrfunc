@@ -10,6 +10,7 @@ Python wrapper around the C extension for the angular correlation function
 
 from __future__ import (division, print_function, absolute_import,
                         unicode_literals)
+import warnings
 
 __author__ = ('Manodeep Sinha', 'Kris Akira Stern')
 __all__ = ('DDtheta_mocks', 'find_fastest_DDtheta_mocks_bin_refs')
@@ -347,6 +348,11 @@ def DDtheta_mocks(autocorr, nthreads, binfile,
     integer_isa = translate_isa_string_to_enum(isa)
     integer_bin_type = translate_bin_type_string_to_enum(bin_type)
     rbinfile = get_edges(binfile)
+
+    warn_small_theta(rbinfile,
+                     RA1.dtype,  # RA and DEC are checked to be the same dtype
+                     )
+
     with sys_pipes():
         extn_results = DDtheta_mocks_extn(autocorr, nthreads, rbinfile,
                                           RA1, DEC1,
@@ -664,6 +670,27 @@ def find_fastest_DDtheta_mocks_bin_refs(autocorr, nthreads, binfile,
             ret += (all_runtimes,)
 
     return ret
+
+
+def warn_small_theta(bins, dtype):
+    '''
+    Small theta values underfloat float32. Warn the user.
+    Context: https://github.com/manodeep/Corrfunc/issues/296 (see also #297)
+    '''
+    if dtype.itemsize > 4:
+        return
+
+    if bins.min() <= 0.2:
+        warnings.warn("""
+A binning with a minimum angular separation of 0.2 degrees or less was
+requested, and the input data is in float32 precision or lower. Be aware that
+small angular pair separations will suffer from loss of floating-point
+precision. In float32, the loss of precision is 0.5% in theta at separations of
+0.2 degrees, and larger at smaller separations.
+For more information, see:
+https://github.com/manodeep/Corrfunc/issues/296 (see also #297)
+"""
+                      )
 
 
 if __name__ == '__main__':

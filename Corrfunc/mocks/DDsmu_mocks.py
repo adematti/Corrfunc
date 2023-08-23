@@ -8,6 +8,7 @@ Python wrapper around the C extension for the pair counter in
 
 from __future__ import (division, print_function, absolute_import,
                         unicode_literals)
+import warnings
 
 __author__ = ('Manodeep Sinha', 'Nick Hand')
 __all__ = ('DDsmu_mocks', )
@@ -25,7 +26,7 @@ def DDsmu_mocks(autocorr, nthreads, binfile, mumax, nmubins,
                 weight_type=None, bin_type='custom', los_type='midpoint',
                 pair_weights=None, sep_pair_weights=None, attrs_pair_weights=None, attrs_selection=None):
     """
-    Calculate the 2-D pair-counts corresponding to the redshift-space correlation
+    Calculate the 2-D pair-counts corresponding to the correlation
     function, :math:`\\xi(s, \\mu)`. The pairs are counted in bins of
     radial separation and cosine of angle to the line-of-sight (LOS). The
     input positions are expected to be on-sky co-ordinates. This module is
@@ -296,6 +297,12 @@ def DDsmu_mocks(autocorr, nthreads, binfile, mumax, nmubins,
     integer_bin_type = translate_bin_type_string_to_enum(bin_type)
     integer_los_type = translate_los_type_string_to_enum(los_type)
     sbinfile = get_edges(binfile)
+
+    warn_large_mu(mumax,
+                  # X1, Y1, Z1 are checked to be the same dtype
+                  dtype=X1.dtype,
+                  )
+
     with sys_pipes():
         extn_results = DDsmu_extn(autocorr, nthreads,
                                   sbinfile, mumax, nmubins,
@@ -342,6 +349,27 @@ def DDsmu_mocks(autocorr, nthreads, binfile, mumax, nmubins,
         return results
     else:
         return results, api_time
+
+
+def warn_large_mu(mu_max, dtype):
+    '''
+    Small theta values (large mu) underfloat float32. Warn the user.
+    Context: https://github.com/manodeep/Corrfunc/issues/296 (see also #297)
+    '''
+    if dtype.itemsize > 4:
+        return
+
+    if mu_max >= 0.9800666:  # cos(0.2)
+        warnings.warn("""
+Be aware that small angular pair separations (mu near 1) will suffer from loss
+of floating-point precision, as the input data is in float32 precision or
+lower. In float32, the loss of precision is 1% in mu at separations of 0.2
+degrees, and larger at smaller separations.
+For more information, see:
+https://github.com/manodeep/Corrfunc/issues/296 (see also #297)
+"""
+                      )
+
 
 if __name__ == '__main__':
     import doctest
