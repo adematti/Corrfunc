@@ -15,7 +15,7 @@ def gals_Mr19():
     filename = pjoin(dirname(abspath(__file__)),
                      "../../theory/tests/data", "gals_Mr19.ff")
     try:
-        x, y, z, w = read_fastfood_catalog(filename, need_weights=True)
+        x, y, z, w = read_fastfood_catalog(filename)
     except OSError:
         pytest.skip(NO_DATA_SKIP_MESSAGE)
 
@@ -36,7 +36,7 @@ def Mr19_mock_northonly_rdz():
     #                 "../../mocks/tests/data", "Mr19_mock_northonly.rdcz.ff")
     try:
         ra, dec, cz, w = read_ascii_catalog(filename)  # ra, dec, cz, w
-        #ra, dec, cz, w = read_fastfood_catalog(filename, need_weights=True)
+        #ra, dec, cz, w = read_fastfood_catalog(filename)
     except OSError:
         pytest.skip(NO_DATA_SKIP_MESSAGE)
 
@@ -50,7 +50,7 @@ def Mr19_randoms_northonly():
     #                 "../../mocks/tests/data", "Mr19_randoms_northonly.rdcz.ff")
     try:
         ra, dec, cz, w = read_ascii_catalog(filename)
-        #ra, dec, cz, w = read_fastfood_catalog(filename, need_weights=True)
+        #ra, dec, cz, w = read_fastfood_catalog(filename)
     except OSError:
         pytest.skip(NO_DATA_SKIP_MESSAGE)
 

@@ -36,14 +36,14 @@ typedef enum {
 
 
 static inline void cpuid (int output[4], int functionnumber) {
-if defined(__clang__) || defined(__ARM_NEON)
+#if (defined (__clang__) || defined (__ARM_NEON))
    output[0] = 0;
    output[1] = 0;
    output[2] = 0;
    output[3] = 0;
    (void) functionnumber;
-
-#elif defined(__GNUC__)              // use inline assembly, Gnu/AT&T syntax
+#else
+#if defined(__GNUC__)              // use inline assembly, Gnu/AT&T syntax
    int a, b, c, d;
    __asm("cpuid" : "=a"(a),"=b"(b),"=c"(c),"=d"(d) : "a"(functionnumber),"c"(0) );
    output[0] = a;
@@ -70,7 +70,7 @@ if defined(__clang__) || defined(__ARM_NEON)
 
 // Define interface to xgetbv instruction
 static inline int64_t xgetbv (int ctr) {
-#if defined(__clang__) || defined(__ARM_NEON)
+#if (defined (__clang__) || defined (__ARM_NEON))
     (void) ctr;
     return (int64_t) FALLBACK; /* use FALLBACK kernels until the ARM64 kernels are added to the pair-counters */
 #else
