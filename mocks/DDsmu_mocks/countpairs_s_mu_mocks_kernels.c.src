@@ -1665,7 +1665,7 @@ static inline int countpairs_s_mu_mocks_gpu_DOUBLE(const int64_t N0, DOUBLE *x0,
             for (int j = tot_nblocks; j < tot_nblocks+nblocks; j++) {
                 cellpair_lut[j] = i;
                 cellthread_lut[j] = tnum;
-                tnum += 512;
+                tnum += THREADS_PER_BLOCK;
             }
             tot_nblocks += nblocks;
             i++;

@@ -789,6 +789,8 @@ int countpairs_s_mu_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z1
         gpu_free_cell_luts(gpu_same_cell, gpu_icell0, gpu_icell1);
         gpu_free_lattice_luts(gpu_np0, gpu_start_idx0);
         gpu_free_lattice_luts(gpu_np1, gpu_start_idx1);
+        if (nw1 > 0) gpu_free_weights_DOUBLE(gpu_W1);
+        if (nw2 > 0) gpu_free_weights_DOUBLE(gpu_W2);
         gpu_free_one_array_DOUBLE(gpu_supp_sqr);
         if (extra->pair_weight.num > 0) {
             gpu_free_one_array_DOUBLE(gpu_p_weight);
