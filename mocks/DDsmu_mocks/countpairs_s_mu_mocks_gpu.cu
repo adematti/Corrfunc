@@ -1281,6 +1281,17 @@ int gpu_batch_countpairs_s_mu_mocks_float(float *x0, float *y0, float *z0,
     return EXIT_SUCCESS;
 }
 
+size_t gpu_get_total_mem() {
+    size_t free_byte ;
+    size_t total_byte ;
+    cudaError_t cuda_status = cudaMemGetInfo( &free_byte, &total_byte ) ;
+
+    if ( cudaSuccess != cuda_status ){
+        printf("Error: cudaMemGetInfo fails, %s \n", cudaGetErrorString(cuda_status) );
+        exit(1);
+    }
+    return total_byte;
+}
 
 void gpu_print_cuda_error() {
        size_t free_byte ;

@@ -133,7 +133,13 @@ int main(int argc, char *argv[])
     }
 
     for (int i=1; i<argc; i++) {
-        if (!strcmp(argv[i],"-gpu")) use_gpu = true;
+        if (!strcmp(argv[i],"-gpu")) {
+            use_gpu = true;
+            for (int j = i+1; j < argc; j++) {
+              argv[j-1] = argv[j];
+            }
+            argv[argc-1] = "-gpu";
+        }
     }
     if (use_gpu) fprintf(stderr, "USE GPU\n");
 
@@ -174,7 +180,7 @@ int main(int argc, char *argv[])
 #endif
 
     int64_t Npw = 0;
-    int iarg = use_gpu;
+    int iarg = 0;
     if(noptargs_given >= 3){
        weight_method_str = argv[nargs + 1 + iarg];
        int wstatus = get_weight_method_by_name(weight_method_str, &weight_method);
@@ -218,9 +224,9 @@ int main(int argc, char *argv[])
     for(int i=1;i<argc;i++) {
         if(i <= nargs) {
             fprintf(stderr,"\t\t %-10s = %s \n",argnames[i-1],argv[i]);
-        } else if (i > nargs + use_gpu) {
-            if (i <= nargs + use_gpu + noptargs_given + with_pair_weights){
-                fprintf(stderr,"\t\t %-10s = %s \n",optargnames[i - nargs - use_gpu - 1],argv[i]);
+        } else if (i > nargs) {
+            if (i <= nargs + noptargs_given + with_pair_weights){
+                fprintf(stderr,"\t\t %-10s = %s \n",optargnames[i - nargs - 1],argv[i]);
             } else {
                 fprintf(stderr,"\t\t <> = `%s' \n",argv[i]);
             }
