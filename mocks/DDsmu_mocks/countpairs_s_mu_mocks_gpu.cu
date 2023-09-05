@@ -40,7 +40,7 @@ typedef struct
     //pair_weight_struct_double pair_weight;
 
     int num_weights;
-    uint8_t num_integer_weights;
+    int num_integer_weights;
     int8_t noffset;
     double default_value;
 } pair_struct_double;
@@ -63,7 +63,7 @@ typedef struct
     //pair_weight_struct_float pair_weight;
 
     int num_weights;
-    uint8_t num_integer_weights;
+    int num_integer_weights;
     int8_t noffset;
     float default_value;
 } pair_struct_float;

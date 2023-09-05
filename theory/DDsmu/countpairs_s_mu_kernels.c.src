@@ -1452,7 +1452,7 @@ static inline int countpairs_s_mu_gpu_DOUBLE(const int64_t N0, DOUBLE *x0, DOUBL
                                                         DOUBLE *weightavg, const weight_method_t weight_method, const pair_weight_struct pair_weight,
                                                         DOUBLE *p_weight, DOUBLE *p_sep,
                                                         const selection_struct selection, const bin_type_t bin_type, const los_type_t los_type, const int autocorr,
-                                                        int *cellpair_lut, int *cellthread_lut, uint8_t verbose)
+                                                        int *cellpair_lut, int *cellthread_lut, int64_t max_blocks, uint8_t verbose)
 {
     if(N0 == 0 || N1 == 0) {
         return EXIT_SUCCESS;
@@ -1474,8 +1474,6 @@ static inline int countpairs_s_mu_gpu_DOUBLE(const int64_t N0, DOUBLE *x0, DOUBL
     const DOUBLE sqr_mumax = mu_max*mu_max;
     const DOUBLE inv_dmu = ((DOUBLE) nmu_bins)/(2*mu_max);
     const DOUBLE mumin_invstep = mu_max*inv_dmu;
-    const int64_t max_threads = 400000000; //400M
-    int64_t max_blocks = (max_threads+THREADS_PER_BLOCK-1) / THREADS_PER_BLOCK; //max num blocks
 
     //7/17/23 - moved allocation of cellpair_lut and cellthread_lut to countpairs_impl
 
@@ -1506,12 +1504,6 @@ static inline int countpairs_s_mu_gpu_DOUBLE(const int64_t N0, DOUBLE *x0, DOUBL
             //nthreads += gpu_np0[gpu_icell0[i]] * gpu_np1[gpu_icell1[i]];
             this_cell_threads = gpu_np0[gpu_icell0[i]] * gpu_np1[gpu_icell1[i]];
             nblocks = (this_cell_threads+THREADS_PER_BLOCK-1)/THREADS_PER_BLOCK;
-            if (tot_nblocks == 0 && nblocks > max_blocks) {
-                if (verbose) fprintf(stderr, "Warning: Density is too high for current max blocks of %ld.  Changing max blocks to %ld.\n", max_blocks, nblocks);
-                size_t gpumem = gpu_get_total_mem();
-                max_blocks = nblocks;
-                if (max_blocks * THREADS_PER_BLOCK * 8 > (int64_t)gpumem) fprintf(stderr, "Warning: Updated max blocks of %ld may be too high for GPU memory %ld bytes.\n", max_blocks, gpumem);
-            }
             if (nblocks + tot_nblocks > max_blocks) break;
             int tnum = 0;
             for (int j = tot_nblocks; j < tot_nblocks+nblocks; j++) {
