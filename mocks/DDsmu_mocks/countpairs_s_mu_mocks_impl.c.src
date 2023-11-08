@@ -561,9 +561,9 @@ int countpairs_mocks_s_mu_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUB
         int64_t cellpair_start = tid*num_cell_pairs/gputhreads;
         int64_t cellpair_end = (tid+1)*num_cell_pairs/gputhreads;
         if (use_gpu && tid < ngpu) {
-                //set CUDA device to this thread id
-                //should never have more threads than GPUs
-                cudaSetDevice(tid);
+            //set CUDA device to this thread id
+            //should never have more threads than GPUs
+            cudaSetDevice(tid);
         }
 #else
         int64_t cellpair_start = 0;
@@ -794,6 +794,9 @@ int countpairs_mocks_s_mu_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUB
         int with_auto_pairs = (supp[0] <= 0.0);
         if (options->selection.selection_type & RP_SELECTION) {
             with_auto_pairs &= (options->selection.rpmin_sqr <= 0.);
+        }
+        if (options->selection.selection_type & THETA_SELECTION) {
+            with_auto_pairs &= (options->selection.costhetamax >= 1.);
         }
         if(with_auto_pairs) {
             /* Then, add all the self-pairs. This ensures that

@@ -16,6 +16,7 @@
 
 #include "macros.h"
 #include "cpu_features.h"
+#include "function_precision.h"
 #include "utils.h"
 
 #ifdef __cplusplus
@@ -49,13 +50,14 @@ struct api_cell_timings
 #define MAX_FAST_DIVIDE_NR_STEPS  3
 #define OPTIONS_HEADER_SIZE     1024
 #define BOXSIZE_NOTGIVEN (-2.)
-#define RP_SQR_NOTGIVEN (-2.)
+
 
 typedef enum {BIN_AUTO, BIN_LIN, BIN_CUSTOM} bin_type_t; // type of weighting to apply
 typedef enum {MIDPOINT_LOS, FIRSTPOINT_LOS} los_type_t;
 typedef enum {
     NONE_SELECTION=0,
-    RP_SELECTION=1
+    RP_SELECTION=1,
+    THETA_SELECTION=2,
 } selection_type_t;
 
 
@@ -63,6 +65,8 @@ typedef struct {
     selection_type_t selection_type;
     double rpmin_sqr;
     double rpmax_sqr;
+    double costhetamin;
+    double costhetamax;
 } selection_struct;
 
 
@@ -216,9 +220,20 @@ static inline void reset_bin_refine_factors(struct config_options *options)
 
 
 static inline int set_selection_struct(selection_struct* selection_st, selection_type_t selection_type, const double rpmin, const double rpmax) {
-    selection_st->selection_type = selection_type;
-    selection_st->rpmin_sqr = rpmin * rpmin;
-    selection_st->rpmax_sqr = rpmax * rpmax;
+    selection_st->selection_type |= selection_type;
+    if (selection_st->selection_type == RP_SELECTION) {
+        selection_st->rpmin_sqr = rpmin * rpmin;
+        selection_st->rpmax_sqr = rpmax * rpmax;
+    }
+    else if (selection_st->selection_type == THETA_SELECTION) {
+        selection_st->costhetamin = COSD(rpmax);  // thetamax, degree
+        selection_st->costhetamax = COSD(rpmin);  // thetamin, degree
+        if (rpmin <= 0.) selection_st->costhetamax = 1. + 1e-6;  // to include perfectly-aligned pairs
+    }
+    else if (selection_st->selection_type != NONE_SELECTION) {
+        fprintf(stderr, "Unknown selection %d\n", selection_st->selection_type);
+        return EXIT_FAILURE;
+    }
     return EXIT_SUCCESS;
 }
 
@@ -230,13 +245,13 @@ static inline void set_gpu_mode(struct config_options *options, uint8_t use_gpu)
 static inline void set_max_cells(struct config_options *options, const int max)
 {
     if(max <= 0) {
-        fprintf(stderr,"Warning: Max. cells per dimension was requested to be set to "
+        fprintf(stderr, "Warning: Max. cells per dimension was requested to be set to "
                 "a negative number = %d...returning\n", max);
         return;
     }
 
     if(max > INT16_MAX) {
-        fprintf(stderr,"Warning: Max cells per dimension is a 2-byte integer and can not "
+        fprintf(stderr, "Warning: Max cells per dimension is a 2-byte integer and can not "
                 "hold supplied value of %d. Max. allowed value for max_cells_per_dim is %d\n",
                 max, INT16_MAX);
     }

@@ -138,19 +138,19 @@ __device__ float inverse_bitwise_float(pair_struct_float *pair){
 
 __global__ void countpairs_s_mu_kernel_double(double *x0, double *y0, double *z0,
                double *x1, double *y1, double *z1, int N,
-               int *np0, int *np1, 
-               int *same_cell, int64_t *icell0, int64_t *icell1, 
+               int *np0, int *np1,
+               int *same_cell, int64_t *icell0, int64_t *icell1,
                int *cellpair_lut, int *cellthread_lut,
                int *start_idx0, int *start_idx1,
-               double *min_xdiff, double *min_ydiff, 
+               double *min_xdiff, double *min_ydiff,
                double *savg, int *npairs, const double *supp_sqr,
                const double pimax, double *off_xwrap, double *off_ywrap, double *off_zwrap,
                const double sqr_smax, const double sqr_smin, const int nsbin,
-               const int nmu_bins, 
+               const int nmu_bins,
                const double sqr_mumax, const double inv_dmu, const double mumin_invstep,
                double inv_sstep, double smin_invstep, const selection_struct selection,
                int need_savg, int autocorr, int bin_type) {
-    //thread index tidx 
+    //thread index tidx
     int tidx = blockDim.x * blockIdx.x + threadIdx.x;
     if (tidx >= N) return;
 
@@ -180,7 +180,7 @@ __global__ void countpairs_s_mu_kernel_double(double *x0, double *y0, double *z0
     double y1pos = y1[j];
     double z1pos = z1[j];
 
-    if (same_cell[icellpair] && z1pos <= zpos) { 
+    if (same_cell[icellpair] && z1pos <= zpos) {
         //return if same particle or in same cell with z1 < z0
         //this way we do not double count pairs
         return;
@@ -201,7 +201,7 @@ __global__ void countpairs_s_mu_kernel_double(double *x0, double *y0, double *z0
         //            if(sqr_min_sep_this_point >= sqr_smax || min_dz > pimax) {
         //particle too far away in separation
         return;
-    } 
+    }
 
     //const double sqr_max_dz = sqr_smax - min_dx*min_dx - min_dy*min_dy;
     const double sqr_max_dz = sqr_smax - min_xdiff[icellpair]*min_xdiff[icellpair] - min_ydiff[icellpair]*min_ydiff[icellpair];
@@ -227,18 +227,18 @@ __global__ void countpairs_s_mu_kernel_double(double *x0, double *y0, double *z0
     const double sqr_s = sqr_dx_dy + sqr_dz;
     if(sqr_s >= sqr_smax || sqr_s < sqr_smin) {
         return;
-    } 
+    }
 
     double sqr_mu = 0.;
     if (sqr_s > 0.) {
-        if (sqr_dz >= sqr_s * sqr_mumax) return; 
+        if (sqr_dz >= sqr_s * sqr_mumax) return;
         sqr_mu = sqr_dz/sqr_s;
     }
 
 
     double s = 0;
     if(need_savg || bin_type == BIN_LIN) {
-        s = sqrt(sqr_s); 
+        s = sqrt(sqr_s);
     }
 
     int kbin = 0;
@@ -257,7 +257,7 @@ __global__ void countpairs_s_mu_kernel_double(double *x0, double *y0, double *z0
     int ibin = kbin + (int) (mubin + mumin_invstep);
     //use atomic add to guarantee atomicity
     atomicAdd(&npairs[ibin], 1);
-    if (need_savg) atomicAdd(&savg[ibin], s); 
+    if (need_savg) atomicAdd(&savg[ibin], s);
     if (autocorr == 1) {
         ibin = kbin + (int) (-mubin + mumin_invstep);
         //use atomic add to guarantee atomicity
@@ -268,19 +268,19 @@ __global__ void countpairs_s_mu_kernel_double(double *x0, double *y0, double *z0
 
 __global__ void countpairs_s_mu_kernel_float(float *x0, float *y0, float *z0,
                float *x1, float *y1, float *z1, int N,
-               int *np0, int *np1, 
-               int *same_cell, int64_t *icell0, int64_t *icell1, 
+               int *np0, int *np1,
+               int *same_cell, int64_t *icell0, int64_t *icell1,
                int *cellpair_lut, int *cellthread_lut,
                int *start_idx0, int *start_idx1,
-               float *min_xdiff, float *min_ydiff, 
+               float *min_xdiff, float *min_ydiff,
                float *savg, int *npairs, const float *supp_sqr,
                const float pimax, float *off_xwrap, float *off_ywrap, float *off_zwrap,
                const float sqr_smax, const float sqr_smin, const int nsbin,
-               const int nmu_bins, 
+               const int nmu_bins,
                const float sqr_mumax, const float inv_dmu, const float mumin_invstep,
                float inv_sstep, float smin_invstep, const selection_struct selection,
                int need_savg, int autocorr, int bin_type) {
-    //thread index tidx 
+    //thread index tidx
     int tidx = blockDim.x * blockIdx.x + threadIdx.x;
     if (tidx >= N) return;
 
@@ -310,7 +310,7 @@ __global__ void countpairs_s_mu_kernel_float(float *x0, float *y0, float *z0,
     float y1pos = y1[j];
     float z1pos = z1[j];
 
-    if (same_cell[icellpair] && z1pos <= zpos) { 
+    if (same_cell[icellpair] && z1pos <= zpos) {
         //return if same particle or in same cell with z1 < z0
         //this way we do not double count pairs
         if (z1pos < zpos) return;
@@ -333,7 +333,7 @@ __global__ void countpairs_s_mu_kernel_float(float *x0, float *y0, float *z0,
         //            if(sqr_min_sep_this_point >= sqr_smax || min_dz > pimax) {
         //particle too far away in separation
         return;
-    } 
+    }
 
     //const float sqr_max_dz = sqr_smax - min_dx*min_dx - min_dy*min_dy;
     const float sqr_max_dz = sqr_smax - min_xdiff[icellpair]*min_xdiff[icellpair] - min_ydiff[icellpair]*min_ydiff[icellpair];
@@ -359,18 +359,18 @@ __global__ void countpairs_s_mu_kernel_float(float *x0, float *y0, float *z0,
     const float sqr_s = sqr_dx_dy + sqr_dz;
     if(sqr_s >= sqr_smax || sqr_s < sqr_smin) {
         return;
-    } 
+    }
 
     float sqr_mu = 0.;
     if (sqr_s > 0.) {
-        if (sqr_dz >= sqr_s * sqr_mumax) return; 
+        if (sqr_dz >= sqr_s * sqr_mumax) return;
         sqr_mu = sqr_dz/sqr_s;
     }
 
 
     float s = 0;
     if(need_savg || bin_type == BIN_LIN) {
-        s = sqrt(sqr_s); 
+        s = sqrt(sqr_s);
     }
 
     int kbin = 0;
@@ -389,7 +389,7 @@ __global__ void countpairs_s_mu_kernel_float(float *x0, float *y0, float *z0,
     int ibin = kbin + (int) (mubin + mumin_invstep);
     //use atomic add to guarantee atomicity
     atomicAdd(&npairs[ibin], 1);
-    if (need_savg) atomicAdd(&savg[ibin], s); 
+    if (need_savg) atomicAdd(&savg[ibin], s);
     if (autocorr == 1) {
         ibin = kbin + (int) (-mubin + mumin_invstep);
         //use atomic add to guarantee atomicity
@@ -400,22 +400,22 @@ __global__ void countpairs_s_mu_kernel_float(float *x0, float *y0, float *z0,
 
 __global__ void countpairs_s_mu_pair_weights_kernel_double(double *x0, double *y0, double *z0,
                double *weights0, int numweights,
-               double *x1, double *y1, double *z1, 
+               double *x1, double *y1, double *z1,
                double *weights1, int numintweights,
-               int N, int *np0, int *np1, 
-               int *same_cell, int64_t *icell0, int64_t *icell1, 
+               int N, int *np0, int *np1,
+               int *same_cell, int64_t *icell0, int64_t *icell1,
                int *cellpair_lut, int *cellthread_lut,
                int *start_idx0, int *start_idx1,
-               double *min_xdiff, double *min_ydiff, 
+               double *min_xdiff, double *min_ydiff,
                double *savg, int *npairs, double *weightavg, const double *supp_sqr,
                const double pimax, double *off_xwrap, double *off_ywrap, double *off_zwrap,
                const double sqr_smax, const double sqr_smin, const int nsbin,
-               const int nmu_bins, 
+               const int nmu_bins,
                const double sqr_mumax, const double inv_dmu, const double mumin_invstep,
                double inv_sstep, double smin_invstep, const selection_struct selection,
                int need_savg, int need_weightavg, int autocorr, int los_type, int bin_type,
                const weight_method_t weight_method, const pair_weight_struct pair_w, double *p_weight, double *p_sep) {
-    //thread index tidx 
+    //thread index tidx
     int tidx = blockDim.x * blockIdx.x + threadIdx.x;
     if (tidx >= N) return;
 
@@ -445,7 +445,7 @@ __global__ void countpairs_s_mu_pair_weights_kernel_double(double *x0, double *y
     double y1pos = y1[j];
     double z1pos = z1[j];
 
-    if (same_cell[icellpair] && z1pos <= zpos) { 
+    if (same_cell[icellpair] && z1pos <= zpos) {
         //return if same particle or in same cell with z1 < z0
         //this way we do not double count pairs
         return;
@@ -466,7 +466,7 @@ __global__ void countpairs_s_mu_pair_weights_kernel_double(double *x0, double *y
         //            if(sqr_min_sep_this_point >= sqr_smax || min_dz > pimax) {
         //particle too far away in separation
         return;
-    } 
+    }
 
     //const double sqr_max_dz = sqr_smax - min_dx*min_dx - min_dy*min_dy;
     const double sqr_max_dz = sqr_smax - min_xdiff[icellpair]*min_xdiff[icellpair] - min_ydiff[icellpair]*min_ydiff[icellpair];
@@ -479,6 +479,10 @@ __global__ void countpairs_s_mu_pair_weights_kernel_double(double *x0, double *y
 
     //need_weightavg is true by definition in this kernel so remove conditional
     const double norm0 = sqrt(xpos*xpos + ypos*ypos + zpos*zpos);
+
+    double pair_costheta_d = x1pos*xpos + y1pos*ypos + z1pos*zpos;
+    pair_costheta_d /= norm1*norm0;
+    if((selection.selection_type & THETA_SELECTION) && ((pair_costheta_d <= selection.costhetamin) || (pair_costheta_d > selection.costhetamax))) continue;
 
     const double dx = x1pos - xpos;
     const double dy = y1pos - ypos;
@@ -499,17 +503,17 @@ __global__ void countpairs_s_mu_pair_weights_kernel_double(double *x0, double *y
     const double sqr_s = sqr_dx_dy + sqr_dz;
     if(sqr_s >= sqr_smax || sqr_s < sqr_smin) {
         return;
-    } 
+    }
 
     double sqr_mu = 0.;
     if (sqr_s > 0.) {
-        if (sqr_dz >= sqr_s * sqr_mumax) return; 
+        if (sqr_dz >= sqr_s * sqr_mumax) return;
         sqr_mu = sqr_dz/sqr_s;
     }
 
     double s = 0, pairweight = 0;
     if(need_savg || bin_type == BIN_LIN) {
-        s = sqrt(sqr_s); 
+        s = sqrt(sqr_s);
     }
     if (autocorr) weights1 = weights0;
 
@@ -523,8 +527,6 @@ __global__ void countpairs_s_mu_pair_weights_kernel_double(double *x0, double *y
             pair.weights0[w] = weights0[i*numweights+w];
             pair.weights1[w] = weights1[j*numweights+w];
         }
-        double pair_costheta_d = x1pos*xpos + y1pos*ypos + z1pos*zpos;
-        pair_costheta_d /= norm1*norm0;
 
         pair.dx = dx;
         pair.dy = dy;
@@ -577,22 +579,22 @@ __global__ void countpairs_s_mu_pair_weights_kernel_double(double *x0, double *y
 
 __global__ void countpairs_s_mu_pair_weights_kernel_float(float *x0, float *y0, float *z0,
                float *weights0, int numweights,
-               float *x1, float *y1, float *z1, 
+               float *x1, float *y1, float *z1,
                float *weights1, int numintweights,
-               int N, int *np0, int *np1, 
-               int *same_cell, int64_t *icell0, int64_t *icell1, 
+               int N, int *np0, int *np1,
+               int *same_cell, int64_t *icell0, int64_t *icell1,
                int *cellpair_lut, int *cellthread_lut,
                int *start_idx0, int *start_idx1,
-               float *min_xdiff, float *min_ydiff, 
+               float *min_xdiff, float *min_ydiff,
                float *savg, int *npairs, float *weightavg, const float *supp_sqr,
                const float pimax, float *off_xwrap, float *off_ywrap, float *off_zwrap,
                const float sqr_smax, const float sqr_smin, const int nsbin,
-               const int nmu_bins, 
+               const int nmu_bins,
                const float sqr_mumax, const float inv_dmu, const float mumin_invstep,
                float inv_sstep, float smin_invstep, const selection_struct selection,
                int need_savg, int need_weightavg, int autocorr, int los_type, int bin_type,
                const weight_method_t weight_method, const pair_weight_struct pair_w, float *p_weight, float *p_sep) {
-    //thread index tidx 
+    //thread index tidx
     int tidx = blockDim.x * blockIdx.x + threadIdx.x;
     if (tidx >= N) return;
 
@@ -622,7 +624,7 @@ __global__ void countpairs_s_mu_pair_weights_kernel_float(float *x0, float *y0, 
     float y1pos = y1[j];
     float z1pos = z1[j];
 
-    if (same_cell[icellpair] && z1pos <= zpos) { 
+    if (same_cell[icellpair] && z1pos <= zpos) {
         //return if same particle or in same cell with z1 < z0
         //this way we do not float count pairs
         if (z1pos < zpos) return;
@@ -645,7 +647,7 @@ __global__ void countpairs_s_mu_pair_weights_kernel_float(float *x0, float *y0, 
         //            if(sqr_min_sep_this_point >= sqr_smax || min_dz > pimax) {
         //particle too far away in separation
         return;
-    } 
+    }
 
     //const float sqr_max_dz = sqr_smax - min_dx*min_dx - min_dy*min_dy;
     const float sqr_max_dz = sqr_smax - min_xdiff[icellpair]*min_xdiff[icellpair] - min_ydiff[icellpair]*min_ydiff[icellpair];
@@ -678,17 +680,17 @@ __global__ void countpairs_s_mu_pair_weights_kernel_float(float *x0, float *y0, 
     const float sqr_s = sqr_dx_dy + sqr_dz;
     if(sqr_s >= sqr_smax || sqr_s < sqr_smin) {
         return;
-    } 
+    }
 
     float sqr_mu = 0.;
     if (sqr_s > 0.) {
-        if (sqr_dz >= sqr_s * sqr_mumax) return; 
+        if (sqr_dz >= sqr_s * sqr_mumax) return;
         sqr_mu = sqr_dz/sqr_s;
     }
 
     float s = 0, pairweight = 0;
     if(need_savg || bin_type == BIN_LIN) {
-        s = sqrt(sqr_s); 
+        s = sqrt(sqr_s);
     }
     if (autocorr) weights1 = weights0;
 
@@ -789,7 +791,7 @@ void gpu_allocate_mins_double(double **p_gpu_min_dx, double **p_gpu_min_dy, cons
     // Takes pointers as args
     cudaMallocManaged(&(*p_gpu_min_dx), num_cell_pairs*sizeof(double));
     cudaMallocManaged(&(*p_gpu_min_dy), num_cell_pairs*sizeof(double));
-}   
+}
 
 void gpu_allocate_wraps_double(double **p_gpu_xwrap, double **p_gpu_ywrap, double **p_gpu_zwrap, const int64_t num_cell_pairs) {
     cudaMallocManaged(&(*p_gpu_xwrap), num_cell_pairs*sizeof(double));
@@ -983,17 +985,17 @@ void gpu_device_synchronize() {
 
 int gpu_batch_countpairs_s_mu_double(double *x0, double *y0, double *z0,
                double *weights0, uint8_t numweights,
-               double *x1, double *y1, double *z1, 
+               double *x1, double *y1, double *z1,
                double *weights1, uint8_t numintweights,
                const int N, int *np0, int *np1,
                int *same_cell, int64_t *icell0, int64_t *icell1,
                int *cellpair_lut, int *cellthread_lut,
                int *start_idx0, int *start_idx1,
-               double *min_xdiff, double *min_ydiff, 
+               double *min_xdiff, double *min_ydiff,
                double *savg, int *npairs, double *weightavg, const double *supp_sqr,
                const double pimax, double *off_xwrap, double *off_ywrap, double *off_zwrap,
                const double sqr_smax, const double sqr_smin, const int nsbin,
-               const int nmu_bins, 
+               const int nmu_bins,
                const double sqr_mumax, const double inv_dmu, const double mumin_invstep,
                double inv_sstep, double smin_invstep, const selection_struct selection,
                int need_savg, const weight_method_t weight_method, const pair_weight_struct pair_weight,
@@ -1029,7 +1031,7 @@ int gpu_batch_countpairs_s_mu_double(double *x0, double *y0, double *z0,
             same_cell, icell0, icell1,
             cellpair_lut, cellthread_lut,
             start_idx0, start_idx1,
-            min_xdiff, min_ydiff, 
+            min_xdiff, min_ydiff,
             savg, npairs, weightavg, supp_sqr,
             pimax, off_xwrap, off_ywrap, off_zwrap,
             sqr_smax, sqr_smin, nsbin, nmu_bins,
@@ -1076,7 +1078,7 @@ int gpu_batch_countpairs_s_mu_float(float *x0, float *y0, float *z0,
     //is not unnecessarily passed extra arrays for weighting calcs that won't
     //be performed
 
-    if (weight_method == NONE) { 
+    if (weight_method == NONE) {
         countpairs_s_mu_kernel_float<<<blocksPerGrid, THREADS_PER_BLOCK>>>(
             x0, y0, z0,
             x1, y1, z1, N,

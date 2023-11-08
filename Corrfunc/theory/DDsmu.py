@@ -203,7 +203,8 @@ def DDsmu(autocorr, nthreads, binfile, mumax, nmubins,
     attrs_selection : dict. Default=None.
         To select pairs to be counted, provide mapping between the quantity (str)
         and the interval (tuple of floats),
-        e.g. ``{'rp': (0., 20.)}`` to select pairs with 'rp' between 0 and 20.
+        e.g. ``{'rp': (0., 20.)}`` to select pairs with transverse separation 'rp' between 0 and 20,
+        `{'theta': (0., 20.)}`` to select pairs with separation angle 'theta' between 0 and 20 degrees.
 
     Returns
     -------

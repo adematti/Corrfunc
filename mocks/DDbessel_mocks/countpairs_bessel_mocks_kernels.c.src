@@ -168,6 +168,7 @@ static inline int countpairs_mocks_bessel_fallback_DOUBLE(const int64_t N0, DOUB
     DOUBLE *xpos0 = weights0->weights[pair.num_weights], *ypos0 = weights0->weights[pair.num_weights+1], *zpos0 = weights0->weights[pair.num_weights+2];
     DOUBLE *xpos1 = weights1->weights[pair.num_weights], *ypos1 = weights1->weights[pair.num_weights+1], *zpos1 = weights1->weights[pair.num_weights+2];
 
+    need_costheta |= (selection.selection_type & THETA_SELECTION);
     DOUBLE *xhat1 = NULL, *yhat1 = NULL, *zhat1 = NULL;
     if (need_costheta || ((autocorr == 1) && (los_type == FIRSTPOINT_LOS))) {
         xhat1 = (DOUBLE *) my_malloc(N1, sizeof(DOUBLE));
@@ -269,7 +270,10 @@ static inline int countpairs_mocks_bessel_fallback_DOUBLE(const int64_t N0, DOUB
                 if(sqr_r >= sqr_rmax || sqr_r < sqr_rmin) continue;
             }
             const DOUBLE localxpos1 = xpos1[localj], localypos1 = ypos1[localj], localzpos1 = zpos1[localj];
-            if(need_costheta) pair.costheta.d = xhat1[localj]*xhat0 + yhat1[localj]*yhat0 + zhat1[localj]*zhat0;
+            if(need_costheta) {
+                pair.costheta.d = xhat1[localj]*xhat0 + yhat1[localj]*yhat0 + zhat1[localj]*zhat0;
+                if((selection.selection_type & THETA_SELECTION) && ((pair.costheta.d <= selection.costhetamin) || (pair.costheta.d > selection.costhetamax))) continue;
+            }
 
             const DOUBLE parx = localxpos0 + localxpos1, pary = localypos0 + localypos1, parz = localzpos0 + localzpos1;
             const DOUBLE perpx = localxpos1 - localxpos0, perpy = localypos1 - localypos0, perpz = localzpos1 - localzpos0;

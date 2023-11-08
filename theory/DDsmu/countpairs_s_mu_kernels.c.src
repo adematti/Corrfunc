@@ -81,6 +81,7 @@ static inline int countpairs_s_mu_avx512_intrinsics_DOUBLE(const int64_t N0, DOU
         need_costheta = pair_weight.num;
         avx512_weight_func = get_avx512_weight_func_by_method_DOUBLE(weight_method);
     }
+    need_costheta |= (selection.selection_type & THETA_SELECTION);
     DOUBLE *norm1 = NULL;
     if (need_costheta) {
         norm1 = (DOUBLE *) my_malloc(N1,sizeof(DOUBLE));
@@ -255,7 +256,7 @@ static inline int countpairs_s_mu_avx512_intrinsics_DOUBLE(const int64_t N0, DOU
             //This gives us the mask for all sqr_smin <= s2 < sqr_smax
             // + mu_min <= mu < mu_max
             m_mask_left = AVX512_MASK_BITWISE_AND(m_mu_mask, m_s2_mask);
-            if (selection.selection_type == RP_SELECTION) {
+            if (selection.selection_type  & RP_SELECTION) {
                 m_mask_left = AVX512_MASK_BITWISE_AND(m_mask_left, AVX512_MASK_BITWISE_AND(AVX512_COMPARE_FLOATS(m_sqr_xdiff_ydiff, AVX512_SET_FLOAT(selection.rpmin_sqr), _CMP_GE_OQ), AVX512_COMPARE_FLOATS(m_sqr_xdiff_ydiff, AVX512_SET_FLOAT(selection.rpmax_sqr), _CMP_LT_OQ)));
             }
 
@@ -273,6 +274,10 @@ static inline int countpairs_s_mu_avx512_intrinsics_DOUBLE(const int64_t N0, DOU
                 const AVX512_FLOATS m_norm1 = AVX512_MASKZ_LOAD_FLOATS_UNALIGNED(m_mask_left, norm1 + j);
                 pair.costheta.a512 = AVX512_MASKZ_ADD_FLOATS(m_mask_left, AVX512_MASKZ_ADD_FLOATS(m_mask_left, AVX512_MASKZ_MULTIPLY_FLOATS(m_mask_left, m_xpos, m_x1), AVX512_MASKZ_MULTIPLY_FLOATS(m_mask_left, m_ypos, m_y1)), AVX512_MASKZ_MULTIPLY_FLOATS(m_mask_left, m_zpos, m_z1));
                 pair.costheta.a512 = AVX512_MASKZ_DIVIDE_FLOATS(m_mask_left, pair.costheta.a512, AVX512_MASKZ_MULTIPLY_FLOATS(m_mask_left, m_norm0, m_norm1));
+            }
+            if (selection.selection_type & THETA_SELECTION) {
+                m_mask_left = AVX512_MASK_BITWISE_AND(m_mask_left, AVX512_MASK_BITWISE_AND(AVX512_COMPARE_FLOATS(pair.costheta.a512, AVX512_SET_FLOAT(selection.costhetamin), _CMP_GT_OQ), AVX512_COMPARE_FLOATS(pair.costheta.a512, AVX512_SET_FLOAT(selection.costhetamax), _CMP_LE_OQ)));
+                if (m_mask_left == 0) continue;
             }
 
             if(need_savg || bin_type == BIN_LIN) {
@@ -421,6 +426,7 @@ static inline int countpairs_s_mu_avx_intrinsics_DOUBLE(const int64_t N0, DOUBLE
         fallback_weight_func = get_weight_func_by_method_DOUBLE(weight_method);
     }
     DOUBLE *norm1 = NULL;
+    need_costheta |= (selection.selection_type & THETA_SELECTION);
     if (need_costheta) {
         norm1 = (DOUBLE *) my_malloc(N1,sizeof(DOUBLE));
         for(int64_t i=0;i<N1;i++) {
@@ -598,7 +604,7 @@ static inline int countpairs_s_mu_avx_intrinsics_DOUBLE(const int64_t N0, DOUBLE
                 //This gives us the mask for all sqr_smin <= s2 < sqr_smax
                 // + mu_min <= mu < mu_max
                 m_mask_left = AVX_BITWISE_AND(m_mu_mask, m_s2_mask);
-                if (selection.selection_type == RP_SELECTION) {
+                if (selection.selection_type  & RP_SELECTION) {
                     m_mask_left = AVX_BITWISE_AND(m_mask_left, AVX_BITWISE_AND(AVX_COMPARE_FLOATS(m_sqr_xdiff_ydiff, AVX_SET_FLOAT(selection.rpmin_sqr), _CMP_GE_OQ), AVX_COMPARE_FLOATS(m_sqr_xdiff_ydiff, AVX_SET_FLOAT(selection.rpmax_sqr), _CMP_LT_OQ)));
                 }
 
@@ -607,6 +613,11 @@ static inline int countpairs_s_mu_avx_intrinsics_DOUBLE(const int64_t N0, DOUBLE
                     continue;
                 }
 
+            }
+
+            if (selection.selection_type & THETA_SELECTION) {
+                m_mask_left = AVX_BITWISE_AND(m_mask_left, AVX_BITWISE_AND(AVX_COMPARE_FLOATS(pair.costheta.a, AVX_SET_FLOAT(selection.costhetamin), _CMP_GT_OQ), AVX_COMPARE_FLOATS(pair.costheta.a, AVX_SET_FLOAT(selection.costhetamax), _CMP_LE_OQ)));
+                if (AVX_TEST_COMPARISON(m_mask_left) == 0) continue;
             }
 
             //There is some s2 that satisfies sqr_smin <= s2 < sqr_smax && mu_min <= |dz| < mu_max
@@ -705,6 +716,7 @@ static inline int countpairs_s_mu_avx_intrinsics_DOUBLE(const int64_t N0, DOUBLE
                 DOUBLE localnorm1 = norm1[j];
                 pair.costheta.d = (*localx1)*xpos + (*localy1)*ypos + (*localz1)*zpos;
                 pair.costheta.d /= localnorm1*norm0;
+                if((selection.selection_type & THETA_SELECTION) && ((pair.costheta.d <= selection.costhetamin) || (pair.costheta.d > selection.costhetamax))) continue;
             }
 
             const DOUBLE dz = *localz1++ - zpos;
@@ -847,6 +859,7 @@ static inline int countpairs_s_mu_sse_intrinsics_DOUBLE(const int64_t N0, DOUBLE
       sse_weight_func = get_sse_weight_func_by_method_DOUBLE(weight_method);
       fallback_weight_func = get_weight_func_by_method_DOUBLE(weight_method);
     }
+    need_costheta |= (selection.selection_type & THETA_SELECTION);
     DOUBLE *norm1 = NULL;
     if (need_costheta) {
         norm1 = (DOUBLE *) my_malloc(N1,sizeof(DOUBLE));
@@ -1029,7 +1042,7 @@ static inline int countpairs_s_mu_sse_intrinsics_DOUBLE(const int64_t N0, DOUBLE
                 //This gives us the mask for all sqr_smin <= s2 < sqr_smax
                 // + mu_min <= mu < mu_max
                 m_mask_left = SSE_BITWISE_AND(m_mu_mask, m_s2_mask);
-                if (selection.selection_type == RP_SELECTION) {
+                if (selection.selection_type  & RP_SELECTION) {
                     m_mask_left = SSE_BITWISE_AND(m_mask_left, SSE_BITWISE_AND(SSE_COMPARE_FLOATS_GE(m_sqr_xdiff_ydiff, SSE_SET_FLOAT(selection.rpmin_sqr)), SSE_COMPARE_FLOATS_LT(m_sqr_xdiff_ydiff, SSE_SET_FLOAT(selection.rpmax_sqr))));
                 }
 
@@ -1038,6 +1051,11 @@ static inline int countpairs_s_mu_sse_intrinsics_DOUBLE(const int64_t N0, DOUBLE
                     continue;
                 }
 
+            }
+
+            if (selection.selection_type & THETA_SELECTION) {
+                m_mask_left = SSE_BITWISE_AND(m_mask_left, SSE_BITWISE_AND(SSE_COMPARE_FLOATS_GT(pair.costheta.s, SSE_SET_FLOAT(selection.costhetamin)), SSE_COMPARE_FLOATS_LE(pair.costheta.s, SSE_SET_FLOAT(selection.costhetamax))));
+                if (SSE_TEST_COMPARISON(m_mask_left) == 0) continue;
             }
 
             //There is some s2 that satisfies sqr_smin <= s2 < sqr_smax && mu_min <= |dz| < mu_max
@@ -1126,6 +1144,7 @@ static inline int countpairs_s_mu_sse_intrinsics_DOUBLE(const int64_t N0, DOUBLE
                 DOUBLE localnorm1 = norm1[j];
                 pair.costheta.d = (*localx1)*xpos + (*localy1)*ypos + (*localz1)*zpos;
                 pair.costheta.d /= localnorm1*norm0;
+                if((selection.selection_type & THETA_SELECTION) && ((pair.costheta.d <= selection.costhetamin) || (pair.costheta.d > selection.costhetamax))) continue;
             }
 
             const DOUBLE dx = *localx1++ - xpos;
@@ -1254,6 +1273,7 @@ static inline int countpairs_s_mu_fallback_DOUBLE(const int64_t N0, DOUBLE *x0, 
         need_costheta = pair_weight.num;
         weight_func = get_weight_func_by_method_DOUBLE(weight_method);
     }
+    need_costheta |= (selection.selection_type & THETA_SELECTION);
     DOUBLE *norm1 = NULL;
     if (need_costheta) {
         norm1 = (DOUBLE *) my_malloc(N1,sizeof(DOUBLE));
@@ -1362,6 +1382,7 @@ static inline int countpairs_s_mu_fallback_DOUBLE(const int64_t N0, DOUBLE *x0, 
                 DOUBLE localnorm1 = norm1[n_off + j];
                 pair.costheta.d = (*localx1)*xpos + (*localy1)*ypos + (*localz1)*zpos;
                 pair.costheta.d /= localnorm1*norm0;
+                if((selection.selection_type & THETA_SELECTION) && ((pair.costheta.d <= selection.costhetamin) || (pair.costheta.d > selection.costhetamax))) continue;
             }
 
             const DOUBLE dx = *localx1++ - xpos;

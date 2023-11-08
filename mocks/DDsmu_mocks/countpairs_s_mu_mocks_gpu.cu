@@ -138,18 +138,18 @@ __device__ float inverse_bitwise_float(pair_struct_float *pair){
 
 __global__ void countpairs_s_mu_mocks_kernel_double(double *x0, double *y0, double *z0,
                double *x1, double *y1, double *z1, int N,
-               int *np0, int *np1, 
-               int *same_cell, int64_t *icell0, int64_t *icell1, 
+               int *np0, int *np1,
+               int *same_cell, int64_t *icell0, int64_t *icell1,
                int *cellpair_lut, int *cellthread_lut,
                int *start_idx0, int *start_idx1,
-               double *min_xdiff, double *min_ydiff, 
+               double *min_xdiff, double *min_ydiff,
                double *savg, int *npairs, const double *supp_sqr,
                const double sqr_smax, const double sqr_smin, const int nsbin,
-               const int nmu_bins, 
+               const int nmu_bins,
                const double sqr_mumax, const double inv_dmu, const double mumin_invstep,
                double inv_sstep, double smin_invstep, const selection_struct selection,
                int need_savg, int autocorr, int los_type, int bin_type) {
-    //thread index tidx 
+    //thread index tidx
     int tidx = blockDim.x * blockIdx.x + threadIdx.x;
     if (tidx >= N) return;
 
@@ -179,7 +179,7 @@ __global__ void countpairs_s_mu_mocks_kernel_double(double *x0, double *y0, doub
     double y1pos = y1[j];
     double z1pos = z1[j];
 
-    if (same_cell[icellpair] && z1pos <= zpos) { 
+    if (same_cell[icellpair] && z1pos <= zpos) {
         //return if same particle or in same cell with z1 < z0
         //this way we do not double count pairs
         return;
@@ -197,10 +197,10 @@ __global__ void countpairs_s_mu_mocks_kernel_double(double *x0, double *y0, doub
     if ((this_dx*this_dx + this_dy*this_dy + this_dz*this_dz) >= sqr_smax) {
         //particle too far away in separation
         return;
-    } 
+    }
 
     //hat1 calcs are done if need_weightavg || ((autocorr == 1) && (los_type == FIRSTPOINT_LOS)
-    //need_weightavg is FALSE by definition in this kernel so remove that part of conditional 
+    //need_weightavg is FALSE by definition in this kernel so remove that part of conditional
     double xhat1=NULL, yhat1=NULL, zhat1=NULL;
     if (((autocorr == 1) && (los_type == FIRSTPOINT_LOS))) {
         const double norm1 = sqrt(x1pos*x1pos + y1pos*y1pos + z1pos*z1pos);
@@ -209,8 +209,8 @@ __global__ void countpairs_s_mu_mocks_kernel_double(double *x0, double *y0, doub
         zhat1 = z1pos/norm1;
     }
 
-    //hat1 calcs are done if need_weightavg || los_type == FIRSTPOINT_LOS 
-    //need_weightavg is FALSE by definition in this kernel so remove that part of conditional 
+    //hat1 calcs are done if need_weightavg || los_type == FIRSTPOINT_LOS
+    //need_weightavg is FALSE by definition in this kernel so remove that part of conditional
     double xhat0=NULL, yhat0=NULL, zhat0=NULL;
     if (los_type == FIRSTPOINT_LOS) {
         const double norm0 = sqrt(xpos*xpos + ypos*ypos + zpos*zpos);
@@ -220,8 +220,8 @@ __global__ void countpairs_s_mu_mocks_kernel_double(double *x0, double *y0, doub
     }
 
     const double parx = xpos + x1pos;
-    const double pary = ypos + y1pos; 
-    const double parz = zpos + z1pos; 
+    const double pary = ypos + y1pos;
+    const double parz = zpos + z1pos;
 
     const double perpx = x1pos - xpos;
     const double perpy = y1pos - ypos;
@@ -235,21 +235,21 @@ __global__ void countpairs_s_mu_mocks_kernel_double(double *x0, double *y0, doub
     const double sqr_s = perpx*perpx + perpy*perpy + perpz*perpz;
     if(sqr_s >= sqr_smax || sqr_s < sqr_smin) {
         return;
-    } 
+    }
 
     double s = 0;
     int mubin = nmu_bins, mubin2 = nmu_bins;
     if (sqr_s <= 0.) {
         mubin2 = mubin = (int) mumin_invstep;
         if((selection.selection_type & RP_SELECTION) && ((0. < selection.rpmin_sqr) || (0. >= selection.rpmax_sqr))) return;
-    } 
+    }
     else if (los_type == MIDPOINT_LOS) {
         const double s_dot_l = parx*perpx + pary*perpy + parz*perpz;
         const double sqr_l = parx*parx + pary*pary + parz*parz;
         const double sqr_mu = s_dot_l * s_dot_l / (sqr_l * sqr_s);
         if (sqr_mu >= sqr_mumax) {
             return;
-        } 
+        }
         if (selection.selection_type & RP_SELECTION) {
             const double sqr_rp = (1. - sqr_mu) * sqr_s;
             if ((sqr_rp < selection.rpmin_sqr) || (sqr_rp >= selection.rpmax_sqr)) return;
@@ -273,7 +273,7 @@ __global__ void countpairs_s_mu_mocks_kernel_double(double *x0, double *y0, doub
             const double sqr_mu2 = s_dot_l2 * s_dot_l2 / sqr_s;
             int skip_mu2 = (sqr_mu2 >= sqr_mumax);
             if (selection.selection_type & RP_SELECTION) {
-                const double sqr_rp = (1. - sqr_mu2) * sqr_s; 
+                const double sqr_rp = (1. - sqr_mu2) * sqr_s;
                 if ((sqr_rp < selection.rpmin_sqr) || (sqr_rp >= selection.rpmax_sqr)) skip_mu2 = 1;
             }
             if (skip_mu && skip_mu2) {
@@ -321,18 +321,18 @@ __global__ void countpairs_s_mu_mocks_kernel_double(double *x0, double *y0, doub
 
 __global__ void countpairs_s_mu_mocks_kernel_float(float *x0, float *y0, float *z0,
                float *x1, float *y1, float *z1, int N,
-               int *np0, int *np1, 
-               int *same_cell, int64_t *icell0, int64_t *icell1, 
+               int *np0, int *np1,
+               int *same_cell, int64_t *icell0, int64_t *icell1,
                int *cellpair_lut, int *cellthread_lut,
                int *start_idx0, int *start_idx1,
-               float *min_xdiff, float *min_ydiff, 
+               float *min_xdiff, float *min_ydiff,
                float *savg, int *npairs, const float *supp_sqr,
                const float sqr_smax, const float sqr_smin, const int nsbin,
-               const int nmu_bins, 
+               const int nmu_bins,
                const float sqr_mumax, const float inv_dmu, const float mumin_invstep,
                float inv_sstep, float smin_invstep, const selection_struct selection,
                int need_savg, int autocorr, int los_type, int bin_type) {
-    //thread index tidx 
+    //thread index tidx
     int tidx = blockDim.x * blockIdx.x + threadIdx.x;
     if (tidx >= N) return;
 
@@ -362,7 +362,7 @@ __global__ void countpairs_s_mu_mocks_kernel_float(float *x0, float *y0, float *
     float y1pos = y1[j];
     float z1pos = z1[j];
 
-    if (same_cell[icellpair] && z1pos <= zpos) { 
+    if (same_cell[icellpair] && z1pos <= zpos) {
         //return if same particle or in same cell with z1 < z0
         //this way we do not float count pairs
         if (z1pos < zpos) return;
@@ -382,10 +382,10 @@ __global__ void countpairs_s_mu_mocks_kernel_float(float *x0, float *y0, float *
     if ((this_dx*this_dx + this_dy*this_dy + this_dz*this_dz) >= sqr_smax) {
         //particle too far away in separation
         return;
-    } 
+    }
 
     //hat1 calcs are done if need_weightavg || ((autocorr == 1) && (los_type == FIRSTPOINT_LOS)
-    //need_weightavg is FALSE by definition in this kernel so remove that part of conditional 
+    //need_weightavg is FALSE by definition in this kernel so remove that part of conditional
     float xhat1=NULL, yhat1=NULL, zhat1=NULL;
     if (((autocorr == 1) && (los_type == FIRSTPOINT_LOS))) {
         const float norm1 = sqrt(x1pos*x1pos + y1pos*y1pos + z1pos*z1pos);
@@ -394,8 +394,8 @@ __global__ void countpairs_s_mu_mocks_kernel_float(float *x0, float *y0, float *
         zhat1 = z1pos/norm1;
     }
 
-    //hat1 calcs are done if need_weightavg || los_type == FIRSTPOINT_LOS 
-    //need_weightavg is FALSE by definition in this kernel so remove that part of conditional 
+    //hat1 calcs are done if need_weightavg || los_type == FIRSTPOINT_LOS
+    //need_weightavg is FALSE by definition in this kernel so remove that part of conditional
     float xhat0=NULL, yhat0=NULL, zhat0=NULL;
     if (los_type == FIRSTPOINT_LOS) {
         const float norm0 = sqrt(xpos*xpos + ypos*ypos + zpos*zpos);
@@ -405,8 +405,8 @@ __global__ void countpairs_s_mu_mocks_kernel_float(float *x0, float *y0, float *
     }
 
     const float parx = xpos + x1pos;
-    const float pary = ypos + y1pos; 
-    const float parz = zpos + z1pos; 
+    const float pary = ypos + y1pos;
+    const float parz = zpos + z1pos;
 
     const float perpx = x1pos - xpos;
     const float perpy = y1pos - ypos;
@@ -420,21 +420,21 @@ __global__ void countpairs_s_mu_mocks_kernel_float(float *x0, float *y0, float *
     const float sqr_s = perpx*perpx + perpy*perpy + perpz*perpz;
     if(sqr_s >= sqr_smax || sqr_s < sqr_smin) {
         return;
-    } 
+    }
 
     float s = 0;
     int mubin = nmu_bins, mubin2 = nmu_bins;
     if (sqr_s <= 0.) {
         mubin2 = mubin = (int) mumin_invstep;
         if((selection.selection_type & RP_SELECTION) && ((0. < selection.rpmin_sqr) || (0. >= selection.rpmax_sqr))) return;
-    } 
+    }
     else if (los_type == MIDPOINT_LOS) {
         const float s_dot_l = parx*perpx + pary*perpy + parz*perpz;
         const float sqr_l = parx*parx + pary*pary + parz*parz;
         const float sqr_mu = s_dot_l * s_dot_l / (sqr_l * sqr_s);
         if (sqr_mu >= sqr_mumax) {
             return;
-        } 
+        }
         if (selection.selection_type & RP_SELECTION) {
             const float sqr_rp = (1. - sqr_mu) * sqr_s;
             if ((sqr_rp < selection.rpmin_sqr) || (sqr_rp >= selection.rpmax_sqr)) return;
@@ -506,22 +506,22 @@ __global__ void countpairs_s_mu_mocks_kernel_float(float *x0, float *y0, float *
 
 __global__ void countpairs_s_mu_mocks_pair_weights_kernel_double(double *x0, double *y0, double *z0,
                double *weights0, int numweights,
-               double *x1, double *y1, double *z1, 
+               double *x1, double *y1, double *z1,
                double *weights1, int numintweights,
-               int N, int *np0, int *np1, 
-               int *same_cell, int64_t *icell0, int64_t *icell1, 
+               int N, int *np0, int *np1,
+               int *same_cell, int64_t *icell0, int64_t *icell1,
                int *cellpair_lut, int *cellthread_lut,
                int *start_idx0, int *start_idx1,
-               double *min_xdiff, double *min_ydiff, 
+               double *min_xdiff, double *min_ydiff,
                double *savg, int *npairs, double *weightavg, const double *supp_sqr,
                const double sqr_smax, const double sqr_smin, const int nsbin,
-               const int nmu_bins, 
+               const int nmu_bins,
                const double sqr_mumax, const double inv_dmu, const double mumin_invstep,
                double inv_sstep, double smin_invstep, const selection_struct selection,
                int need_savg, int need_weightavg, int autocorr, int los_type, int bin_type,
                const weight_method_t weight_method, const pair_weight_struct pair_w, double *p_weight, double *p_sep) {
 
-    //thread index tidx 
+    //thread index tidx
     int tidx = blockDim.x * blockIdx.x + threadIdx.x;
     if (tidx >= N) return;
 
@@ -569,7 +569,7 @@ __global__ void countpairs_s_mu_mocks_pair_weights_kernel_double(double *x0, dou
     if ((this_dx*this_dx + this_dy*this_dy + this_dz*this_dz) >= sqr_smax) {
         //particle too far away in separation
         return;
-    } 
+    }
 
     //hat1 calcs are done if need_weightavg || ((autocorr == 1) && (los_type == FIRSTPOINT_LOS)
     //need_weightavg is true by definition in this kernel so remove conditional
@@ -579,7 +579,7 @@ __global__ void countpairs_s_mu_mocks_pair_weights_kernel_double(double *x0, dou
     yhat1 = y1pos/norm1;
     zhat1 = z1pos/norm1;
 
-    //hat1 calcs are done if need_weightavg || los_type == FIRSTPOINT_LOS 
+    //hat1 calcs are done if need_weightavg || los_type == FIRSTPOINT_LOS
     //need_weightavg is true by definition in this kernel so remove conditional
     double xhat0=NULL, yhat0=NULL, zhat0=NULL;
     const double norm0 = sqrt(xpos*xpos + ypos*ypos + zpos*zpos);
@@ -587,10 +587,13 @@ __global__ void countpairs_s_mu_mocks_pair_weights_kernel_double(double *x0, dou
     yhat0 = ypos/norm0;
     zhat0 = zpos/norm0;
 
+    double pair_costheta_d = xhat1*xhat0 + yhat1*yhat0 + zhat1*zhat0;
+
+    if((selection.selection_type & THETA_SELECTION) && ((pair_costheta_d <= selection.costhetamin) || (pair_costheta_d > selection.costhetamax))) continue;
 
     const double parx = xpos + x1pos;
-    const double pary = ypos + y1pos; 
-    const double parz = zpos + z1pos; 
+    const double pary = ypos + y1pos;
+    const double parz = zpos + z1pos;
 
     const double perpx = x1pos - xpos;
     const double perpy = y1pos - ypos;
@@ -604,21 +607,22 @@ __global__ void countpairs_s_mu_mocks_pair_weights_kernel_double(double *x0, dou
     const double sqr_s = perpx*perpx + perpy*perpy + perpz*perpz;
     if(sqr_s >= sqr_smax || sqr_s < sqr_smin) {
         return;
-    } 
+    }
+
 
     double s = 0;
     int mubin = nmu_bins, mubin2 = nmu_bins;
     if (sqr_s <= 0.) {
         mubin2 = mubin = (int) mumin_invstep;
         if((selection.selection_type & RP_SELECTION) && ((0. < selection.rpmin_sqr) || (0. >= selection.rpmax_sqr))) return;
-    } 
+    }
     else if (los_type == MIDPOINT_LOS) {
         const double s_dot_l = parx*perpx + pary*perpy + parz*perpz;
         const double sqr_l = parx*parx + pary*pary + parz*parz;
         const double sqr_mu = s_dot_l * s_dot_l / (sqr_l * sqr_s);
         if (sqr_mu >= sqr_mumax) {
             return;
-        } 
+        }
         if (selection.selection_type & RP_SELECTION) {
             const double sqr_rp = (1. - sqr_mu) * sqr_s;
             if ((sqr_rp < selection.rpmin_sqr) || (sqr_rp >= selection.rpmax_sqr)) return;
@@ -661,7 +665,7 @@ __global__ void countpairs_s_mu_mocks_pair_weights_kernel_double(double *x0, dou
         }
     }
 
-    double pairweight = 0; 
+    double pairweight = 0;
     double sw = s;
     if (autocorr) weights1 = weights0;
 
@@ -675,9 +679,6 @@ __global__ void countpairs_s_mu_mocks_pair_weights_kernel_double(double *x0, dou
             pair.weights0[w] = weights0[i*numweights+w];
             pair.weights1[w] = weights1[j*numweights+w];
         }
-
-        double pair_costheta_d = xhat1*xhat0 + yhat1*yhat0 + zhat1*zhat0;
-
         pair.dx = perpx;
         pair.dy = perpy;
         pair.dz = perpz;
@@ -727,21 +728,21 @@ __global__ void countpairs_s_mu_mocks_pair_weights_kernel_double(double *x0, dou
 
 __global__ void countpairs_s_mu_mocks_pair_weights_kernel_float(float *x0, float *y0, float *z0,
                float *weights0, int numweights,
-               float *x1, float *y1, float *z1, 
+               float *x1, float *y1, float *z1,
                float *weights1, int numintweights,
-               int N, int *np0, int *np1, 
-               int *same_cell, int64_t *icell0, int64_t *icell1, 
+               int N, int *np0, int *np1,
+               int *same_cell, int64_t *icell0, int64_t *icell1,
                int *cellpair_lut, int *cellthread_lut,
                int *start_idx0, int *start_idx1,
-               float *min_xdiff, float *min_ydiff, 
+               float *min_xdiff, float *min_ydiff,
                float *savg, int *npairs, float *weightavg, const float *supp_sqr,
                const float sqr_smax, const float sqr_smin, const int nsbin,
-               const int nmu_bins, 
+               const int nmu_bins,
                const float sqr_mumax, const float inv_dmu, const float mumin_invstep,
                float inv_sstep, float smin_invstep, const selection_struct selection,
                int need_savg, int need_weightavg, int autocorr, int los_type, int bin_type,
                const weight_method_t weight_method, const pair_weight_struct pair_w, float *p_weight, float *p_sep) {
-    //thread index tidx 
+    //thread index tidx
     int tidx = blockDim.x * blockIdx.x + threadIdx.x;
     if (tidx >= N) return;
 
@@ -789,7 +790,7 @@ __global__ void countpairs_s_mu_mocks_pair_weights_kernel_float(float *x0, float
     if ((this_dx*this_dx + this_dy*this_dy + this_dz*this_dz) >= sqr_smax) {
         //particle too far away in separation
         return;
-    } 
+    }
 
     //hat1 calcs are done if need_weightavg || ((autocorr == 1) && (los_type == FIRSTPOINT_LOS)
     //need_weightavg is true by definition in this kernel so remove conditional
@@ -799,7 +800,7 @@ __global__ void countpairs_s_mu_mocks_pair_weights_kernel_float(float *x0, float
     yhat1 = y1pos/norm1;
     zhat1 = z1pos/norm1;
 
-    //hat1 calcs are done if need_weightavg || los_type == FIRSTPOINT_LOS 
+    //hat1 calcs are done if need_weightavg || los_type == FIRSTPOINT_LOS
     //need_weightavg is true by definition in this kernel so remove conditional
     float xhat0=NULL, yhat0=NULL, zhat0=NULL;
     const float norm0 = sqrt(xpos*xpos + ypos*ypos + zpos*zpos);
@@ -807,13 +808,17 @@ __global__ void countpairs_s_mu_mocks_pair_weights_kernel_float(float *x0, float
     yhat0 = ypos/norm0;
     zhat0 = zpos/norm0;
 
+    float pair_costheta_d = xhat1*xhat0 + yhat1*yhat0 + zhat1*zhat0;
+
+    if((selection.selection_type & THETA_SELECTION) && ((pair_costheta_d < selection.costhetamin) || (pair_costheta_d >= selection.costhetamax))) continue;
+
     //need_weightavg is TRUE in this kernel BUT pair_costheta_d not used
-    //in PAIR_PRODUCT so comment out - will be used for INVERSE_BITWISE 
+    //in PAIR_PRODUCT so comment out - will be used for INVERSE_BITWISE
     //float pair_costheta_d = xhat1*xhat0 + yhat1*yhat0 + zhat1*zhat0;
 
     const float parx = xpos + x1pos;
-    const float pary = ypos + y1pos; 
-    const float parz = zpos + z1pos; 
+    const float pary = ypos + y1pos;
+    const float parz = zpos + z1pos;
 
     const float perpx = x1pos - xpos;
     const float perpy = y1pos - ypos;
@@ -827,21 +832,21 @@ __global__ void countpairs_s_mu_mocks_pair_weights_kernel_float(float *x0, float
     const float sqr_s = perpx*perpx + perpy*perpy + perpz*perpz;
     if(sqr_s >= sqr_smax || sqr_s < sqr_smin) {
         return;
-    } 
+    }
 
     float s = 0;
     int mubin = nmu_bins, mubin2 = nmu_bins;
     if (sqr_s <= 0.) {
         mubin2 = mubin = (int) mumin_invstep;
         if((selection.selection_type & RP_SELECTION) && ((0. < selection.rpmin_sqr) || (0. >= selection.rpmax_sqr))) return;
-    } 
+    }
     else if (los_type == MIDPOINT_LOS) {
         const float s_dot_l = parx*perpx + pary*perpy + parz*perpz;
         const float sqr_l = parx*parx + pary*pary + parz*parz;
         const float sqr_mu = s_dot_l * s_dot_l / (sqr_l * sqr_s);
         if (sqr_mu >= sqr_mumax) {
             return;
-        } 
+        }
         if (selection.selection_type & RP_SELECTION) {
             const float sqr_rp = (1. - sqr_mu) * sqr_s;
             if ((sqr_rp < selection.rpmin_sqr) || (sqr_rp >= selection.rpmax_sqr)) return;
@@ -884,7 +889,7 @@ __global__ void countpairs_s_mu_mocks_pair_weights_kernel_float(float *x0, float
         }
     }
 
-    float pairweight = 0; 
+    float pairweight = 0;
     float sw = s;
     if (autocorr) weights1 = weights0;
 
@@ -898,7 +903,6 @@ __global__ void countpairs_s_mu_mocks_pair_weights_kernel_float(float *x0, float
             pair.weights0[w] = weights0[i*numweights+w];
             pair.weights1[w] = weights1[j*numweights+w];
         }
-        float pair_costheta_d = xhat1*xhat0 + yhat1*yhat0 + zhat1*zhat0;
 
         pair.dx = perpx;
         pair.dy = perpy;
@@ -983,7 +987,7 @@ void gpu_allocate_mins_double(double **p_gpu_min_dx, double **p_gpu_min_dy, cons
     // Takes pointers as args
     cudaMallocManaged(&(*p_gpu_min_dx), num_cell_pairs*sizeof(double));
     cudaMallocManaged(&(*p_gpu_min_dy), num_cell_pairs*sizeof(double));
-}   
+}
 
 void gpu_allocate_mocks_double(double **p_X1, double **p_Y1, double **p_Z1, const int64_t ND1) {
     // Allocate Unified Memory – accessible from CPU or GPU
@@ -1153,16 +1157,16 @@ void gpu_device_synchronize() {
 
 int gpu_batch_countpairs_s_mu_mocks_double(double *x0, double *y0, double *z0,
                double *weights0, uint8_t numweights,
-               double *x1, double *y1, double *z1, 
+               double *x1, double *y1, double *z1,
                double *weights1, uint8_t numintweights,
                const int N, int *np0, int *np1,
                int *same_cell, int64_t *icell0, int64_t *icell1,
                int *cellpair_lut, int *cellthread_lut,
                int *start_idx0, int *start_idx1,
-               double *min_xdiff, double *min_ydiff, 
+               double *min_xdiff, double *min_ydiff,
                double *savg, int *npairs, double *weightavg, const double *supp_sqr,
                const double sqr_smax, const double sqr_smin, const int nsbin,
-               const int nmu_bins, 
+               const int nmu_bins,
                const double sqr_mumax, const double inv_dmu, const double mumin_invstep,
                double inv_sstep, double smin_invstep, const selection_struct selection,
                int need_savg, const weight_method_t weight_method, const pair_weight_struct pair_weight,
@@ -1197,7 +1201,7 @@ int gpu_batch_countpairs_s_mu_mocks_double(double *x0, double *y0, double *z0,
             same_cell, icell0, icell1,
             cellpair_lut, cellthread_lut,
             start_idx0, start_idx1,
-            min_xdiff, min_ydiff, 
+            min_xdiff, min_ydiff,
             savg, npairs, weightavg, supp_sqr,
             sqr_smax, sqr_smin, nsbin, nmu_bins,
             sqr_mumax,inv_dmu,mumin_invstep,

@@ -726,11 +726,11 @@ def process_weights(weights1, weights2, X1, X2, weight_type, autocorr):
 def sys_pipes():
     '''
     In a Jupyter notebook, Python's ``sys.stdout`` and ``sys.stderr`` are redirected
-    so output ends up in cells.  But C extensions don't know about that!  Wurlitzer
+    so output ends up in cells. But C extensions don't know about that! Wurlitzer
     uses os.dup2 to redirect fds 1 & 2 to the new location and restore them on return,
-    but will cause the output to hang if they were not already redirected.  It seems
+    but will cause the output to hang if they were not already redirected. It seems
     we can compare Python's ``sys.stdout`` to the saved ``sys.__stdout__`` to tell
-    if redirection occurred.  We will also check if the output is a TTY as a safety
+    if redirection occurred. We will also check if the output is a TTY as a safety
     net, even though it is probably a subset of the preceeding check.
 
     Basic usage is:

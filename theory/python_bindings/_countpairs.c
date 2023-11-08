@@ -1284,6 +1284,7 @@ static int check_selection(PyObject *module, selection_struct *selection_st, PyO
 {
     int status = EXIT_SUCCESS;
     char msg[1024];
+    selection_st->selection_type = NONE_SELECTION;
     if (attrs_selection_obj != NULL) {
         if (!PyDict_Check(attrs_selection_obj)) {
             snprintf(msg, 1024, "Please input dict of name: limits (tuple)");
@@ -1294,6 +1295,9 @@ static int check_selection(PyObject *module, selection_struct *selection_st, PyO
         while (PyDict_Next(attrs_selection_obj, &pos, &key, &value)) {
             if (PyUnicode_CompareWithASCIIString(key, "rp") == 0) {
                 set_selection_struct(selection_st, RP_SELECTION, PyFloat_AsDouble(PySequence_Fast_GET_ITEM(value, 0)), PyFloat_AsDouble(PySequence_Fast_GET_ITEM(value, 1)));
+            }
+            else if (PyUnicode_CompareWithASCIIString(key, "theta") == 0) {
+                set_selection_struct(selection_st, THETA_SELECTION, PyFloat_AsDouble(PySequence_Fast_GET_ITEM(value, 0)), PyFloat_AsDouble(PySequence_Fast_GET_ITEM(value, 1)));
             }
             else {
                 snprintf(msg, 1024, "ERROR: Found unknown key in attrs_selection_obj\n");

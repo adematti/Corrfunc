@@ -663,7 +663,7 @@ int countpairs_s_mu_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z1
                                                                          cellpair_start, cellpair_end,
                                                                          gpu_np0, gpu_np1, gpu_start_idx0, gpu_start_idx1,
                                                                          smax, smin, nsbin, nmu_bins, gpu_supp_sqr, mu_max,
-                                                                         pimax, gpu_xwrap, gpu_ywrap, gpu_zwrap, 
+                                                                         pimax, gpu_xwrap, gpu_ywrap, gpu_zwrap,
                                                                          gpu_min_dx, gpu_min_dy,
                                                                          gpu_savg, gpu_npairs,
                                                                          gpu_weightavg, extra->weight_method, extra->pair_weight,
@@ -867,6 +867,9 @@ int countpairs_s_mu_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z1
         int with_auto_pairs = (supp[0] <= 0.0);
         if (options->selection.selection_type & RP_SELECTION) {
             with_auto_pairs &= (options->selection.rpmin_sqr <= 0.);
+        }
+        if (options->selection.selection_type & THETA_SELECTION) {
+            with_auto_pairs &= (options->selection.costhetamax >= 1.);
         }
         if(with_auto_pairs) {
             /* Then, add all the self-pairs. This ensures that

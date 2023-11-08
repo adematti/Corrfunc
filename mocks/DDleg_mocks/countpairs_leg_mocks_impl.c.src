@@ -490,6 +490,9 @@ int countpairs_mocks_leg_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBL
         if (options->selection.selection_type & RP_SELECTION) {
             with_auto_pairs &= (options->selection.rpmin_sqr <= 0.);
         }
+        if (options->selection.selection_type & THETA_SELECTION) {
+            with_auto_pairs &= (options->selection.costhetamax >= 1.);
+        }
         if(with_auto_pairs) {
             // Then, add all the self-pairs. This ensures that
             // a cross-correlation with two identical datasets
