@@ -235,6 +235,13 @@ __global__ void countpairs_s_mu_kernel_double(double *x0, double *y0, double *z0
         sqr_mu = sqr_dz/sqr_s;
     }
 
+    if(selection.selection_type & THETA_SELECTION) {
+        const double norm1 = x1pos*x1pos + y1pos*y1pos + z1pos*z1pos;
+        const double norm0 = xpos*xpos + ypos*ypos + zpos*zpos;
+        double pair_costheta_d = x1pos*xpos + y1pos*ypos + z1pos*zpos;
+        pair_costheta_d /= sqrt(norm1*norm0);
+        if((pair_costheta_d <= selection.costhetamin) || (pair_costheta_d > selection.costhetamax)) return;
+    }
 
     double s = 0;
     if(need_savg || bin_type == BIN_LIN) {
@@ -367,6 +374,13 @@ __global__ void countpairs_s_mu_kernel_float(float *x0, float *y0, float *z0,
         sqr_mu = sqr_dz/sqr_s;
     }
 
+    if(selection.selection_type & THETA_SELECTION) {
+        const float norm1 = x1pos*x1pos + y1pos*y1pos + z1pos*z1pos;
+        const float norm0 = xpos*xpos + ypos*ypos + zpos*zpos;
+        float pair_costheta_d = x1pos*xpos + y1pos*ypos + z1pos*zpos;
+        pair_costheta_d /= sqrt(norm1*norm0);
+        if((pair_costheta_d <= selection.costhetamin) || (pair_costheta_d > selection.costhetamax)) return;
+    }
 
     float s = 0;
     if(need_savg || bin_type == BIN_LIN) {
@@ -472,14 +486,6 @@ __global__ void countpairs_s_mu_pair_weights_kernel_double(double *x0, double *y
     const double sqr_max_dz = sqr_smax - min_xdiff[icellpair]*min_xdiff[icellpair] - min_ydiff[icellpair]*min_ydiff[icellpair];
     max_dz = sqr_max_dz < pimax*pimax ? sqrt(sqr_max_dz):pimax;
 
-    //norm calcs are done if need_costheta == need_weightavg
-    //need_weightavg is true by definition in this kernel so remove conditional
-    //positions are not divided by norm here
-    const double norm1 = sqrt(x1pos*x1pos + y1pos*y1pos + z1pos*z1pos);
-
-    //need_weightavg is true by definition in this kernel so remove conditional
-    const double norm0 = sqrt(xpos*xpos + ypos*ypos + zpos*zpos);
-
     const double dx = x1pos - xpos;
     const double dy = y1pos - ypos;
     const double dz = z1pos - zpos;//the ordering is important. localz1 - zpos ensures dz is in increasing order for future iterations
@@ -488,9 +494,6 @@ __global__ void countpairs_s_mu_pair_weights_kernel_double(double *x0, double *y
     if (dz > max_dz) {
         return;
     }
-    double pair_costheta_d = x1pos*xpos + y1pos*ypos + z1pos*zpos;
-    pair_costheta_d /= norm1*norm0;
-    if((selection.selection_type & THETA_SELECTION) && ((pair_costheta_d <= selection.costhetamin) || (pair_costheta_d > selection.costhetamax))) return;
 
     const double sqr_dx_dy = dx*dx + dy*dy;
     //const double sqr_s = perpx*perpx + perpy*perpy + perpz*perpz;
@@ -508,6 +511,21 @@ __global__ void countpairs_s_mu_pair_weights_kernel_double(double *x0, double *y
     if (sqr_s > 0.) {
         if (sqr_dz >= sqr_s * sqr_mumax) return;
         sqr_mu = sqr_dz/sqr_s;
+    }
+
+    double pair_costheta_d = NULL;
+
+    if ((selection.selection_type & THETA_SELECTION) || (weight_method == INVERSE_BITWISE)) {
+        //norm calcs are done if need_costheta == need_weightavg
+        //need_weightavg is true by definition in this kernel so remove conditional
+        //positions are not divided by norm here
+        const double norm1 = x1pos*x1pos + y1pos*y1pos + z1pos*z1pos;
+
+        //need_weightavg is true by definition in this kernel so remove conditional
+        const double norm0 = xpos*xpos + ypos*ypos + zpos*zpos;
+        pair_costheta_d = x1pos*xpos + y1pos*ypos + z1pos*zpos;
+        pair_costheta_d /= sqrt(norm1*norm0);
+        if((selection.selection_type & THETA_SELECTION) && ((pair_costheta_d <= selection.costhetamin) || (pair_costheta_d > selection.costhetamax))) return;
     }
 
     double s = 0, pairweight = 0;
@@ -652,14 +670,6 @@ __global__ void countpairs_s_mu_pair_weights_kernel_float(float *x0, float *y0, 
     const float sqr_max_dz = sqr_smax - min_xdiff[icellpair]*min_xdiff[icellpair] - min_ydiff[icellpair]*min_ydiff[icellpair];
     max_dz = sqr_max_dz < pimax*pimax ? sqrt(sqr_max_dz):pimax;
 
-    //norm calcs are done if need_costheta == need_weightavg
-    //need_weightavg is true by definition in this kernel so remove conditional
-    //positions are not divided by norm here
-    const float norm1 = sqrt(x1pos*x1pos + y1pos*y1pos + z1pos*z1pos);
-
-    //need_weightavg is true by definition in this kernel so remove conditional
-    const float norm0 = sqrt(xpos*xpos + ypos*ypos + zpos*zpos);
-
     const float dx = x1pos - xpos;
     const float dy = y1pos - ypos;
     const float dz = z1pos - zpos;//the ordering is important. localz1 - zpos ensures dz is in increasing order for future iterations
@@ -687,6 +697,21 @@ __global__ void countpairs_s_mu_pair_weights_kernel_float(float *x0, float *y0, 
         sqr_mu = sqr_dz/sqr_s;
     }
 
+    float pair_costheta_d = NULL;
+
+    if ((selection.selection_type & THETA_SELECTION) || (weight_method == INVERSE_BITWISE)) {
+        //norm calcs are done if need_costheta == need_weightavg
+        //need_weightavg is true by definition in this kernel so remove conditional
+        //positions are not divided by norm here
+        const float norm1 = x1pos*x1pos + y1pos*y1pos + z1pos*z1pos;
+
+        //need_weightavg is true by definition in this kernel so remove conditional
+        const float norm0 = xpos*xpos + ypos*ypos + zpos*zpos;
+        pair_costheta_d = x1pos*xpos + y1pos*ypos + z1pos*zpos;
+        pair_costheta_d /= sqrt(norm1*norm0);
+        if((selection.selection_type & THETA_SELECTION) && ((pair_costheta_d <= selection.costhetamin) || (pair_costheta_d > selection.costhetamax))) return;
+    }
+
     float s = 0, pairweight = 0;
     if(need_savg || bin_type == BIN_LIN) {
         s = sqrt(sqr_s);
@@ -703,8 +728,6 @@ __global__ void countpairs_s_mu_pair_weights_kernel_float(float *x0, float *y0, 
             pair.weights0[w] = weights0[i*numweights+w];
             pair.weights1[w] = weights1[j*numweights+w];
         }
-        float pair_costheta_d = x1pos*xpos + y1pos*ypos + z1pos*zpos;
-        pair_costheta_d /= norm1*norm0;
 
         pair.dx = dx;
         pair.dy = dy;

@@ -199,26 +199,6 @@ __global__ void countpairs_s_mu_mocks_kernel_double(double *x0, double *y0, doub
         return;
     }
 
-    //hat1 calcs are done if need_weightavg || ((autocorr == 1) && (los_type == FIRSTPOINT_LOS)
-    //need_weightavg is FALSE by definition in this kernel so remove that part of conditional
-    double xhat1=NULL, yhat1=NULL, zhat1=NULL;
-    if (((autocorr == 1) && (los_type == FIRSTPOINT_LOS))) {
-        const double norm1 = sqrt(x1pos*x1pos + y1pos*y1pos + z1pos*z1pos);
-        xhat1 = x1pos/norm1;
-        yhat1 = y1pos/norm1;
-        zhat1 = z1pos/norm1;
-    }
-
-    //hat1 calcs are done if need_weightavg || los_type == FIRSTPOINT_LOS
-    //need_weightavg is FALSE by definition in this kernel so remove that part of conditional
-    double xhat0=NULL, yhat0=NULL, zhat0=NULL;
-    if (los_type == FIRSTPOINT_LOS) {
-        const double norm0 = sqrt(xpos*xpos + ypos*ypos + zpos*zpos);
-        xhat0 = xpos/norm0;
-        yhat0 = ypos/norm0;
-        zhat0 = zpos/norm0;
-    }
-
     const double parx = xpos + x1pos;
     const double pary = ypos + y1pos;
     const double parz = zpos + z1pos;
@@ -236,6 +216,32 @@ __global__ void countpairs_s_mu_mocks_kernel_double(double *x0, double *y0, doub
     if(sqr_s >= sqr_smax || sqr_s < sqr_smin) {
         return;
     }
+
+
+    //hat1 calcs are done if need_weightavg || ((autocorr == 1) && (los_type == FIRSTPOINT_LOS)
+    //need_weightavg is false by definition in this kernel so remove conditional
+    double xhat1=NULL, yhat1=NULL, zhat1=NULL;
+
+    //hat1 calcs are done if need_weightavg || los_type == FIRSTPOINT_LOS
+    //need_weightavg is false by definition in this kernel so remove conditional
+    double xhat0=NULL, yhat0=NULL, zhat0=NULL;
+    double pair_costheta_d=NULL;
+
+    if ((selection.selection_type & THETA_SELECTION) || (los_type != MIDPOINT_LOS)) {
+        const double norm1 = sqrt(x1pos*x1pos + y1pos*y1pos + z1pos*z1pos);
+        xhat1 = x1pos/norm1;
+        yhat1 = y1pos/norm1;
+        zhat1 = z1pos/norm1;
+
+        const double norm0 = sqrt(xpos*xpos + ypos*ypos + zpos*zpos);
+        xhat0 = xpos/norm0;
+        yhat0 = ypos/norm0;
+        zhat0 = zpos/norm0;
+
+        pair_costheta_d = xhat1*xhat0 + yhat1*yhat0 + zhat1*zhat0;
+    }
+
+    if((selection.selection_type & THETA_SELECTION) && ((pair_costheta_d <= selection.costhetamin) || (pair_costheta_d > selection.costhetamax))) return;
 
     double s = 0;
     int mubin = nmu_bins, mubin2 = nmu_bins;
@@ -384,26 +390,6 @@ __global__ void countpairs_s_mu_mocks_kernel_float(float *x0, float *y0, float *
         return;
     }
 
-    //hat1 calcs are done if need_weightavg || ((autocorr == 1) && (los_type == FIRSTPOINT_LOS)
-    //need_weightavg is FALSE by definition in this kernel so remove that part of conditional
-    float xhat1=NULL, yhat1=NULL, zhat1=NULL;
-    if (((autocorr == 1) && (los_type == FIRSTPOINT_LOS))) {
-        const float norm1 = sqrt(x1pos*x1pos + y1pos*y1pos + z1pos*z1pos);
-        xhat1 = x1pos/norm1;
-        yhat1 = y1pos/norm1;
-        zhat1 = z1pos/norm1;
-    }
-
-    //hat1 calcs are done if need_weightavg || los_type == FIRSTPOINT_LOS
-    //need_weightavg is FALSE by definition in this kernel so remove that part of conditional
-    float xhat0=NULL, yhat0=NULL, zhat0=NULL;
-    if (los_type == FIRSTPOINT_LOS) {
-        const float norm0 = sqrt(xpos*xpos + ypos*ypos + zpos*zpos);
-        xhat0 = xpos/norm0;
-        yhat0 = ypos/norm0;
-        zhat0 = zpos/norm0;
-    }
-
     const float parx = xpos + x1pos;
     const float pary = ypos + y1pos;
     const float parz = zpos + z1pos;
@@ -421,6 +407,31 @@ __global__ void countpairs_s_mu_mocks_kernel_float(float *x0, float *y0, float *
     if(sqr_s >= sqr_smax || sqr_s < sqr_smin) {
         return;
     }
+
+    //hat1 calcs are done if need_weightavg || ((autocorr == 1) && (los_type == FIRSTPOINT_LOS)
+    //need_weightavg is false by definition in this kernel so remove conditional
+    float xhat1=NULL, yhat1=NULL, zhat1=NULL;
+
+    //hat1 calcs are done if need_weightavg || los_type == FIRSTPOINT_LOS
+    //need_weightavg is false by definition in this kernel so remove conditional
+    float xhat0=NULL, yhat0=NULL, zhat0=NULL;
+    float pair_costheta_d=NULL;
+
+    if ((selection.selection_type & THETA_SELECTION) || (los_type != MIDPOINT_LOS)) {
+        const float norm1 = sqrt(x1pos*x1pos + y1pos*y1pos + z1pos*z1pos);
+        xhat1 = x1pos/norm1;
+        yhat1 = y1pos/norm1;
+        zhat1 = z1pos/norm1;
+
+        const float norm0 = sqrt(xpos*xpos + ypos*ypos + zpos*zpos);
+        xhat0 = xpos/norm0;
+        yhat0 = ypos/norm0;
+        zhat0 = zpos/norm0;
+
+        pair_costheta_d = xhat1*xhat0 + yhat1*yhat0 + zhat1*zhat0;
+    }
+
+    if((selection.selection_type & THETA_SELECTION) && ((pair_costheta_d <= selection.costhetamin) || (pair_costheta_d > selection.costhetamax))) return;
 
     float s = 0;
     int mubin = nmu_bins, mubin2 = nmu_bins;
@@ -571,22 +582,6 @@ __global__ void countpairs_s_mu_mocks_pair_weights_kernel_double(double *x0, dou
         return;
     }
 
-    //hat1 calcs are done if need_weightavg || ((autocorr == 1) && (los_type == FIRSTPOINT_LOS)
-    //need_weightavg is true by definition in this kernel so remove conditional
-    double xhat1=NULL, yhat1=NULL, zhat1=NULL;
-    const double norm1 = sqrt(x1pos*x1pos + y1pos*y1pos + z1pos*z1pos);
-    xhat1 = x1pos/norm1;
-    yhat1 = y1pos/norm1;
-    zhat1 = z1pos/norm1;
-
-    //hat1 calcs are done if need_weightavg || los_type == FIRSTPOINT_LOS
-    //need_weightavg is true by definition in this kernel so remove conditional
-    double xhat0=NULL, yhat0=NULL, zhat0=NULL;
-    const double norm0 = sqrt(xpos*xpos + ypos*ypos + zpos*zpos);
-    xhat0 = xpos/norm0;
-    yhat0 = ypos/norm0;
-    zhat0 = zpos/norm0;
-
     const double parx = xpos + x1pos;
     const double pary = ypos + y1pos;
     const double parz = zpos + z1pos;
@@ -605,7 +600,28 @@ __global__ void countpairs_s_mu_mocks_pair_weights_kernel_double(double *x0, dou
         return;
     }
 
-    double pair_costheta_d = xhat1*xhat0 + yhat1*yhat0 + zhat1*zhat0;
+    //hat1 calcs are done if need_weightavg || ((autocorr == 1) && (los_type == FIRSTPOINT_LOS)
+    //need_weightavg is true by definition in this kernel so remove conditional
+    double xhat1=NULL, yhat1=NULL, zhat1=NULL;
+
+    //hat1 calcs are done if need_weightavg || los_type == FIRSTPOINT_LOS
+    //need_weightavg is true by definition in this kernel so remove conditional
+    double xhat0=NULL, yhat0=NULL, zhat0=NULL;
+    double pair_costheta_d=NULL;
+
+    if ((selection.selection_type & THETA_SELECTION) || (los_type != MIDPOINT_LOS) || (weight_method == INVERSE_BITWISE)) {
+        const double norm1 = sqrt(x1pos*x1pos + y1pos*y1pos + z1pos*z1pos);
+        xhat1 = x1pos/norm1;
+        yhat1 = y1pos/norm1;
+        zhat1 = z1pos/norm1;
+
+        const double norm0 = sqrt(xpos*xpos + ypos*ypos + zpos*zpos);
+        xhat0 = xpos/norm0;
+        yhat0 = ypos/norm0;
+        zhat0 = zpos/norm0;
+
+        pair_costheta_d = xhat1*xhat0 + yhat1*yhat0 + zhat1*zhat0;
+    }
 
     if((selection.selection_type & THETA_SELECTION) && ((pair_costheta_d <= selection.costhetamin) || (pair_costheta_d > selection.costhetamax))) return;
 
@@ -791,26 +807,6 @@ __global__ void countpairs_s_mu_mocks_pair_weights_kernel_float(float *x0, float
         return;
     }
 
-    //hat1 calcs are done if need_weightavg || ((autocorr == 1) && (los_type == FIRSTPOINT_LOS)
-    //need_weightavg is true by definition in this kernel so remove conditional
-    float xhat1=NULL, yhat1=NULL, zhat1=NULL;
-    const float norm1 = sqrt(x1pos*x1pos + y1pos*y1pos + z1pos*z1pos);
-    xhat1 = x1pos/norm1;
-    yhat1 = y1pos/norm1;
-    zhat1 = z1pos/norm1;
-
-    //hat1 calcs are done if need_weightavg || los_type == FIRSTPOINT_LOS
-    //need_weightavg is true by definition in this kernel so remove conditional
-    float xhat0=NULL, yhat0=NULL, zhat0=NULL;
-    const float norm0 = sqrt(xpos*xpos + ypos*ypos + zpos*zpos);
-    xhat0 = xpos/norm0;
-    yhat0 = ypos/norm0;
-    zhat0 = zpos/norm0;
-
-    float pair_costheta_d = xhat1*xhat0 + yhat1*yhat0 + zhat1*zhat0;
-
-    if((selection.selection_type & THETA_SELECTION) && ((pair_costheta_d < selection.costhetamin) || (pair_costheta_d >= selection.costhetamax))) continue;
-
     //need_weightavg is TRUE in this kernel BUT pair_costheta_d not used
     //in PAIR_PRODUCT so comment out - will be used for INVERSE_BITWISE
     //float pair_costheta_d = xhat1*xhat0 + yhat1*yhat0 + zhat1*zhat0;
@@ -832,6 +828,31 @@ __global__ void countpairs_s_mu_mocks_pair_weights_kernel_float(float *x0, float
     if(sqr_s >= sqr_smax || sqr_s < sqr_smin) {
         return;
     }
+
+    //hat1 calcs are done if need_weightavg || ((autocorr == 1) && (los_type == FIRSTPOINT_LOS)
+    //need_weightavg is true by definition in this kernel so remove conditional
+    float xhat1=NULL, yhat1=NULL, zhat1=NULL;
+
+    //hat1 calcs are done if need_weightavg || los_type == FIRSTPOINT_LOS
+    //need_weightavg is true by definition in this kernel so remove conditional
+    float xhat0=NULL, yhat0=NULL, zhat0=NULL;
+    float pair_costheta_d=NULL;
+
+    if ((selection.selection_type & THETA_SELECTION) || (los_type != MIDPOINT_LOS) || (weight_method == INVERSE_BITWISE)) {
+        const float norm1 = sqrt(x1pos*x1pos + y1pos*y1pos + z1pos*z1pos);
+        xhat1 = x1pos/norm1;
+        yhat1 = y1pos/norm1;
+        zhat1 = z1pos/norm1;
+
+        const float norm0 = sqrt(xpos*xpos + ypos*ypos + zpos*zpos);
+        xhat0 = xpos/norm0;
+        yhat0 = ypos/norm0;
+        zhat0 = zpos/norm0;
+
+        pair_costheta_d = xhat1*xhat0 + yhat1*yhat0 + zhat1*zhat0;
+    }
+
+    if((selection.selection_type & THETA_SELECTION) && ((pair_costheta_d <= selection.costhetamin) || (pair_costheta_d > selection.costhetamax))) return;
 
     float s = 0;
     int mubin = nmu_bins, mubin2 = nmu_bins;
