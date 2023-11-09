@@ -1473,7 +1473,7 @@ static inline int countpairs_s_mu_gpu_DOUBLE(const int64_t N0, DOUBLE *x0, DOUBL
                                                         DOUBLE *weightavg, const weight_method_t weight_method, const pair_weight_struct pair_weight,
                                                         DOUBLE *p_weight, DOUBLE *p_sep,
                                                         const selection_struct selection, const bin_type_t bin_type, const los_type_t los_type, const int autocorr,
-                                                        int *cellpair_lut, int *cellthread_lut, uint8_t verbose)
+                                                        int *cellpair_lut, int *cellthread_lut, int64_t max_blocks, uint8_t verbose)
 {
     if(N0 == 0 || N1 == 0) {
         return EXIT_SUCCESS;
@@ -1495,8 +1495,6 @@ static inline int countpairs_s_mu_gpu_DOUBLE(const int64_t N0, DOUBLE *x0, DOUBL
     const DOUBLE sqr_mumax = mu_max*mu_max;
     const DOUBLE inv_dmu = ((DOUBLE) nmu_bins)/(2*mu_max);
     const DOUBLE mumin_invstep = mu_max*inv_dmu;
-    const int max_threads = 400000000; //400M
-    const int max_blocks = (max_threads+THREADS_PER_BLOCK-1) / THREADS_PER_BLOCK; //max num blocks
 
     //7/17/23 - moved allocation of cellpair_lut and cellthread_lut to countpairs_impl
 
@@ -1520,9 +1518,9 @@ static inline int countpairs_s_mu_gpu_DOUBLE(const int64_t N0, DOUBLE *x0, DOUBL
     int status = EXIT_FAILURE;
     while (i < cell_pair_end) {
         int64_t i_start = i;
-        int tot_nblocks = 0;
+        int64_t tot_nblocks = 0;
         int this_cell_threads = 0;
-        int nblocks = 0;
+        int64_t nblocks = 0;
         while (i < cell_pair_end && nblocks < max_blocks) {
             //nthreads += gpu_np0[gpu_icell0[i]] * gpu_np1[gpu_icell1[i]];
             this_cell_threads = gpu_np0[gpu_icell0[i]] * gpu_np1[gpu_icell1[i]];
@@ -1532,7 +1530,7 @@ static inline int countpairs_s_mu_gpu_DOUBLE(const int64_t N0, DOUBLE *x0, DOUBL
             for (int j = tot_nblocks; j < tot_nblocks+nblocks; j++) {
                 cellpair_lut[j] = i;
                 cellthread_lut[j] = tnum;
-                tnum += 512;
+                tnum += THREADS_PER_BLOCK;
             }
             tot_nblocks += nblocks;
             i++;

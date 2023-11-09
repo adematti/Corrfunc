@@ -440,8 +440,8 @@ int countpairs_mocks_s_mu_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUB
     DOUBLE *gpu_p_weight, *gpu_p_sep;
 
     //define max threads and max blocks here
-    const int max_threads = 400000000; //400M
-    const int max_blocks = (max_threads+THREADS_PER_BLOCK-1) / THREADS_PER_BLOCK; //max num blocks
+    const int64_t max_threads = 1600000000; //1.6 billion threads
+    int64_t max_blocks = (max_threads+THREADS_PER_BLOCK-1) / THREADS_PER_BLOCK; //max num blocks
 
     //allocate global arrays here outside of OPENMP parallel block
     //outputs and block LUTs will be allocated inside OPENMP block
@@ -496,6 +496,8 @@ int countpairs_mocks_s_mu_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUB
         //loop over lattices and populate LUTs
         int pcount1 = 0, pcount2 = 0;
         int64_t i1 = 0, i2 = 0;
+        int64_t this_cell_threads = 0;
+        int64_t nblocks = 0;
         for (int64_t icell = 0; icell<totncells; icell++) {
                 gpu_np0[icell] = (&lattice1[icell])->nelements;
                 gpu_np1[icell] = (&lattice2[icell])->nelements;
@@ -503,6 +505,16 @@ int countpairs_mocks_s_mu_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUB
                 gpu_start_idx1[icell] = pcount2;
                 pcount1 += (&lattice1[icell])->nelements;
                 pcount2 += (&lattice2[icell])->nelements;
+
+                this_cell_threads = (&lattice1[icell])->nelements * (&lattice2[icell])->nelements;
+                nblocks = (this_cell_threads+THREADS_PER_BLOCK-1)/THREADS_PER_BLOCK;
+                if (nblocks > max_blocks) {
+                    if (options->verbose) fprintf(stderr, "Warning: Density is too high for current max blocks of %ld.  Changing max blocks to %ld.\n", max_blocks, nblocks);
+                    size_t gpumem = gpu_get_total_mem();
+                    max_blocks = nblocks;
+                    if (max_blocks * THREADS_PER_BLOCK * 8 > (int64_t)gpumem) fprintf(stderr, "Warning: Updated max blocks of %ld may be too high for GPU memory %ld bytes.\n", max_blocks, gpumem);
+                }
+
                 const cellarray_mocks_DOUBLE *first = &lattice1[icell];
                 const cellarray_mocks_DOUBLE *second = &lattice2[icell];
                 //loop over elements in first, second cells
@@ -605,7 +617,8 @@ int countpairs_mocks_s_mu_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUB
                                                                          gpu_weightavg, extra->weight_method, extra->pair_weight,
                                                                          gpu_p_weight, gpu_p_sep,
                                                                          options->selection, options->bin_type, options->los_type, autocorr,
-                                                                         gpu_cellpair_lut, gpu_cellthread_lut, options->verbose);
+                                                                         gpu_cellpair_lut, gpu_cellthread_lut, max_blocks, options->verbose);
+
                 abort_status |= status;
             }
         } else {
@@ -719,6 +732,8 @@ int countpairs_mocks_s_mu_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUB
         gpu_free_cell_luts(gpu_same_cell, gpu_icell0, gpu_icell1);
         gpu_free_lattice_luts(gpu_np0, gpu_start_idx0);
         gpu_free_lattice_luts(gpu_np1, gpu_start_idx1);
+        if (nw1 > 0) gpu_free_weights_DOUBLE(gpu_W1);
+        if (nw2 > 0) gpu_free_weights_DOUBLE(gpu_W2);
         gpu_free_one_array_DOUBLE(gpu_supp_sqr);
         if (extra->pair_weight.num > 0) {
             gpu_free_one_array_DOUBLE(gpu_p_weight);

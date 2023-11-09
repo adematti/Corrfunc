@@ -98,4 +98,6 @@ int gpu_batch_countpairs_s_mu_float(float *x0, float *y0, float *z0, float *weig
 
 void gpu_device_synchronize();
 
+size_t gpu_get_total_mem();
+
 void gpu_print_cuda_error();

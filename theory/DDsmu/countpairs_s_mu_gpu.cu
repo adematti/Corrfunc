@@ -40,7 +40,7 @@ typedef struct
     //pair_weight_struct_double pair_weight;
 
     int num_weights;
-    uint8_t num_integer_weights;
+    int num_integer_weights;
     int8_t noffset;
     double default_value;
 } pair_struct_double;
@@ -63,7 +63,7 @@ typedef struct
     //pair_weight_struct_float pair_weight;
 
     int num_weights;
-    uint8_t num_integer_weights;
+    int num_integer_weights;
     int8_t noffset;
     float default_value;
 } pair_struct_float;
@@ -1119,6 +1119,17 @@ int gpu_batch_countpairs_s_mu_float(float *x0, float *y0, float *z0,
     return EXIT_SUCCESS;
 }
 
+size_t gpu_get_total_mem() {
+    size_t free_byte ;
+    size_t total_byte ;
+    cudaError_t cuda_status = cudaMemGetInfo( &free_byte, &total_byte ) ;
+
+    if ( cudaSuccess != cuda_status ){
+        printf("Error: cudaMemGetInfo fails, %s \n", cudaGetErrorString(cuda_status) );
+        exit(1);
+    }
+    return total_byte;
+}
 
 void gpu_print_cuda_error() {
        size_t free_byte ;
