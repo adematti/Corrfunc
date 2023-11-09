@@ -136,7 +136,7 @@ static inline AVX512_FLOATS avx512_inverse_bitwise_DOUBLE(pair_struct_DOUBLE *pa
             //printf("w%d %ld %ld\n", w, *((LONG *) &(pair->weights0[w].d)), *((LONG *) &(pair->weights1[w].d)));
             nbits += POPCOUNT(*((LONG *) &(pair->weights0[w].da512[jj])) & *((LONG *) &(pair->weights1[w].da512[jj])));
         }
-        DOUBLE weight = (nbits == 0) ? pair->default_value : 1./nbits;
+        DOUBLE weight = (nbits == 0) ? pair->default_value : 1. / nbits;
         int num = pair->pair_weight.num;
         if (num) {
             DOUBLE costheta = pair->costheta.da512[jj];
@@ -180,7 +180,7 @@ static inline AVX_FLOATS avx_inverse_bitwise_DOUBLE(pair_struct_DOUBLE *pair){
         for (int w=0;w<pair->num_integer_weights;w++) {
             nbits += POPCOUNT(*((LONG *) &(pair->weights0[w].da[jj])) & *((LONG *) &(pair->weights1[w].da[jj])));
         }
-        DOUBLE weight = (nbits == 0) ? pair->default_value : 1./nbits;
+        DOUBLE weight = (nbits == 0) ? pair->default_value : 1. / nbits;
         int num = pair->pair_weight.num;
         if (num) {
             DOUBLE costheta = pair->costheta.da[jj];
@@ -226,7 +226,7 @@ static inline SSE_FLOATS sse_inverse_bitwise_DOUBLE(pair_struct_DOUBLE *pair){
             //printf("w%d %ld %ld\n", w, *((LONG *) &(pair->weights0[w].d)), *((LONG *) &(pair->weights1[w].d)));
             nbits += POPCOUNT(*((LONG *) &(pair->weights0[w].ds[jj])) & *((LONG *) &(pair->weights1[w].ds[jj])));
         }
-        DOUBLE weight = (nbits == 0) ? pair->default_value : 1./nbits;
+        DOUBLE weight = (nbits == 0) ? pair->default_value : 1. / nbits;
         int num = pair->pair_weight.num;
         if (num) {
             DOUBLE costheta = pair->costheta.ds[jj];
@@ -266,7 +266,7 @@ static inline DOUBLE inverse_bitwise_DOUBLE(pair_struct_DOUBLE *pair){
     for (int w=0;w<pair->num_integer_weights;w++) {
         nbits += POPCOUNT(*((LONG *) &(pair->weights0[w].d)) & *((LONG *) &(pair->weights1[w].d)));
     }
-    DOUBLE weight = (nbits == 0) ? pair->default_value : 1./nbits;
+    DOUBLE weight = (nbits == 0) ? pair->default_value : 1. / nbits;
     int num = pair->pair_weight.num;
     if (num) {
         DOUBLE costheta = pair->costheta.d;

@@ -1213,22 +1213,31 @@ static int check_pair_weight(PyObject *module, pair_weight_struct *pair_weight_s
     char msg[1024];
     pair_weight_st->noffset = 1;
     pair_weight_st->default_value = 0.;
+    PyArrayObject *sep = NULL, *weight = NULL;
     if (attrs_pair_weight_obj != NULL) {
-        if (!PySequence_Check(attrs_pair_weight_obj)) {
-            snprintf(msg, 1024, "Please input tuple/list of weight attributes");
-            return EXIT_FAILURE;
+        if (!PyDict_Check(attrs_pair_weight_obj)) {
+            snprintf(msg, 1024, "Please input dict of name: value for attrs_pair_weights");
+            goto except;
         }
-        pair_weight_st->noffset = PyLong_AsLong(PySequence_Fast_GET_ITEM(attrs_pair_weight_obj, 0));
-        pair_weight_st->default_value = PyFloat_AsDouble(PySequence_Fast_GET_ITEM(attrs_pair_weight_obj, 1));
-        if (PyErr_Occurred() != NULL) {
-          snprintf(msg, 1024, "Please provide tuple of integers (noffset, default_value) as weight attributes");
-          return EXIT_FAILURE;
+        PyObject *key, *value;
+        Py_ssize_t pos = 0;
+        while (PyDict_Next(attrs_pair_weight_obj, &pos, &key, &value)) {
+            if (PyUnicode_CompareWithASCIIString(key, "noffset") == 0) {
+                pair_weight_st->noffset = PyLong_AsLong(value);
+            }
+            else if (PyUnicode_CompareWithASCIIString(key, "default_value") == 0) {
+                pair_weight_st->default_value = PyFloat_AsDouble(value);
+            }
+            else {
+                snprintf(msg, 1024, "ERROR: Found unknown key in attrs_pair_weights\n");
+                goto except;
+            }
         }
     }
     if (weight_obj == NULL) return status;
     const int requirements = NPY_ARRAY_IN_ARRAY;
-    PyArrayObject *sep = (PyArrayObject *) PyArray_FromArray((PyArrayObject *) sep_obj, NOTYPE_DESCR, requirements);
-    PyArrayObject *weight = (PyArrayObject *) PyArray_FromArray((PyArrayObject *) weight_obj, NOTYPE_DESCR, requirements);
+    sep = (PyArrayObject *) PyArray_FromArray((PyArrayObject *) sep_obj, NOTYPE_DESCR, requirements);
+    weight = (PyArrayObject *) PyArray_FromArray((PyArrayObject *) weight_obj, NOTYPE_DESCR, requirements);
     PyArrayObject *arrays[2] = {sep, weight};
     for (int ii=0; ii<2; ii++) {
         PyArrayObject *array = arrays[ii];
@@ -1287,8 +1296,8 @@ static int check_selection(PyObject *module, selection_struct *selection_st, PyO
     selection_st->selection_type = NONE_SELECTION;
     if (attrs_selection_obj != NULL) {
         if (!PyDict_Check(attrs_selection_obj)) {
-            snprintf(msg, 1024, "Please input dict of name: limits (tuple)");
-            return EXIT_FAILURE;
+            snprintf(msg, 1024, "Please input dict of name: limits (tuple) for attrs_selection");
+            goto except;
         }
         PyObject *key, *value;
         Py_ssize_t pos = 0;
@@ -1300,7 +1309,7 @@ static int check_selection(PyObject *module, selection_struct *selection_st, PyO
                 set_selection_struct(selection_st, THETA_SELECTION, PyFloat_AsDouble(PySequence_Fast_GET_ITEM(value, 0)), PyFloat_AsDouble(PySequence_Fast_GET_ITEM(value, 1)));
             }
             else {
-                snprintf(msg, 1024, "ERROR: Found unknown key in attrs_selection_obj\n");
+                snprintf(msg, 1024, "ERROR: Found unknown key in attrs_selection\n");
                 goto except;
             }
         }

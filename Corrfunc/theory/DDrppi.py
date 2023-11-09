@@ -188,8 +188,8 @@ def DDrppi(autocorr, nthreads, binfile, pimax, npibins, X1, Y1, Z1, weights1=Non
 
     attrs_pair_weights : tuple. Default: None.
         Attributes for pair weights; in case ``weight_type`` is "inverse_bitwise",
-        the tuple of (offset to be added to the bitwise counts,
-        default weight value if denominator is zero).
+        the dictionary of {"noffset": offset to be added to the bitwise counts,
+        "default_value": default weight value if denominator is zero}.
 
     Returns
     -------
