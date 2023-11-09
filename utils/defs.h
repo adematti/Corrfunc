@@ -16,7 +16,6 @@
 
 #include "macros.h"
 #include "cpu_features.h"
-#include "function_precision.h"
 #include "utils.h"
 
 #ifdef __cplusplus
@@ -219,6 +218,9 @@ static inline void reset_bin_refine_factors(struct config_options *options)
 }
 
 
+#define PI_OVER_180       0.017453292519943295769236907684886127134428718885417254560971
+
+
 static inline int set_selection_struct(selection_struct* selection_st, selection_type_t selection_type, const double rpmin, const double rpmax) {
     selection_st->selection_type |= selection_type;
     if (selection_st->selection_type == RP_SELECTION) {
@@ -226,8 +228,8 @@ static inline int set_selection_struct(selection_struct* selection_st, selection
         selection_st->rpmax_sqr = rpmax * rpmax;
     }
     else if (selection_st->selection_type == THETA_SELECTION) {
-        selection_st->costhetamin = COSD(rpmax);  // thetamax, degree
-        selection_st->costhetamax = COSD(rpmin);  // thetamin, degree
+        selection_st->costhetamin = cos(rpmax * PI_OVER_180);  // thetamax, degree
+        selection_st->costhetamax = cos(rpmin * PI_OVER_180);  // thetamin, degree
         if (rpmin <= 0.) selection_st->costhetamax = 1. + 1e-6;  // to include perfectly-aligned pairs
     }
     else if (selection_st->selection_type != NONE_SELECTION) {
