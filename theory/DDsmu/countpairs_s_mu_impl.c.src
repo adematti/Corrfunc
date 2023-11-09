@@ -325,7 +325,6 @@ int countpairs_s_mu_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUBLE *Z1
         }
     }
 
-
     /*---Create 3-D lattice--------------------------------------*/
     int nmesh_x=0,nmesh_y=0,nmesh_z=0;
     cellarray_DOUBLE *lattice1 = gridlink_DOUBLE(ND1, X1, Y1, Z1, &(extra->weights0),

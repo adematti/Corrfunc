@@ -480,10 +480,6 @@ __global__ void countpairs_s_mu_pair_weights_kernel_double(double *x0, double *y
     //need_weightavg is true by definition in this kernel so remove conditional
     const double norm0 = sqrt(xpos*xpos + ypos*ypos + zpos*zpos);
 
-    double pair_costheta_d = x1pos*xpos + y1pos*ypos + z1pos*zpos;
-    pair_costheta_d /= norm1*norm0;
-    if((selection.selection_type & THETA_SELECTION) && ((pair_costheta_d <= selection.costhetamin) || (pair_costheta_d > selection.costhetamax))) continue;
-
     const double dx = x1pos - xpos;
     const double dy = y1pos - ypos;
     const double dz = z1pos - zpos;//the ordering is important. localz1 - zpos ensures dz is in increasing order for future iterations
@@ -492,6 +488,9 @@ __global__ void countpairs_s_mu_pair_weights_kernel_double(double *x0, double *y
     if (dz > max_dz) {
         return;
     }
+    double pair_costheta_d = x1pos*xpos + y1pos*ypos + z1pos*zpos;
+    pair_costheta_d /= norm1*norm0;
+    if((selection.selection_type & THETA_SELECTION) && ((pair_costheta_d <= selection.costhetamin) || (pair_costheta_d > selection.costhetamax))) return;
 
     const double sqr_dx_dy = dx*dx + dy*dy;
     //const double sqr_s = perpx*perpx + perpy*perpy + perpz*perpz;

@@ -2412,6 +2412,7 @@ static PyObject *countpairs_countpairs_s_mu_mocks(PyObject *self, PyObject *args
                                        &results,
                                        &options,
                                        &extra);
+
     if(options.c_api_timer) {
         c_api_time = options.c_api_time;
     }

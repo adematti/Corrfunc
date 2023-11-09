@@ -752,11 +752,6 @@ static inline int countpairs_s_mu_mocks_avx_intrinsics_DOUBLE(const int64_t N0, 
         //Take care of the remainder
         for(;j<N1;j++) {
 
-            if(need_costheta) {
-                pair.costheta.d = xhat1[j]*xhat0 + yhat1[j]*yhat0 + zhat1[j]*zhat0;
-                if((selection.selection_type & THETA_SELECTION) && ((pair.costheta.d <= selection.costhetamin) || (pair.costheta.d > selection.costhetamax))) continue;
-            }
-
             const DOUBLE parx = xpos + *localx1;
             const DOUBLE pary = ypos + *localy1;
             const DOUBLE parz = zpos + *localz1;
@@ -771,6 +766,11 @@ static inline int countpairs_s_mu_mocks_avx_intrinsics_DOUBLE(const int64_t N0, 
 
             const DOUBLE sqr_s = perpx*perpx + perpy*perpy + perpz*perpz;
             if(sqr_s >= sqr_smax || sqr_s < sqr_smin) continue;
+
+            if(need_costheta) {
+                pair.costheta.d = xhat1[j]*xhat0 + yhat1[j]*yhat0 + zhat1[j]*zhat0;
+                if((selection.selection_type & THETA_SELECTION) && ((pair.costheta.d <= selection.costhetamin) || (pair.costheta.d > selection.costhetamax))) continue;
+            }
 
             DOUBLE s = ZERO;
             int mubin = nmu_bins, mubin2 = nmu_bins;
@@ -1232,11 +1232,6 @@ static inline int countpairs_s_mu_mocks_sse_intrinsics_DOUBLE(const int64_t N0, 
         //Take care of the remainder
         for(;j<N1;j++) {
 
-            if(need_costheta) {
-                pair.costheta.d = xhat1[j]*xhat0 + yhat1[j]*yhat0 + zhat1[j]*zhat0;
-                if((selection.selection_type & THETA_SELECTION) && ((pair.costheta.d <= selection.costhetamin) || (pair.costheta.d > selection.costhetamax))) continue;
-            }
-
             const DOUBLE parx = xpos + *localx1;
             const DOUBLE pary = ypos + *localy1;
             const DOUBLE parz = zpos + *localz1;
@@ -1251,6 +1246,11 @@ static inline int countpairs_s_mu_mocks_sse_intrinsics_DOUBLE(const int64_t N0, 
 
             const DOUBLE sqr_s = perpx*perpx + perpy*perpy + perpz*perpz;
             if(sqr_s >= sqr_smax || sqr_s < sqr_smin) continue;
+
+            if(need_costheta) {
+                pair.costheta.d = xhat1[j]*xhat0 + yhat1[j]*yhat0 + zhat1[j]*zhat0;
+                if((selection.selection_type & THETA_SELECTION) && ((pair.costheta.d <= selection.costhetamin) || (pair.costheta.d > selection.costhetamax))) continue;
+            }
 
             DOUBLE s = ZERO;
             int mubin = nmu_bins, mubin2 = nmu_bins;
@@ -1504,11 +1504,6 @@ static inline int countpairs_s_mu_mocks_fallback_DOUBLE(const int64_t N0, DOUBLE
 
             localj++;
 
-            if(need_costheta) {
-                pair.costheta.d = xhat1[localj]*xhat0 + yhat1[localj]*yhat0 + zhat1[localj]*zhat0;
-                if((selection.selection_type & THETA_SELECTION) && ((pair.costheta.d <= selection.costhetamin) || (pair.costheta.d > selection.costhetamax))) continue;
-            }
-
             const DOUBLE parx = xpos + *localx1;
             const DOUBLE pary = ypos + *localy1;
             const DOUBLE parz = zpos + *localz1;
@@ -1523,6 +1518,11 @@ static inline int countpairs_s_mu_mocks_fallback_DOUBLE(const int64_t N0, DOUBLE
 
             const DOUBLE sqr_s = perpx*perpx + perpy*perpy + perpz*perpz;
             if(sqr_s >= sqr_smax || sqr_s < sqr_smin) continue;
+
+            if(need_costheta) {
+                pair.costheta.d = xhat1[localj]*xhat0 + yhat1[localj]*yhat0 + zhat1[localj]*zhat0;
+                if((selection.selection_type & THETA_SELECTION) && ((pair.costheta.d <= selection.costhetamin) || (pair.costheta.d > selection.costhetamax))) continue;
+            }
 
             DOUBLE s = ZERO;
             int mubin = nmu_bins, mubin2 = nmu_bins;

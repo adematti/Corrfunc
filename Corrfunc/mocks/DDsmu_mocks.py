@@ -323,6 +323,7 @@ def DDsmu_mocks(autocorr, nthreads, binfile, mumax, nmubins,
                                   bin_type=integer_bin_type,
                                   los_type=integer_los_type,
                                   **kwargs)
+
     if extn_results is None:
         msg = "RuntimeError occurred"
         raise RuntimeError(msg)

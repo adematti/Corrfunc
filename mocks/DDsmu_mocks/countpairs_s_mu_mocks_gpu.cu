@@ -587,10 +587,6 @@ __global__ void countpairs_s_mu_mocks_pair_weights_kernel_double(double *x0, dou
     yhat0 = ypos/norm0;
     zhat0 = zpos/norm0;
 
-    double pair_costheta_d = xhat1*xhat0 + yhat1*yhat0 + zhat1*zhat0;
-
-    if((selection.selection_type & THETA_SELECTION) && ((pair_costheta_d <= selection.costhetamin) || (pair_costheta_d > selection.costhetamax))) continue;
-
     const double parx = xpos + x1pos;
     const double pary = ypos + y1pos;
     const double parz = zpos + z1pos;
@@ -609,6 +605,9 @@ __global__ void countpairs_s_mu_mocks_pair_weights_kernel_double(double *x0, dou
         return;
     }
 
+    double pair_costheta_d = xhat1*xhat0 + yhat1*yhat0 + zhat1*zhat0;
+
+    if((selection.selection_type & THETA_SELECTION) && ((pair_costheta_d <= selection.costhetamin) || (pair_costheta_d > selection.costhetamax))) return;
 
     double s = 0;
     int mubin = nmu_bins, mubin2 = nmu_bins;

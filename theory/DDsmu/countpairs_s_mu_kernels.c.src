@@ -256,7 +256,7 @@ static inline int countpairs_s_mu_avx512_intrinsics_DOUBLE(const int64_t N0, DOU
             //This gives us the mask for all sqr_smin <= s2 < sqr_smax
             // + mu_min <= mu < mu_max
             m_mask_left = AVX512_MASK_BITWISE_AND(m_mu_mask, m_s2_mask);
-            if (selection.selection_type  & RP_SELECTION) {
+            if (selection.selection_type & RP_SELECTION) {
                 m_mask_left = AVX512_MASK_BITWISE_AND(m_mask_left, AVX512_MASK_BITWISE_AND(AVX512_COMPARE_FLOATS(m_sqr_xdiff_ydiff, AVX512_SET_FLOAT(selection.rpmin_sqr), _CMP_GE_OQ), AVX512_COMPARE_FLOATS(m_sqr_xdiff_ydiff, AVX512_SET_FLOAT(selection.rpmax_sqr), _CMP_LT_OQ)));
             }
 
@@ -604,7 +604,7 @@ static inline int countpairs_s_mu_avx_intrinsics_DOUBLE(const int64_t N0, DOUBLE
                 //This gives us the mask for all sqr_smin <= s2 < sqr_smax
                 // + mu_min <= mu < mu_max
                 m_mask_left = AVX_BITWISE_AND(m_mu_mask, m_s2_mask);
-                if (selection.selection_type  & RP_SELECTION) {
+                if (selection.selection_type & RP_SELECTION) {
                     m_mask_left = AVX_BITWISE_AND(m_mask_left, AVX_BITWISE_AND(AVX_COMPARE_FLOATS(m_sqr_xdiff_ydiff, AVX_SET_FLOAT(selection.rpmin_sqr), _CMP_GE_OQ), AVX_COMPARE_FLOATS(m_sqr_xdiff_ydiff, AVX_SET_FLOAT(selection.rpmax_sqr), _CMP_LT_OQ)));
                 }
 
@@ -716,7 +716,6 @@ static inline int countpairs_s_mu_avx_intrinsics_DOUBLE(const int64_t N0, DOUBLE
                 DOUBLE localnorm1 = norm1[j];
                 pair.costheta.d = (*localx1)*xpos + (*localy1)*ypos + (*localz1)*zpos;
                 pair.costheta.d /= localnorm1*norm0;
-                if((selection.selection_type & THETA_SELECTION) && ((pair.costheta.d <= selection.costhetamin) || (pair.costheta.d > selection.costhetamax))) continue;
             }
 
             const DOUBLE dz = *localz1++ - zpos;
@@ -727,6 +726,7 @@ static inline int countpairs_s_mu_avx_intrinsics_DOUBLE(const int64_t N0, DOUBLE
             }
             if(dz > max_dz) break;
 
+            if((selection.selection_type & THETA_SELECTION) && ((pair.costheta.d <= selection.costhetamin) || (pair.costheta.d > selection.costhetamax))) continue;
             const DOUBLE sqr_dx_dy = dx*dx + dy*dy;
             if((selection.selection_type & RP_SELECTION) && ((sqr_dx_dy < selection.rpmin_sqr) || (sqr_dx_dy >= selection.rpmax_sqr))){
                 continue;
@@ -1042,7 +1042,7 @@ static inline int countpairs_s_mu_sse_intrinsics_DOUBLE(const int64_t N0, DOUBLE
                 //This gives us the mask for all sqr_smin <= s2 < sqr_smax
                 // + mu_min <= mu < mu_max
                 m_mask_left = SSE_BITWISE_AND(m_mu_mask, m_s2_mask);
-                if (selection.selection_type  & RP_SELECTION) {
+                if (selection.selection_type & RP_SELECTION) {
                     m_mask_left = SSE_BITWISE_AND(m_mask_left, SSE_BITWISE_AND(SSE_COMPARE_FLOATS_GE(m_sqr_xdiff_ydiff, SSE_SET_FLOAT(selection.rpmin_sqr)), SSE_COMPARE_FLOATS_LT(m_sqr_xdiff_ydiff, SSE_SET_FLOAT(selection.rpmax_sqr))));
                 }
 
@@ -1144,7 +1144,6 @@ static inline int countpairs_s_mu_sse_intrinsics_DOUBLE(const int64_t N0, DOUBLE
                 DOUBLE localnorm1 = norm1[j];
                 pair.costheta.d = (*localx1)*xpos + (*localy1)*ypos + (*localz1)*zpos;
                 pair.costheta.d /= localnorm1*norm0;
-                if((selection.selection_type & THETA_SELECTION) && ((pair.costheta.d <= selection.costhetamin) || (pair.costheta.d > selection.costhetamax))) continue;
             }
 
             const DOUBLE dx = *localx1++ - xpos;
@@ -1155,6 +1154,7 @@ static inline int countpairs_s_mu_sse_intrinsics_DOUBLE(const int64_t N0, DOUBLE
             }
             if(dz > max_dz) break;
 
+            if((selection.selection_type & THETA_SELECTION) && ((pair.costheta.d <= selection.costhetamin) || (pair.costheta.d > selection.costhetamax))) continue;
             const DOUBLE sqr_dx_dy = dx*dx + dy*dy;
             if((selection.selection_type & RP_SELECTION) && ((sqr_dx_dy < selection.rpmin_sqr) || (sqr_dx_dy >= selection.rpmax_sqr))){
                 continue;
@@ -1382,7 +1382,6 @@ static inline int countpairs_s_mu_fallback_DOUBLE(const int64_t N0, DOUBLE *x0, 
                 DOUBLE localnorm1 = norm1[n_off + j];
                 pair.costheta.d = (*localx1)*xpos + (*localy1)*ypos + (*localz1)*zpos;
                 pair.costheta.d /= localnorm1*norm0;
-                if((selection.selection_type & THETA_SELECTION) && ((pair.costheta.d <= selection.costhetamin) || (pair.costheta.d > selection.costhetamax))) continue;
             }
 
             const DOUBLE dx = *localx1++ - xpos;
@@ -1393,6 +1392,7 @@ static inline int countpairs_s_mu_fallback_DOUBLE(const int64_t N0, DOUBLE *x0, 
             }
             if(dz > max_dz) break;
 
+            if((selection.selection_type & THETA_SELECTION) && ((pair.costheta.d <= selection.costhetamin) || (pair.costheta.d > selection.costhetamax))) continue;
             const DOUBLE sqr_dx_dy = dx*dx + dy*dy;
             if((selection.selection_type & RP_SELECTION) && ((sqr_dx_dy < selection.rpmin_sqr) || (sqr_dx_dy >= selection.rpmax_sqr))){
                 continue;
