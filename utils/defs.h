@@ -230,7 +230,8 @@ static inline int set_selection_struct(selection_struct* selection_st, selection
     else if (selection_type == THETA_SELECTION) {
         selection_st->costhetamin = cos(rpmax * PI_OVER_180);  // thetamax, degree
         selection_st->costhetamax = cos(rpmin * PI_OVER_180);  // thetamin, degree
-        if (rpmin <= 0.) selection_st->costhetamax = 1. + 1e-6;  // to include perfectly-aligned pairs
+        if (rpmin <= 0.) selection_st->costhetamax = 1.1;  // to include perfectly-aligned pairs
+        if (rpmax >= 180.) selection_st->costhetamin = -1.1;  // to include perfectly-antialigned pairs
     }
     else if (selection_type != NONE_SELECTION) {
         fprintf(stderr, "Unknown selection %d\n", selection_st->selection_type);
