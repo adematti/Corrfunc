@@ -204,7 +204,7 @@ def DDrppi_mocks(autocorr, nthreads, binfile, pimax, npibins,
     sep_pair_weights : array-like, optional. Default: None.
         Array of separations corresponding to ``pair_weights``.
 
-    attrs_pair_weights : tuple. Default: None.
+    attrs_pair_weights : dict. Default: None.
         Attributes for pair weights; in case ``weight_type`` is "inverse_bitwise",
         the dictionary of {"noffset": offset to be added to the bitwise counts,
         "default_value": default weight value if denominator is zero}.
