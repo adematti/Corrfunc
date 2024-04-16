@@ -1633,7 +1633,7 @@ static inline int countpairs_s_mu_mocks_gpu_DOUBLE(const int64_t N0, DOUBLE *x0,
                                                         DOUBLE *min_xdiff, DOUBLE *min_ydiff,
                                                         DOUBLE *savg, int *npairs,
                                                         DOUBLE *weightavg, const weight_method_t weight_method, const pair_weight_struct pair_weight,
-                                                        DOUBLE *p_weight, DOUBLE *p_sep,
+                                                        DOUBLE *p_weight, DOUBLE *p_sep, DOUBLE *p_correction_bits,
                                                         const selection_struct selection, const bin_type_t bin_type, const los_type_t los_type, const int autocorr,
                                                         int *cellpair_lut, int *cellthread_lut, int64_t max_blocks, uint8_t verbose)
 {
@@ -1713,7 +1713,7 @@ static inline int countpairs_s_mu_mocks_gpu_DOUBLE(const int64_t N0, DOUBLE *x0,
                        sqr_mumax, inv_dmu, mumin_invstep,
                        inv_sstep, smin_invstep, selection,
                        need_savg, weight_method, pair_weight,
-                       p_weight, p_sep,
+                       p_weight, p_sep, p_correction_bits,
                        autocorr, los_type, bin_type);
     }
     //no longer need to free block LUTs here, done in countpairs_mocks_impl

@@ -73,7 +73,7 @@ int gpu_batch_countpairs_s_mu_double(double *x0, double *y0, double *z0, double 
                const double sqr_mumax, const double inv_dmu, const double mumin_invstep,
                double inv_sstep, double smin_invstep, const selection_struct selection,
                int need_savg, const weight_method_t weight_method, const pair_weight_struct pair_weight,
-               double *p_weight, double *p_sep,
+               double *p_weight, double *p_sep, double *p_correction_bits,
                int autocorr, int los_type, int bin_type);
 
 int gpu_batch_countpairs_s_mu_float(float *x0, float *y0, float *z0, float *weights0, uint8_t nw0,
@@ -90,7 +90,7 @@ int gpu_batch_countpairs_s_mu_float(float *x0, float *y0, float *z0, float *weig
                const float sqr_mumax, const float inv_dmu, const float mumin_invstep,
                float inv_sstep, float smin_invstep, const selection_struct selection,
                int need_savg, const weight_method_t weight_method, const pair_weight_struct pair_weight,
-               float *p_weight, float *p_sep,
+               float *p_weight, float *p_sep, float *p_correction_bits,
                int autocorr, int los_type, int bin_type);
 
 // ======================================================= /

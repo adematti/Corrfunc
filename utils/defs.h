@@ -500,7 +500,7 @@ static inline int set_weight_struct(weight_struct* weight_st, const weight_metho
 
 
 static inline int set_pair_weight_struct(pair_weight_struct* pair_weight_st, void* sep, void* weight, const uint8_t num,
-                                         const int8_t noffset, const double default_value, void* correction_bits, int num_bits) {
+                                         const int8_t noffset, const double default_value, void* correction_bits, uint8_t num_bits) {
     pair_weight_st->weight = weight;
     pair_weight_st->sep = sep;
     pair_weight_st->num = num;

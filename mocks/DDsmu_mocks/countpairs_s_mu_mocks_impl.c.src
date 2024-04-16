@@ -437,7 +437,7 @@ int countpairs_mocks_s_mu_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUB
     //Make copies of pair_weight_struct arrays that are type void* here
     //These need to be copied to GPU Unified memory before they can be used
     //if doing inverse bitwise with pair weights
-    DOUBLE *gpu_p_weight, *gpu_p_sep;
+    DOUBLE *gpu_p_weight, *gpu_p_sep, *gpu_p_correction_bits;
 
     //define max threads and max blocks here
     const int64_t max_threads = 1600000000; //1.6 billion threads
@@ -469,7 +469,14 @@ int countpairs_mocks_s_mu_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUB
                 gpu_p_sep[i] = p_sep[i];
             }
         }
-
+        if (extra->pair_weight.num_bits > 0) {
+            DOUBLE *p_correction_bits = (DOUBLE *)(extra->pair_weight.correction_bits);
+            gpu_allocate_one_array_DOUBLE(&gpu_p_correction_bits, extra->pair_weight.num_bits * extra->pair_weight.num_bits);
+            //Now copy over to GPU
+            for (int i = 0; i < extra->pair_weight.num_bits * extra->pair_weight.num_bits; i++) {
+                gpu_p_correction_bits[i] = p_correction_bits[i];
+            }
+        }
         //copy data to GPU
         for (int i = 0; i < nsbin; i++) gpu_supp_sqr[i] = supp_sqr[i];
 
@@ -615,7 +622,7 @@ int countpairs_mocks_s_mu_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUB
                                                                          gpu_min_dx, gpu_min_dy,
                                                                          gpu_savg, gpu_npairs,
                                                                          gpu_weightavg, extra->weight_method, extra->pair_weight,
-                                                                         gpu_p_weight, gpu_p_sep,
+                                                                         gpu_p_weight, gpu_p_sep, gpu_p_correction_bits,
                                                                          options->selection, options->bin_type, options->los_type, autocorr,
                                                                          gpu_cellpair_lut, gpu_cellthread_lut, max_blocks, options->verbose);
 
@@ -738,6 +745,9 @@ int countpairs_mocks_s_mu_DOUBLE(const int64_t ND1, DOUBLE *X1, DOUBLE *Y1, DOUB
         if (extra->pair_weight.num > 0) {
             gpu_free_one_array_DOUBLE(gpu_p_weight);
             gpu_free_one_array_DOUBLE(gpu_p_sep);
+        }
+        if (extra->pair_weight.num_bits > 0) {
+            gpu_free_one_array_DOUBLE(gpu_p_correction_bits);
         }
     }
 #endif

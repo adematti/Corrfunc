@@ -54,3 +54,4 @@ cov-int
 *.old
 *.vscode
 **/NULL
+**/.ipynb_checkpoints

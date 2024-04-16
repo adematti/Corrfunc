@@ -143,7 +143,7 @@ static inline AVX512_FLOATS avx512_inverse_bitwise_DOUBLE(pair_struct_DOUBLE *pa
         DOUBLE weight = pair->default_value;
         if (nbits != 0) {
             weight = 1. / nbits;
-            if (pair->correction_bits != NULL) {
+            if (pair->num_bits > 0) {
                 int nbits1 = 0, nbits2 = 0;
                 for (int w=0;w<pair->num_integer_weights;w++) {
                     nbits1 += POPCOUNT(*((LONG *) &(pair->weights0[w].da512[jj])));
@@ -198,7 +198,7 @@ static inline AVX_FLOATS avx_inverse_bitwise_DOUBLE(pair_struct_DOUBLE *pair){
         DOUBLE weight = pair->default_value;
         if (nbits != 0) {
             weight = 1. / nbits;
-            if (pair->correction_bits != NULL) {
+            if (pair->num_bits > 0) {
                 int nbits1 = 0, nbits2 = 0;
                 for (int w=0;w<pair->num_integer_weights;w++) {
                     nbits1 += POPCOUNT(*((LONG *) &(pair->weights0[w].da[jj])));
@@ -255,7 +255,7 @@ static inline SSE_FLOATS sse_inverse_bitwise_DOUBLE(pair_struct_DOUBLE *pair){
         DOUBLE weight = pair->default_value;
         if (nbits != 0) {
             weight = 1. / nbits;
-            if (pair->correction_bits != NULL) {
+            if (pair->num_bits > 0) {
                 int nbits1 = 0, nbits2 = 0;
                 for (int w=0;w<pair->num_integer_weights;w++) {
                     nbits1 += POPCOUNT(*((LONG *) &(pair->weights0[w].ds[jj])));
@@ -306,7 +306,7 @@ static inline DOUBLE inverse_bitwise_DOUBLE(pair_struct_DOUBLE *pair){
     DOUBLE weight = pair->default_value;
     if (nbits != 0) {
         weight = 1. / nbits;
-        if (pair->correction_bits != NULL) {
+        if (pair->num_bits > 0) {
             int nbits1 = 0, nbits2 = 0;
             for (int w=0;w<pair->num_integer_weights;w++) {
                 nbits1 += POPCOUNT(*((LONG *) &(pair->weights0[w].d)));
