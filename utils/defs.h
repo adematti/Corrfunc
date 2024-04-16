@@ -411,6 +411,8 @@ typedef struct
     uint8_t num;
     int8_t noffset;
     double default_value;
+    void *correction_bits;
+    uint8_t num_bits;
 } pair_weight_struct;
 
 
@@ -498,12 +500,14 @@ static inline int set_weight_struct(weight_struct* weight_st, const weight_metho
 
 
 static inline int set_pair_weight_struct(pair_weight_struct* pair_weight_st, void* sep, void* weight, const uint8_t num,
-                                         const int8_t noffset, const double default_value) {
+                                         const int8_t noffset, const double default_value, void* correction_bits, int num_bits) {
     pair_weight_st->weight = weight;
     pair_weight_st->sep = sep;
     pair_weight_st->num = num;
     pair_weight_st->noffset = noffset;
     pair_weight_st->default_value = default_value;
+    pair_weight_st->correction_bits = correction_bits;
+    pair_weight_st->num_bits = num_bits;
     //printf("Found %d pair weights.\n",num);
     return EXIT_SUCCESS;
 }
@@ -655,7 +659,7 @@ static inline struct extra_options get_extra_options(const weight_method_t weigh
 
     set_weight_struct(&(extra.weights0), weight_method, NULL, -1);
     set_weight_struct(&(extra.weights1), weight_method, NULL, -1);
-    set_pair_weight_struct(&(extra.pair_weight), NULL, NULL, 0, 1, 0.);
+    set_pair_weight_struct(&(extra.pair_weight), NULL, NULL, 0, 1, 0., NULL, 0);
     //set_selection_struct(&(extra.selection), NONE_SELECTION, -1., -1.);
 
     return extra;

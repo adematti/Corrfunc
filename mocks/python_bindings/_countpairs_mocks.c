@@ -972,6 +972,18 @@ static int check_pair_weight(PyObject *module, pair_weight_struct *pair_weight_s
             else if (PyUnicode_CompareWithASCIIString(key, "default_value") == 0) {
                 pair_weight_st->default_value = PyFloat_AsDouble(value);
             }
+            else if (PyUnicode_CompareWithASCIIString(key, "correction") == 0) {
+                const int requirements = NPY_ARRAY_IN_ARRAY;
+                PyArrayObject *array = (PyArrayObject *) PyArray_FromArray((PyArrayObject *) value, NOTYPE_DESCR, requirements);
+                if (array == NULL) {
+                    snprintf(msg, 1024, "TypeError: Could not convert 'correction' of attrs_pair_weights to array. Are you passing a numpy array?\n");
+                    Py_XDECREF(array);
+                    goto except;
+                }
+                pair_weight_st->correction_bits = (void *) PyArray_DATA(array);
+                pair_weight_st->num_bits = (int8_t) sqrt((double) PyArray_SIZE((PyArrayObject *) array));
+                Py_XDECREF(array);
+            }
             else {
                 snprintf(msg, 1024, "ERROR: Found unknown key in attrs_pair_weights\n");
                 goto except;
@@ -1019,7 +1031,7 @@ static int check_pair_weight(PyObject *module, pair_weight_struct *pair_weight_s
         snprintf(msg, 1024, "ERROR: Expected pair weight array and separation array to be of same size.\nFound %d and %d instead.\n", num_weight, num);
         goto except;
     }
-    set_pair_weight_struct(pair_weight_st, (void *) PyArray_DATA(sep), (void *) PyArray_DATA(weight), num, pair_weight_st->noffset, pair_weight_st->default_value);
+    set_pair_weight_struct(pair_weight_st, (void *) PyArray_DATA(sep), (void *) PyArray_DATA(weight), num, pair_weight_st->noffset, pair_weight_st->default_value, pair_weight_st->correction_bits, pair_weight_st->num_bits);
     goto finally;
 except:
     countpairs_mocks_error_out(module, msg);

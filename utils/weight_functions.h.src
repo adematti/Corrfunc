@@ -60,6 +60,8 @@ typedef struct
     uint8_t num_integer_weights;
     int8_t noffset;
     DOUBLE default_value;
+    DOUBLE *correction_bits;
+    uint8_t num_bits;
 } pair_struct_DOUBLE;
 
 
@@ -73,6 +75,8 @@ static inline int set_pair_struct_DOUBLE(pair_struct_DOUBLE *pair, const weight_
     pair->pair_weight.num = pair_w->num;
     pair->noffset = pair_w->noffset;
     pair->default_value = (DOUBLE) pair_w->default_value;
+    pair->correction_bits = (DOUBLE *) pair_w->correction_bits;
+    pair->num_bits = pair_w->num_bits;
     pair->dx.d = 0.; pair->dy.d = 0.; pair->dz.d = 0.;
     pair->parx.d = 0.; pair->pary.d = 0.; pair->parz.d = 0.;
     pair->costheta.d = 1.;
@@ -136,7 +140,18 @@ static inline AVX512_FLOATS avx512_inverse_bitwise_DOUBLE(pair_struct_DOUBLE *pa
             //printf("w%d %ld %ld\n", w, *((LONG *) &(pair->weights0[w].d)), *((LONG *) &(pair->weights1[w].d)));
             nbits += POPCOUNT(*((LONG *) &(pair->weights0[w].da512[jj])) & *((LONG *) &(pair->weights1[w].da512[jj])));
         }
-        DOUBLE weight = (nbits == 0) ? pair->default_value : 1. / nbits;
+        DOUBLE weight = pair->default_value;
+        if (nbits != 0) {
+            weight = 1. / nbits;
+            if (pair->correction_bits != NULL) {
+                int nbits1 = 0, nbits2 = 0;
+                for (int w=0;w<pair->num_integer_weights;w++) {
+                    nbits1 += POPCOUNT(*((LONG *) &(pair->weights0[w].da512[jj])));
+                    nbits2 += POPCOUNT(*((LONG *) &(pair->weights1[w].da512[jj])));
+                }
+                weight /= pair->correction_bits[nbits1 * pair->num_bits + nbits2];
+            }
+        }
         int num = pair->pair_weight.num;
         if (num) {
             DOUBLE costheta = pair->costheta.da512[jj];
@@ -180,7 +195,18 @@ static inline AVX_FLOATS avx_inverse_bitwise_DOUBLE(pair_struct_DOUBLE *pair){
         for (int w=0;w<pair->num_integer_weights;w++) {
             nbits += POPCOUNT(*((LONG *) &(pair->weights0[w].da[jj])) & *((LONG *) &(pair->weights1[w].da[jj])));
         }
-        DOUBLE weight = (nbits == 0) ? pair->default_value : 1. / nbits;
+        DOUBLE weight = pair->default_value;
+        if (nbits != 0) {
+            weight = 1. / nbits;
+            if (pair->correction_bits != NULL) {
+                int nbits1 = 0, nbits2 = 0;
+                for (int w=0;w<pair->num_integer_weights;w++) {
+                    nbits1 += POPCOUNT(*((LONG *) &(pair->weights0[w].da[jj])));
+                    nbits2 += POPCOUNT(*((LONG *) &(pair->weights1[w].da[jj])));
+                }
+                weight /= pair->correction_bits[nbits1 * pair->num_bits + nbits2];
+            }
+        }
         int num = pair->pair_weight.num;
         if (num) {
             DOUBLE costheta = pair->costheta.da[jj];
@@ -226,7 +252,18 @@ static inline SSE_FLOATS sse_inverse_bitwise_DOUBLE(pair_struct_DOUBLE *pair){
             //printf("w%d %ld %ld\n", w, *((LONG *) &(pair->weights0[w].d)), *((LONG *) &(pair->weights1[w].d)));
             nbits += POPCOUNT(*((LONG *) &(pair->weights0[w].ds[jj])) & *((LONG *) &(pair->weights1[w].ds[jj])));
         }
-        DOUBLE weight = (nbits == 0) ? pair->default_value : 1. / nbits;
+        DOUBLE weight = pair->default_value;
+        if (nbits != 0) {
+            weight = 1. / nbits;
+            if (pair->correction_bits != NULL) {
+                int nbits1 = 0, nbits2 = 0;
+                for (int w=0;w<pair->num_integer_weights;w++) {
+                    nbits1 += POPCOUNT(*((LONG *) &(pair->weights0[w].ds[jj])));
+                    nbits2 += POPCOUNT(*((LONG *) &(pair->weights1[w].ds[jj])));
+                }
+                weight /= pair->correction_bits[nbits1 * pair->num_bits + nbits2];
+            }
+        }
         int num = pair->pair_weight.num;
         if (num) {
             DOUBLE costheta = pair->costheta.ds[jj];
@@ -266,7 +303,18 @@ static inline DOUBLE inverse_bitwise_DOUBLE(pair_struct_DOUBLE *pair){
     for (int w=0;w<pair->num_integer_weights;w++) {
         nbits += POPCOUNT(*((LONG *) &(pair->weights0[w].d)) & *((LONG *) &(pair->weights1[w].d)));
     }
-    DOUBLE weight = (nbits == 0) ? pair->default_value : 1. / nbits;
+    DOUBLE weight = pair->default_value;
+    if (nbits != 0) {
+        weight = 1. / nbits;
+        if (pair->correction_bits != NULL) {
+            int nbits1 = 0, nbits2 = 0;
+            for (int w=0;w<pair->num_integer_weights;w++) {
+                nbits1 += POPCOUNT(*((LONG *) &(pair->weights0[w].d)));
+                nbits2 += POPCOUNT(*((LONG *) &(pair->weights1[w].d)));
+            }
+            weight /= pair->correction_bits[nbits1 * pair->num_bits + nbits2];
+        }
+    }
     int num = pair->pair_weight.num;
     if (num) {
         DOUBLE costheta = pair->costheta.d;
