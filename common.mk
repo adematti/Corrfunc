@@ -506,7 +506,7 @@ ifeq ($(DO_CHECKS), 1)
       MIN_PYTHON_MINOR := 7
 
       MIN_NUMPY_MAJOR  := 1
-      MIN_NUMPY_MINOR  := 16
+      MIN_NUMPY_MINOR  := 20
 
       PYTHON_AVAIL := $(shell [ $(PYTHON_VERSION_MAJOR) -gt $(MIN_PYTHON_MAJOR) -o \( $(PYTHON_VERSION_MAJOR) -eq $(MIN_PYTHON_MAJOR) -a $(PYTHON_VERSION_MINOR) -ge $(MIN_PYTHON_MINOR) \) ] && echo true)
       NUMPY_AVAIL  := $(shell [ $(NUMPY_VERSION_MAJOR) -gt $(MIN_NUMPY_MAJOR) -o \( $(NUMPY_VERSION_MAJOR) -eq $(MIN_NUMPY_MAJOR) -a $(NUMPY_VERSION_MINOR) -ge $(MIN_NUMPY_MINOR) \) ] && echo true)
@@ -534,14 +534,14 @@ ifeq ($(DO_CHECKS), 1)
         # NUMPY is available -> next step should not fail
         # That's why we are not checking if the NUMPY_INCL_FLAG is defined.
         ifeq ($(NUMPY_CHECKED), 0)
-          export NUMPY_INCL_FLAG := $(shell $(PYTHON) -c "from __future__ import print_function; import numpy; print('-isystem ' + numpy.__path__[0] + '/core/include/numpy/')")
+          export NUMPY_INCL_FLAG := $(shell $(PYTHON) -c "from __future__ import print_function; import numpy; print('-isystem ' + numpy.get_include())")
           # Take the second word -> the path (the first word is "isystem")
           NUMPY_INCL_PATH := $(word 2, ${NUMPY_INCL_FLAG})
           # Now check that the 'arrayobject.h' file is present in the
           # supposed numpy directory. Otherwise, compilation will fail.
           # The absence of the file likely indicates a missing numpy-devel
           # package (see issue #134 on github)
-          NUMPY_NEEDED_HEADER_FILE := ${NUMPY_INCL_PATH}arrayobject.h
+          NUMPY_NEEDED_HEADER_FILE := ${NUMPY_INCL_PATH}/numpy/arrayobject.h
           ifeq (,$(wildcard ${NUMPY_NEEDED_HEADER_FILE}))
             $(error Required $(ccred)numpy headers$(ccreset) are missing...stopping the compilation. You might be able to fix this by installing $(ccblue)numpy-devel$(ccreset))
           endif
